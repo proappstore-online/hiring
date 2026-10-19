@@ -1,6 +1,6 @@
 import { initPro, ProShell, PageHeader, useAuth, type NavItem } from '@proappstore/sdk'
 
-const app = initPro({ appId: 'APPNAME' })
+const app = initPro({ appId: 'hiring' })
 
 /**
  * The app's screens. ProShell renders them as its main navigation — a
@@ -9,13 +9,13 @@ const app = initPro({ appId: 'APPNAME' })
  * Add a screen here and in <Screens />; never put navigation on a page.
  */
 const NAV: NavItem[] = [
-  { label: 'Home', href: '/', title: 'APPNAME' },
-  { label: 'About', href: '/about', title: 'About — APPNAME' },
+  { label: 'Home', href: '/', title: 'hiring' },
+  { label: 'About', href: '/about', title: 'About — hiring' },
 ]
 
 export default function App() {
   return (
-    <ProShell app={app} appName="APPNAME" nav={NAV} branding="app">
+    <ProShell app={app} appName="hiring" nav={NAV} branding="app">
       <Screens />
     </ProShell>
   )
@@ -34,7 +34,7 @@ function Home() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
-      <PageHeader title="APPNAME" description={`Signed in as ${user?.name ?? 'you'}.`} />
+      <PageHeader title="hiring" description={`Signed in as ${user?.name ?? 'you'}.`} />
       <p className="text-sm text-[var(--muted)]">
         Edit <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">web/src/App.tsx</code> to start building.
         Each screen starts with a <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">PageHeader</code> and is listed in <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">NAV</code>.
@@ -46,7 +46,7 @@ function Home() {
 function About() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
-      <PageHeader title="About" description="What APPNAME is for." />
+      <PageHeader title="About" description="What hiring is for." />
       <p className="text-sm text-[var(--muted)]">
         Replace this screen with your own. The error boundary, loading fallback, toasts
         (<code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">useToast</code>), offline banner and skip link come with ProShell.

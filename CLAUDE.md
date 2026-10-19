@@ -1,8 +1,8 @@
-# APPNAME
+# hiring
 
 An independently branded app.
 
-- Subdomain: `APPNAME.proappstore.online`
+- Subdomain: `hiring.proappstore.online`
 - Dev: `pnpm install && pnpm dev`
 - Build: `pnpm build` (runs platform compliance check via prebuild)
 - Deploy: `git push origin main` (auto-deploys via GitHub Actions → R2)
@@ -19,7 +19,7 @@ https://proappstore.online/skills.md
 
 ## Marketing site
 
-`marketing/` is the static Astro + Tailwind site for `about-APPNAME.proappstore.online` (home,
+`marketing/` is the static Astro + Tailwind site for `about-hiring.proappstore.online` (home,
 Privacy Policy, Terms & Conditions). Edit copy, owner, contact and colours in
 `marketing/src/site.ts` (colours feed the Tailwind theme) and the pages freely; keep claims true and versions
 pinned. `pnpm dev:marketing` / `pnpm build:marketing` (HTML in `marketing/dist/`).

@@ -15,11 +15,11 @@ test('the marketing site pins Astro and ships home, Privacy and Terms pages', ()
   assert.match(read('marketing/astro.config.ts'), /output: 'static'/)
 })
 
-test('APPNAME appears only in files pas create substitutes', () => {
-  // pas create replaces APPNAME in .ts/.json/... but not .astro, so app config stays in src/site.ts.
+test('hiring appears only in files pas create substitutes', () => {
+  // pas create replaces hiring in .ts/.json/... but not .astro, so app config stays in src/site.ts.
   const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)])
   for (const file of walk(resolve(root, 'marketing/src')).filter((f) => f.endsWith('.astro'))) {
-    assert.doesNotMatch(readFileSync(file, 'utf8'), /APPNAME/, file)
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /hiring/, file)
   }
 })

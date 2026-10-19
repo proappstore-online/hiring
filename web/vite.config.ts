@@ -35,9 +35,9 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'APPNAME',
-        short_name: 'APPNAME',
-        description: 'Explore APPNAME.',
+        name: 'hiring',
+        short_name: 'hiring',
+        description: 'Explore hiring.',
         start_url: '/',
         scope: '/',
         display: 'standalone',

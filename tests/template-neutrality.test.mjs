@@ -10,7 +10,7 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8')
 test('the starter uses independently branded shell controls', () => {
   const app = read('web/src/App.tsx')
 
-  assert.match(app, /<ProShell app=\{app\} appName="APPNAME" nav=\{NAV\} branding="app">/)
+  assert.match(app, /<ProShell app=\{app\} appName="hiring" nav=\{NAV\} branding="app">/)
   assert.doesNotMatch(app, /Built for ProAppStore|href="https:\/\/proappstore\.online"/)
 })
 
@@ -18,11 +18,11 @@ test('public starter metadata and manifest are neutral', () => {
   const html = read('web/index.html')
   const vite = read('web/vite.config.ts')
 
-  assert.match(html, /<title>APPNAME<\/title>/)
-  assert.match(html, /content="Explore APPNAME\."/)
+  assert.match(html, /<title>hiring<\/title>/)
+  assert.match(html, /content="Explore hiring\."/)
   assert.doesNotMatch(html, /ProAppStore/)
-  assert.match(vite, /name: 'APPNAME'/)
-  assert.match(vite, /description: 'Explore APPNAME\.'/)
+  assert.match(vite, /name: 'hiring'/)
+  assert.match(vite, /description: 'Explore hiring\.'/)
   assert.doesNotMatch(vite, /ProAppStore/)
 })
 

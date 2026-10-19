@@ -4,6 +4,6 @@ import { defineConfig } from 'astro/config'
 // Static HTML only: no adapter, no server rendering. `astro build` writes dist/.
 export default defineConfig({
   output: 'static',
-  site: 'https://about-APPNAME.proappstore.online',
+  site: 'https://about-hiring.proappstore.online',
   vite: { plugins: [tailwindcss()] },
 })
