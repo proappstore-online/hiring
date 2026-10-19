@@ -3,6 +3,10 @@
     {
       "name": "0001_init",
       "sql": "CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, user_id TEXT, title TEXT NOT NULL, status TEXT, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_items_created_at ON items (created_at)"
+    },
+    {
+      "name": "0002_hiring_runtime_gate",
+      "sql": "CREATE TABLE IF NOT EXISTS hiring_runtime_gate (id INTEGER PRIMARY KEY CHECK (id = 1), intake_status TEXT NOT NULL CHECK (intake_status IN ('closed', 'open')), reason_code TEXT NOT NULL, updated_at INTEGER NOT NULL); INSERT INTO hiring_runtime_gate (id, intake_status, reason_code, updated_at) VALUES (1, 'closed', 'public_intake_route_unverified', 0)"
     }
   ]
 }

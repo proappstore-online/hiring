@@ -1,6 +1,6 @@
 # Hiring MCP contract
 
-The current `mcp.json` contains template `items` actions, not Hiring tools. Registered actions deploy before frontend upload and must match `migrations.json`. All Hiring tools run through a trusted authorization path. Natural-language requests and candidate content are untrusted input; tool descriptions alone cannot enforce access.
+The first implementation retires the template `items` actions and registers only `get_hiring_runtime_gate`, a bounded public read of non-sensitive intake availability. It grants no access to applicant data. Registered actions deploy before frontend upload and must match `migrations.json`. All future tenant-scoped Hiring tools run through a trusted authorization path. Natural-language requests and candidate content are untrusted input; tool descriptions alone cannot enforce access.
 
 ## Common envelope
 

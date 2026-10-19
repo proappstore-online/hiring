@@ -2,6 +2,12 @@
 
 The current repo has a React client (`web/`), Astro marketing site (`marketing/`), D1 schema (`migrations.json`), registered SQL tools (`mcp.json`) and main-branch deploy. Deploy applies migrations, deploys an optional worker, registers tools, then uploads the frontend. D1 requires an authenticated platform user. Public candidate intake therefore needs a supported, abuse-protected server route; it cannot be an anonymous browser `app.db` call. Verify app-worker availability before building intake. If unavailable, that milestone is blocked until a supported route exists.
 
+## Capability check in issue #7
+
+The platform [app-worker reference](https://github.com/proappstore-online/platform/blob/main/docs/app-workers.md) currently marks app workers as an opt-in prototype; deployment is refused with 403 when an app is not enabled. Its `/.pas/worker/*` browser route is for signed-in users only, so it does not provide anonymous candidate intake. The worker has no direct D1 or R2 binding; data calls go through registered actions. The SDK documents D1 `batch` as transactional, while the action executor supports a bounded atomic batch with per-statement caller scoping. Direct SQL actions therefore remain unsuitable for high-impact multi-step Hiring grants without a proven trusted authorization path. These are platform contract findings, not evidence that the `hiring` app has been enabled on the live platform.
+
+Migration `0002_hiring_runtime_gate` starts candidate intake closed. The only registered Hiring action reads that non-sensitive gate; template `items` tools are retired. The app displays a closed state even if the gate cannot be read, and it has no application form. Opening the gate or deploying a public intake route remains blocked on platform capability verification, privacy approval and the later intake implementation issues.
+
 ## ADR-001 — Tenant authorization
 
 D1 is canonical. Every business record is organization-scoped and brand data is additionally brand-scoped. Platform auth identifies the user, and `app.roles` gates app-level administration; Hiring-owned membership/grant records express organization, brand, requisition and assignment scope. A trusted server path enforces both for every sensitive read and mutation. Browser filters are display aids, never policy. Direct `mcp.json` SQL is unsuitable for multi-step grants unless its runtime demonstrably enforces them.

@@ -1,16 +1,17 @@
-import { initPro, ProShell, PageHeader, useAuth, type NavItem } from '@proappstore/sdk'
+import { useEffect, useState } from 'react'
+import { initPro, ProShell, PageHeader, type NavItem } from '@proappstore/sdk'
 
 const app = initPro({ appId: 'hiring' })
 
-/**
- * The app's screens. ProShell renders them as its main navigation — a
- * <nav aria-label="Main"> in the topbar that marks the current screen and
- * collapses to a menu on small screens — and uses each `title` as the tab title.
- * Add a screen here and in <Screens />; never put navigation on a page.
- */
+type RuntimeGate = {
+  intake_status: 'closed' | 'open'
+  reason_code: string
+  updated_at: number
+}
+
 const NAV: NavItem[] = [
-  { label: 'Home', href: '/', title: 'hiring' },
-  { label: 'About', href: '/about', title: 'About — hiring' },
+  { label: 'Home', href: '/', title: 'Hiring' },
+  { label: 'About', href: '/about', title: 'About Hiring' },
 ]
 
 export default function App() {
@@ -21,24 +22,35 @@ export default function App() {
   )
 }
 
-/** Nav items are plain links: a click loads the path and the platform serves the app for it. */
 function Screens() {
-  switch (window.location.pathname) {
-    case '/about': return <About />
-    default: return <Home />
-  }
+  return window.location.pathname === '/about' ? <About /> : <Home />
 }
 
 function Home() {
-  const { user } = useAuth()
+  const [gate, setGate] = useState<RuntimeGate | null>(null)
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    let active = true
+    app.actions.callPublic<{ rows: RuntimeGate[] }>('get_hiring_runtime_gate')
+      .then(({ rows }) => { if (active) setGate(rows[0] ?? null) })
+      .catch(() => { if (active) setGate(null) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  const available = gate?.intake_status === 'open'
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
-      <PageHeader title="hiring" description={`Signed in as ${user?.name ?? 'you'}.`} />
-      <p className="text-sm text-[var(--muted)]">
-        Edit <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">web/src/App.tsx</code> to start building.
-        Each screen starts with a <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">PageHeader</code> and is listed in <code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">NAV</code>.
-      </p>
+      <PageHeader title="Hiring" description="A private workspace for recruiting across distinct brands." />
+      <section className="mt-8 rounded-xl border border-[var(--line-strong)] bg-[var(--panel)] p-6" aria-live="polite">
+        <h2 className="text-lg font-semibold">Candidate applications</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {loading ? 'Checking availability…' : available
+            ? 'Application intake is being prepared. No application form is available yet.'
+            : 'Application intake is currently closed. Please check back later.'}
+        </p>
+      </section>
     </div>
   )
 }
@@ -46,10 +58,9 @@ function Home() {
 function About() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">
-      <PageHeader title="About" description="What hiring is for." />
+      <PageHeader title="About Hiring" description="A multi-brand applicant tracking system in development." />
       <p className="text-sm text-[var(--muted)]">
-        Replace this screen with your own. The error boundary, loading fallback, toasts
-        (<code className="rounded bg-[var(--line)] px-1.5 py-0.5 text-xs">useToast</code>), offline banner and skip link come with ProShell.
+        The recruiting workspace and candidate application process are not available yet.
       </p>
     </div>
   )
