@@ -13,3 +13,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
 
 This is a plan, not a claim that features exist or legal copy is approved. The runtime configuration remains a scaffold. Legal and platform capability decisions marked pending must be resolved in their issues before dependent launch work.
+
+## Delivery environment prerequisite
+
+The repository workflows use GitHub-hosted runners; the deploy workflow uses GitHub OIDC rather than stored repository credentials. Workflow execution therefore also depends on the organization/account having an active GitHub Actions billing arrangement and available spending limit. When GitHub prevents a job from starting at the account layer, no workflow-step or secret change can remedy it. The owner must resolve the billing block and re-run CI, Platform Compliance, and Deploy to R2. Issue #43 records the observed block and remediation.
