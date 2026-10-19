@@ -1,0 +1,8 @@
+{
+  "migrations": [
+    {
+      "name": "0001_init",
+      "sql": "CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, user_id TEXT, title TEXT NOT NULL, status TEXT, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_items_created_at ON items (created_at)"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "tools": [
+    {
+      "name": "list_items",
+      "description": "List items from the app database",
+      "operation": "query",
+      "sql": "SELECT * FROM items WHERE user_id = :__user_id AND (:status IS NULL OR status = :status) ORDER BY created_at DESC LIMIT :limit",
+      "params": {
+        "status": {
+          "type": "string",
+          "optional": true,
+          "description": "Filter by status"
+        },
+        "limit": {
+          "type": "integer",
+          "optional": true,
+          "default": 20,
+          "max": 100,
+          "description": "Max results"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "get_item",
+      "description": "Get a single item by ID",
+      "operation": "query",
+      "sql": "SELECT * FROM items WHERE id = :id AND user_id = :__user_id",
+      "params": {
+        "id": {
+          "type": "string",
+          "description": "Item ID"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "create_item",
+      "description": "Create a new item",
+      "operation": "execute",
+      "sql": "INSERT INTO items (id, user_id, title, created_at) VALUES (:__uuid, :__user_id, :title, :__now)",
+      "params": {
+        "title": {
+          "type": "string",
+          "description": "Item title"
+        }
+      },
+      "requires_auth": true
+    }
+  ]
+}
