@@ -212,7 +212,7 @@
       "description": "Change application stage with optimistic version, reason, history and audit",
       "operation": "batch",
       "statements": [
-        "UPDATE hiring_applications SET stage=:to_stage,version=version+1,updated_at=:__now WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND stage=:from_stage AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND :to_stage IN ('in_review','interviewing','decision_pending','offered','hired','rejected','withdrawn') AND :to_stage<>:from_stage AND length(trim(:reason))>0 AND :from_stage IN ('submitted','in_review','interviewing','decision_pending','offered')",
+        "UPDATE hiring_applications SET stage=:to_stage,version=version+1,updated_at=:__now WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND stage=:from_stage AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND :to_stage IN ('in_review','interviewing','decision_pending','offered','hired','rejected','withdrawn') AND :to_stage<>:from_stage AND length(trim(:reason))>0 AND :from_stage IN ('submitted','in_review','interviewing','decision_pending','offered') AND NOT EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id)",
         "INSERT OR IGNORE INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:from_stage,:to_stage,:expected_version+1,:reason,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND a.version=:expected_version+1 AND a.stage=:to_stage AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id)",
         "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.stage_changed',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id AND application_id=:application_id)"
       ],
@@ -239,6 +239,61 @@
           "type": "string"
         },
         "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "reassign_application",
+      "description": "Change an application assignee to another member of the same brand with version and append-only history",
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_applications SET assignee_user_id=:to_user_id,version=version+1,updated_at=:__now WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND assignee_user_id=:from_user_id AND :to_user_id<>:from_user_id AND length(trim(:reason))>0 AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND m.user_id=:__user_id) AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND m.user_id=:to_user_id) AND NOT EXISTS (SELECT 1 FROM hiring_assignment_events WHERE id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id)",
+        "INSERT OR IGNORE INTO hiring_assignment_events(id,organization_id,brand_id,application_id,from_user_id,to_user_id,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:from_user_id,:to_user_id,:expected_version+1,:reason,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND a.version=:expected_version+1 AND a.assignee_user_id=:to_user_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND m.user_id=:__user_id)",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.reassigned',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_assignment_events e WHERE e.id=:operation_id AND e.application_id=:application_id AND e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.actor_user_id=:__user_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "from_user_id": {
+          "type": "string"
+        },
+        "to_user_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "number"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_assignment_events",
+      "description": "List append-only assignment history for a granted application",
+      "operation": "query",
+      "sql": "SELECT from_user_id,to_user_id,version,reason,actor_user_id,created_at FROM hiring_assignment_events WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id=a.organization_id AND m.brand_id=a.brand_id AND m.user_id=:__user_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id) ORDER BY version DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
           "type": "string"
         }
       },

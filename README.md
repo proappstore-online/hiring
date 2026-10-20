@@ -1,6 +1,6 @@
 # Hiring
 
-Hiring is a planned multi-brand applicant tracking system. This repository currently contains a ProAppStore starter, not a working ATS. The implementation baseline is [docs/README.md](docs/README.md).
+Hiring is an early multi-brand applicant tracking system. The first private recruiter workflow is live; public intake and communication sending remain closed. The implementation baseline is [docs/README.md](docs/README.md).
 
 - `web/`: Vite/React shell with PAS-native Google and GitHub staff sign-in; candidate intake remains closed.
 - `marketing/`: Astro starter copy and draft legal pages, not approved Hiring claims.
