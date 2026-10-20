@@ -48,6 +48,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Ensure jq for keyless deploy steps
+        run: |
+          if command -v jq >/dev/null 2>&1; then exit 0; fi
+          if command -v brew >/dev/null 2>&1; then
+            brew install jq
+          elif command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y jq
+          else
+            echo "::error::jq is required for OIDC deploy responses"; exit 1
+          fi
+
       - name: Install
         run: if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
 
