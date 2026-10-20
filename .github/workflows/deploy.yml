@@ -48,17 +48,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Ensure jq for keyless deploy steps
-        run: |
-          if command -v jq >/dev/null 2>&1; then exit 0; fi
-          if command -v brew >/dev/null 2>&1; then
-            brew install jq
-          elif command -v apt-get >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
-          else
-            echo "::error::jq is required for OIDC deploy responses"; exit 1
-          fi
-
       - name: Install
         run: if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
 
@@ -69,7 +58,7 @@ jobs:
           # Fail closed (#204): a failing build script — its tsc, or the pas check
           # prebuild — fails the deploy, and nothing is uploaded. Only a bundle with
           # no build script at all falls back to a bare vite build.
-          if jq -e '.scripts.build' package.json >/dev/null 2>&1; then pnpm build
+          if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then pnpm build
           else (cd web 2>/dev/null || true; npx vite build); fi
 
       - name: Locate build output
@@ -108,16 +97,16 @@ jobs:
           # (DROP/RENAME/DELETE/UPDATE) statement. Idempotent via _migrations.
           # HARD GATE: a migration failure fails the deploy — nothing ships.
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then echo "::error::could not obtain OIDC token"; exit 1; fi
           RESP=$(curl -sS -X POST \
             "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/migrate/oidc" \
             -H "Authorization: Bearer $OIDC" -H "Content-Type: application/json" \
             --data-binary @migrations.json)
-          if echo "$RESP" | jq -e '.ok == true' >/dev/null; then
-            echo "Applied migration(s): $(echo "$RESP" | jq -c '.applied // []'); already: $(echo "$RESP" | jq -c '.already // []')"
+          if echo "$RESP" | node scripts/deploy-json.mjs true ok >/dev/null; then
+            echo "Applied migration(s): $(echo "$RESP" | node scripts/deploy-json.mjs json applied '[]'); already: $(echo "$RESP" | node scripts/deploy-json.mjs json already '[]')"
           else
-            echo "::error::migration failed: $(echo "$RESP" | jq -c '.error // .')"; exit 1
+            echo "::error::migration failed: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"; exit 1
           fi
 
       - name: Deploy app worker (worker/ -> platform, keyless)
@@ -132,7 +121,7 @@ jobs:
           pnpm --dir worker build
           [ -f worker/dist/app.js ] || { echo "::error::worker build must produce worker/dist/app.js"; exit 1; }
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then echo "::error::could not obtain OIDC token"; exit 1; fi
           PARTS=()
           while IFS= read -r f; do PARTS+=(-F "${f#./}=@worker/dist/${f#./};type=application/javascript"); done \
@@ -140,10 +129,10 @@ jobs:
           RESP=$(curl -sS -X PUT \
             "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/worker/oidc" \
             -H "Authorization: Bearer $OIDC" "${PARTS[@]}")
-          if echo "$RESP" | jq -e '.ok == true' >/dev/null; then
-            echo "Deployed app worker $(echo "$RESP" | jq -r '.bundle_sha256') ($(echo "$RESP" | jq -r '.backend'))"
+          if echo "$RESP" | node scripts/deploy-json.mjs true ok >/dev/null; then
+            echo "Deployed app worker $(echo "$RESP" | node scripts/deploy-json.mjs raw bundle_sha256) ($(echo "$RESP" | node scripts/deploy-json.mjs raw backend))"
           else
-            echo "::error::app worker deploy refused: $(echo "$RESP" | jq -c '.error // .')"; exit 1
+            echo "::error::app worker deploy refused: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"; exit 1
           fi
 
       - name: Register app tools (mcp.json -> platform, keyless)
@@ -156,19 +145,19 @@ jobs:
           # manifest must block the deploy — registering after the upload left
           # the new frontend live with the previous revision's actions.
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then echo "::error::could not obtain OIDC token"; exit 1; fi
           RESP=$(curl -sS -X PUT \
             "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/tools/oidc" \
             -H "Authorization: Bearer $OIDC" -H "Content-Type: application/json" \
             --data-binary @mcp.json)
-          if echo "$RESP" | jq -e '.ok == true' >/dev/null; then
-            echo "Registered $(echo "$RESP" | jq -r '.registered') app tool(s)"
-            echo "$RESP" | jq -r '.warnings[]? | "::warning::mcp.json: " + .'
+          if echo "$RESP" | node scripts/deploy-json.mjs true ok >/dev/null; then
+            echo "Registered $(echo "$RESP" | node scripts/deploy-json.mjs raw registered) app tool(s)"
+            echo "$RESP" | node scripts/deploy-json.mjs lines warnings '::warning::mcp.json: '
           else
-            echo "::error::tools registration failed: $(echo "$RESP" | jq -c '.error // .')"
+            echo "::error::tools registration failed: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"
             # Schema coherence (#33): name each action + the missing column/table.
-            echo "$RESP" | jq -r '.details[]? | "::error::" + .'
+            echo "$RESP" | node scripts/deploy-json.mjs lines details '::error::'
             exit 1
           fi
 
@@ -176,22 +165,22 @@ jobs:
         run: |
           # 1. Ask GitHub for an OIDC token scoped to the platform audience.
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then echo "::error::could not obtain OIDC token"; exit 1; fi
           # 2. Exchange it for short-lived, prefix-scoped R2 credentials.
           RESP=$(curl -sS -X POST \
             "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/deploy-credentials" \
             -H "Authorization: Bearer $OIDC")
-          AKID=$(echo "$RESP" | jq -r '.accessKeyId // empty')
-          if [ -z "$AKID" ]; then echo "::error::deploy-credentials failed: $(echo "$RESP" | jq -c '.error // .')"; exit 1; fi
+          AKID=$(echo "$RESP" | node scripts/deploy-json.mjs raw accessKeyId)
+          if [ -z "$AKID" ]; then echo "::error::deploy-credentials failed: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"; exit 1; fi
           # 3. Export masked, ephemeral creds for the upload step.
-          echo "::add-mask::$(echo "$RESP" | jq -r '.secretAccessKey')"
-          echo "::add-mask::$(echo "$RESP" | jq -r '.sessionToken')"
+          echo "::add-mask::$(echo "$RESP" | node scripts/deploy-json.mjs raw secretAccessKey)"
+          echo "::add-mask::$(echo "$RESP" | node scripts/deploy-json.mjs raw sessionToken)"
           {
             echo "AWS_ACCESS_KEY_ID=$AKID"
-            echo "AWS_SECRET_ACCESS_KEY=$(echo "$RESP" | jq -r '.secretAccessKey')"
-            echo "AWS_SESSION_TOKEN=$(echo "$RESP" | jq -r '.sessionToken')"
-            echo "R2_ENDPOINT=$(echo "$RESP" | jq -r '.endpoint')"
+            echo "AWS_SECRET_ACCESS_KEY=$(echo "$RESP" | node scripts/deploy-json.mjs raw secretAccessKey)"
+            echo "AWS_SESSION_TOKEN=$(echo "$RESP" | node scripts/deploy-json.mjs raw sessionToken)"
+            echo "R2_ENDPOINT=$(echo "$RESP" | node scripts/deploy-json.mjs raw endpoint)"
           } >> "$GITHUB_ENV"
 
       - name: Upload to R2
@@ -212,7 +201,7 @@ jobs:
           # Advisory: a failure here never blocks the deploy (results land in the
           # platform QA run history).
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           [ -n "$OIDC" ] && [ "$OIDC" != "null" ] || { echo "no OIDC token"; exit 0; }
           curl -sS -X POST "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/qa/runs" \
             -H "Authorization: Bearer $OIDC" -H "Content-Type: application/json" \
@@ -264,7 +253,7 @@ jobs:
           # shared INTERNAL_TOKEN. kb-host derives the app prefix from the
           # `repository` claim, so this run can only write its own app's prefix.
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=proappstore-kb-host" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=proappstore-kb-host" | node ../scripts/deploy-json.mjs raw value)
           # Non-fatal: test results are diagnostics, not a deploy gate.
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then
             echo "skipped results upload (could not obtain OIDC token)"
