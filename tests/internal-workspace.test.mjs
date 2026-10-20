@@ -166,3 +166,7 @@ test('blank workspace, requisition and member values are rejected server-side', 
   assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_requisitions').get().n, 1)
   assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_memberships').get().n, 1)
 })
+
+test('versioned actions declare expected_version as an integer', () => {
+  for (const name of ['change_application_stage', 'reassign_application']) assert.equal(action(name).params.expected_version.type, 'integer', name)
+})

@@ -276,7 +276,7 @@
           "type": "string"
         },
         "expected_version": {
-          "type": "number"
+          "type": "integer"
         }
       },
       "requires_auth": true

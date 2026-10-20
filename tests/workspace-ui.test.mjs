@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const source = () => ['App.tsx', ...['api.ts', 'ui.tsx', 'forms.tsx', 'ApplicationDetail.tsx'].filter(f => { try { readFileSync(resolve(root, 'web/src', f)); return true } catch { return false } })]
-  .map(f => readFileSync(resolve(root, 'web/src', f), 'utf8')).join('\n')
+const dir = resolve(root, 'web/src')
+const source = () => readdirSync(dir).filter(f => /\.tsx?$/.test(f)).map(f => readFileSync(resolve(dir, f), 'utf8')).join('\n')
 
 test('workspace and application data are keyed so stale loads never render under another record', () => {
   const app = source()
