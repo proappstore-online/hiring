@@ -36,10 +36,6 @@ jobs:
     needs: router
     if: github.event.repository.name != 'template-app'
     runs-on: ${{ fromJSON(needs.router.outputs.runner) }}
-    # Self-hosted runners can have a shared npm cache owned by another job.
-    # Keep npx prebuild and code-health installs in this run's writable temp area.
-    env:
-      NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache-${{ github.run_id }}-${{ github.job }}
     outputs:
       has_e2e: ${{ steps.e2e-check.outputs.has_e2e }}
     steps:
@@ -58,6 +54,8 @@ jobs:
       - name: Build
         env:
           VITE_COMMIT_SHA: ${{ github.sha }}
+          # Self-hosted runners may have a shared cache owned by another job.
+          NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache-${{ github.run_id }}
         run: |
           # Fail closed (#204): a failing build script — its tsc, or the pas check
           # prebuild — fails the deploy, and nothing is uploaded. Only a bundle with
@@ -82,6 +80,8 @@ jobs:
 
       - name: Code-health scan (VCQA, report-only)
         continue-on-error: true
+        env:
+          NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache-${{ github.run_id }}
         run: |
           npx -y @vibecodeqa/cli@0.44.0 --skip-tests . || true
           if [ -f .vibe-check/report.json ]; then
