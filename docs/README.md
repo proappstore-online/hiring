@@ -6,6 +6,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | --- | --- |
 | [Product boundary](product-boundary.md) | Actors, release scope, brand separation, exclusions. |
 | [Domain model](domain-model.md) | Canonical records, invariants, state transitions. |
+| [Internal workspace](internal-workspace.md) | Staff setup, scope, and current limits. |
 | [Architecture and ADRs](architecture.md) | Platform mapping, authorization and deployment decisions. |
 | [Privacy and governance](privacy-governance.md) | Consent, retention, rights and unpaid-arrangement controls. |
 | [MAIL contract](mail-contract.md) | Provider-neutral messaging boundary and failure handling. |

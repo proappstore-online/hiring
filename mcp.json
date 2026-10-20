@@ -7,6 +7,380 @@
       "sql": "SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1",
       "params": {},
       "requires_auth": false
+    },
+    {
+      "name": "list_my_workspaces",
+      "description": "list my workspaces",
+      "operation": "query",
+      "sql": "SELECT o.id AS organization_id, o.name AS organization_name, b.id AS brand_id, b.name AS brand_name, m.role FROM hiring_memberships m JOIN hiring_organizations o ON o.id=m.organization_id JOIN hiring_brands b ON b.id=m.brand_id WHERE m.user_id=:__user_id ORDER BY o.created_at DESC LIMIT 100",
+      "params": {},
+      "requires_auth": true
+    },
+    {
+      "name": "create_workspace",
+      "description": "Create an internal organization, brand, draft requisition and owner membership",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_organizations(id,name,created_by,created_at) VALUES(:organization_id,:organization_name,:__user_id,:__now)",
+        "INSERT OR IGNORE INTO hiring_brands(id,organization_id,name,created_at) SELECT :brand_id,:organization_id,:brand_name,:__now FROM hiring_organizations WHERE id=:organization_id AND created_by=:__user_id",
+        "INSERT OR IGNORE INTO hiring_requisitions(id,organization_id,brand_id,title,created_at) SELECT :requisition_id,:organization_id,:brand_id,:requisition_title,:__now FROM hiring_brands b JOIN hiring_organizations o ON o.id=b.organization_id WHERE b.id=:brand_id AND b.organization_id=:organization_id AND o.created_by=:__user_id",
+        "INSERT OR IGNORE INTO hiring_memberships(id,organization_id,brand_id,user_id,role,created_at) SELECT :operation_id,:organization_id,:brand_id,:__user_id,'owner',:__now FROM hiring_brands b JOIN hiring_organizations o ON o.id=b.organization_id WHERE b.id=:brand_id AND b.organization_id=:organization_id AND o.created_by=:__user_id",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'workspace.created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role = 'owner')"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "organization_name": {
+          "type": "string"
+        },
+        "brand_name": {
+          "type": "string"
+        },
+        "requisition_title": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "add_workspace_member",
+      "description": "Owner grants a PAS user ID recruiter access to this brand",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_memberships(id,organization_id,brand_id,user_id,role,created_at) SELECT :operation_id,:organization_id,:brand_id,:member_user_id,:role,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role = 'owner') AND :role='recruiter' AND :member_user_id<>:__user_id",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'membership.added',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role = 'owner') AND EXISTS (SELECT 1 FROM hiring_memberships WHERE id=:operation_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "member_user_id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_workspace_members",
+      "description": "list workspace members",
+      "operation": "query",
+      "sql": "SELECT user_id, role, created_at FROM hiring_memberships WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) ORDER BY created_at LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_requisitions",
+      "description": "list requisitions",
+      "operation": "query",
+      "sql": "SELECT id,title,status FROM hiring_requisitions WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) ORDER BY created_at DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "create_requisition",
+      "description": "Create a draft requisition for internal sourcing",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_requisitions(id,organization_id,brand_id,title,created_at) SELECT :requisition_id,:organization_id,:brand_id,:title,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id)",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_requisitions WHERE id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_applications",
+      "description": "list applications",
+      "operation": "query",
+      "sql": "SELECT a.id,a.stage,a.version,a.source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,c.linkedin_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id JOIN hiring_requisitions r ON r.id=a.requisition_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) ORDER BY a.updated_at DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "create_linkedin_application",
+      "description": "Record a LinkedIn sourced candidate and application with basis, contact context, assignment and audit",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at) SELECT :candidate_id,:organization_id,:brand_id,:candidate_name,NULLIF(:email,''),NULLIF(:phone,''),:linkedin_url,:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_requisitions WHERE id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id) AND :linkedin_url LIKE 'https://www.linkedin.com/%' AND length(trim(:candidate_name))>0 AND length(trim(:basis_reference))>0 AND length(trim(:contact_context))>0 AND EXISTS (SELECT 1 FROM hiring_memberships WHERE organization_id=:organization_id AND brand_id=:brand_id AND user_id=:assignee_user_id) AND length(trim(:source_detail))>0",
+        "INSERT OR IGNORE INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:candidate_id,'linkedin',:source_detail,:basis_reference,:contact_context,:assignee_user_id,'submitted',1,:__user_id,:__now,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id AND organization_id=:organization_id AND brand_id=:brand_id) AND EXISTS (SELECT 1 FROM hiring_memberships WHERE organization_id=:organization_id AND brand_id=:brand_id AND user_id=:assignee_user_id)",
+        "INSERT OR IGNORE INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,NULL,'submitted',1,'LinkedIn sourced',:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id)",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "candidate_name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "linkedin_url": {
+          "type": "string"
+        },
+        "source_detail": {
+          "type": "string"
+        },
+        "basis_reference": {
+          "type": "string"
+        },
+        "contact_context": {
+          "type": "string"
+        },
+        "assignee_user_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "change_application_stage",
+      "description": "Change application stage with optimistic version, reason, history and audit",
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_applications SET stage=:to_stage,version=version+1,updated_at=:__now WHERE id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND stage=:from_stage AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND :to_stage IN ('in_review','interviewing','decision_pending','offered','hired','rejected','withdrawn') AND :to_stage<>:from_stage AND length(trim(:reason))>0 AND :from_stage IN ('submitted','in_review','interviewing','decision_pending','offered')",
+        "INSERT OR IGNORE INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:from_stage,:to_stage,:expected_version+1,:reason,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND a.version=:expected_version+1 AND a.stage=:to_stage AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id)",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.stage_changed',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id AND application_id=:application_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "from_stage": {
+          "type": "string"
+        },
+        "to_stage": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_stage_events",
+      "description": "list stage events",
+      "operation": "query",
+      "sql": "SELECT from_stage,to_stage,version,reason,actor_user_id,created_at FROM hiring_stage_events WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) ORDER BY version DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "add_application_note",
+      "description": "Add a private application note and audit event",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_notes(id,organization_id,brand_id,application_id,body,actor_user_id,created_at) SELECT :note_id,:organization_id,:brand_id,:application_id,:body,:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) AND length(trim(:body))>0",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.note_added',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) AND EXISTS (SELECT 1 FROM hiring_notes WHERE id=:note_id AND application_id=:application_id)"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "note_id": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_application_notes",
+      "description": "list application notes",
+      "operation": "query",
+      "sql": "SELECT id,body,actor_user_id,created_at FROM hiring_notes WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) ORDER BY created_at DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "create_communication_draft",
+      "description": "Save an unsent email draft to the internal outbox; no send capability",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at) SELECT :draft_id,:organization_id,:brand_id,:application_id,:recipient_email,:subject,:body,'draft',:__user_id,:__now FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.email=:recipient_email AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) AND length(trim(:subject))>0 AND length(trim(:body))>0",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'communication.draft_created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) AND EXISTS (SELECT 1 FROM hiring_outbox WHERE id=:draft_id AND application_id=:application_id AND status='draft')"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "recipient_email": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_communication_drafts",
+      "description": "list communication drafts",
+      "operation": "query",
+      "sql": "SELECT id,recipient_email,subject,body,status,actor_user_id,created_at FROM hiring_outbox WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) ORDER BY created_at DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "list_application_audit",
+      "description": "list application audit",
+      "operation": "query",
+      "sql": "SELECT action,actor_user_id,created_at,operation_id FROM hiring_audit_events WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_memberships m ON m.organization_id = a.organization_id AND m.brand_id = a.brand_id AND m.user_id = :__user_id WHERE a.id = :application_id AND a.organization_id = :organization_id AND a.brand_id = :brand_id) ORDER BY created_at DESC LIMIT 100",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
     }
   ]
 }

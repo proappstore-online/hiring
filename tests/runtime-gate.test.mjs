@@ -13,7 +13,8 @@ test('runtime gate is default-closed and the only public action', () => {
   const manifest = read('mcp.json')
   assert.equal(migrations[0].name, '0001_init')
   assert.equal(migrations[1].name, '0002_hiring_runtime_gate')
-  assert.deepEqual(manifest.tools.map(({ name }) => name), ['get_hiring_runtime_gate'])
+  assert.deepEqual(manifest.tools.filter(({ requires_auth }) => !requires_auth).map(({ name }) => name), ['get_hiring_runtime_gate'])
+  assert.ok(manifest.tools.slice(1).every(({ requires_auth }) => requires_auth))
   assert.equal(manifest.tools[0].requires_auth, false)
   assert.match(manifest.tools[0].sql, /LIMIT 1$/)
 

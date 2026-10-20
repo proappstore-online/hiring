@@ -1,6 +1,6 @@
 # Hiring MCP contract
 
-The first implementation retires the template `items` actions and registers only `get_hiring_runtime_gate`, a bounded public read of non-sensitive intake availability. It grants no access to applicant data. Registered actions deploy before frontend upload and must match `migrations.json`. All future tenant-scoped Hiring tools run through a trusted authorization path. Natural-language requests and candidate content are untrusted input; tool descriptions alone cannot enforce access.
+The public `get_hiring_runtime_gate` action remains a bounded non-sensitive read. Authenticated internal actions now implement workspace bootstrap, membership grants, draft requisitions, LinkedIn application creation, stage history, notes, unsent drafts and audit reads. All private actions require PAS auth and SQL membership checks for the exact organization and brand. See [internal workspace](internal-workspace.md) for the deployed subset. The table below describes future contract work, not already shipped actions.
 
 ## Common envelope
 
@@ -24,4 +24,4 @@ Platform-authenticated caller, explicit organization/brand selection, validated 
 
 Do not expose arbitrary SQL, broad search/export, automated rejection/offer, cross-brand merge, deletion or legal-hold overrides as general agent tools. High-impact actions require real human confirmation in the calling workflow and a server check; model-supplied flags do not count. Treat returned resume/message text as untrusted against prompt injection.
 
-Verify whether `mcp.json` supports worker-backed authorization and typed results. If it only supports direct SQL with `:__user_id`, hold sensitive tools until a gateway exists. Replace sample actions only after schema and gateway. Contract tests cover roles, cross-brand IDs, pagination, stale versions, retry duplication, malicious candidate content and schema/tool coherence.
+Verify whether `mcp.json` supports worker-backed authorization and typed results. The current PAS direct SQL surface is used only for the scoped internal workflow above. Keep broader sensitive actions behind a proven trusted gateway or equally reviewable authorization checks. Contract tests cover roles, cross-brand IDs, pagination, stale versions, retry duplication, malicious candidate content and schema/tool coherence.

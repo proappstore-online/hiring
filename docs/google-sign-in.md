@@ -21,4 +21,4 @@ Google's [web-server OAuth guide](https://developers.google.com/identity/protoco
 
 After a credential change, check that `/.pas/auth/start?provider=google&return_to=%2F` on the Hiring host redirects through PAS to Google, then complete a sign-in with an authorized account and confirm the Hiring page loads. GitHub remains available as a second native provider. A Google account and a GitHub account have different PAS user IDs even if their emails match; Hiring membership and brand grants must use the stable PAS user ID and never infer access from email equality.
 
-Candidate intake remains closed. Staff sign-in does not grant any organization or brand access by itself; those grants will be enforced by later Hiring issues.
+Candidate intake remains closed. Staff sign-in does not grant access to another organization or brand by itself. The internal workspace grants the creator owner access and lets that owner add recruiters by exact PAS user ID; see [internal workspace](internal-workspace.md).
