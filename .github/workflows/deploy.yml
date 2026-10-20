@@ -36,6 +36,10 @@ jobs:
     needs: router
     if: github.event.repository.name != 'template-app'
     runs-on: ${{ fromJSON(needs.router.outputs.runner) }}
+    # Self-hosted runners can have a shared npm cache owned by another job.
+    # Keep npx prebuild and code-health installs in this run's writable temp area.
+    env:
+      NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache-${{ github.run_id }}-${{ github.job }}
     outputs:
       has_e2e: ${{ steps.e2e-check.outputs.has_e2e }}
     steps:
