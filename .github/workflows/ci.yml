@@ -34,3 +34,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # Action SQL authz/regression tests (node:sqlite, Node >= 22.13).
+      - run: node --test tests/*.test.mjs
