@@ -13,14 +13,17 @@ function fixture() {
   const call = (name, user, values = {}) => {
     const tool = action(name)
     const params = { ...values, __user_id: user, __now: Date.now(), __uuid: crypto.randomUUID() }
-    const sql = tool.statements ?? [tool.sql]
+    const statements = tool.statements ?? [tool.sql]
     const result = []
     db.exec('BEGIN')
     try {
-      for (const statement of sql) {
-        const binds = Object.fromEntries([...statement.matchAll(/:([a-z_][a-z0-9_]*)/gi)].map(([, key]) => [key, params[key]]))
-        assert.ok(Object.values(binds).every(v => v !== undefined), `${name}: missing param`)
-        result.push(tool.operation === 'query' ? db.prepare(statement).all(binds) : db.prepare(statement).run(binds).changes)
+      for (const statement of statements) {
+        // PAS rewrites each named occurrence to a positional placeholder and binds
+        // the corresponding value, including repeated names, in occurrence order.
+        const binds = []
+        const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { binds.push(params[key]); return '?' })
+        assert.ok(binds.every(v => v !== undefined), `${name}: missing param`)
+        result.push(tool.operation === 'query' ? db.prepare(sql).all(...binds) : db.prepare(sql).run(...binds).changes)
       }
       db.exec('COMMIT')
       return tool.operation === 'query' ? result[0] : result
@@ -62,6 +65,20 @@ test('internal LinkedIn workflow is scoped, audited, and never sends', () => {
   assert.equal(call('list_application_audit', 'staff-a', draft).length, 4)
   assert.equal(call('list_application_audit', 'outsider', draft).length, 0)
   assert.equal(tools.some(t => /send|dispatch/i.test(t.name)), false)
+})
+
+test('authorized LinkedIn create accepts the bare host and makes an application visible', () => {
+  const { call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  const input = { ...candidate, linkedin_url: 'https://linkedin.com/in/synthetic-fixture' }
+  const changes = call('create_linkedin_application', 'staff-a', input)
+  assert.deepEqual(changes, [1, 1, 1, 1])
+  const rows = call('list_applications', 'staff-a', scope)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].id, input.application_id)
+  const lookalike = { ...candidate, candidate_id: 'lookalike', application_id: 'lookalike-app', operation_id: 'lookalike-op', linkedin_url: 'https://linkedin.com.example.org/in/not-linkedin' }
+  assert.deepEqual(call('create_linkedin_application', 'staff-a', lookalike), [0, 0, 0, 0])
+  assert.equal(call('list_applications', 'staff-a', scope).length, 1)
 })
 
 test('failed assignment cannot strand a candidate, and owner grants exact PAS ID', () => {
