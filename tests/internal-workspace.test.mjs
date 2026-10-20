@@ -154,6 +154,24 @@ test('replaying an existing application ID does not write a second creation audi
   assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.created'").get().n, 1)
 })
 
+test('replaying an existing note, draft or requisition ID with a new operation does not write a second audit', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  call('create_linkedin_application', 'staff-a', candidate)
+  const auditCount = action => db.prepare('SELECT count(*) AS n FROM hiring_audit_events WHERE action=?').get(action).n
+  const cases = [
+    ['create_requisition', { ...scope, requisition_id: 'req-replay', title: 'Designer' }, 'requisition.created'],
+    ['add_application_note', { ...scope, application_id: 'app-a', note_id: 'note-replay', body: 'First note' }, 'application.note_added'],
+    ['create_communication_draft', { ...scope, application_id: 'app-a', draft_id: 'draft-replay', recipient_email: 'a@example.com', subject: 'Hello', body: 'First draft' }, 'communication.draft_created'],
+  ]
+  for (const [name, values, audit] of cases) {
+    assert.equal(call(name, 'staff-a', { ...values, operation_id: `${name}-first` }).at(-1), 1, name)
+    assert.equal(auditCount(audit), 1, name)
+    assert.equal(call(name, 'staff-a', { ...values, operation_id: `${name}-replay` }).at(-1), 0, name)
+    assert.equal(auditCount(audit), 1, name)
+  }
+})
+
 test('blank workspace, requisition and member values are rejected server-side', () => {
   const { db, call } = fixture()
   for (const field of ['organization_name', 'brand_name', 'requisition_title']) {
