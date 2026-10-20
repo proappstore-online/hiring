@@ -116,3 +116,36 @@ test('reassignment requires a current version and in-brand staff, and preserves 
   assert.equal(db.prepare('SELECT stage,version FROM hiring_applications WHERE id=?').get('app-a').stage, 'submitted')
   assert.equal(call('change_application_stage', 'staff-b', { ...scope, application_id: 'app-a', expected_version: 2, from_stage: 'submitted', to_stage: 'in_review', reason: 'Reviewed', operation_id: 'stage-after-move' }).at(-1), 1)
 })
+
+test('reusing an existing candidate cannot bypass application governance fields', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  assert.equal(call('create_linkedin_application', 'staff-a', candidate).at(-1), 1)
+  for (const field of ['source_detail', 'basis_reference', 'contact_context']) {
+    const reuse = { ...candidate, application_id: `app-${field}`, operation_id: `op-${field}`, [field]: '  ' }
+    assert.equal(call('create_linkedin_application', 'staff-a', reuse).at(-1), 0, field)
+  }
+  assert.equal(call('create_linkedin_application', 'staff-a', { ...candidate, application_id: 'app-bad-req', operation_id: 'op-bad-req', requisition_id: 'missing' }).at(-1), 0)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_applications').get().n, 1)
+})
+
+test('replaying an existing application ID does not write a second creation audit', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  assert.equal(call('create_linkedin_application', 'staff-a', candidate).at(-1), 1)
+  assert.equal(call('create_linkedin_application', 'staff-a', { ...candidate, candidate_id: 'cand-b', operation_id: 'replay-op' }).at(-1), 0)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.created'").get().n, 1)
+})
+
+test('blank workspace, requisition and member values are rejected server-side', () => {
+  const { db, call } = fixture()
+  for (const field of ['organization_name', 'brand_name', 'requisition_title']) {
+    assert.equal(call('create_workspace', 'staff-a', { ...bootstrap, [field]: ' ' }).at(-1), 0, field)
+  }
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_organizations').get().n, 0)
+  call('create_workspace', 'staff-a', bootstrap)
+  assert.equal(call('create_requisition', 'staff-a', { ...scope, requisition_id: 'blank', title: '   ', operation_id: 'blank-op' }).at(-1), 0)
+  assert.equal(call('add_workspace_member', 'staff-a', { ...scope, member_user_id: ' ', role: 'recruiter', operation_id: 'blank-grant' }).at(-1), 0)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_requisitions').get().n, 1)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_memberships').get().n, 1)
+})
