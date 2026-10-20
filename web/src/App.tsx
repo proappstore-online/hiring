@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { initPro, ProShell, PageHeader, SignInButton, useAuth, type NavItem } from '@proappstore/sdk'
 
 const app = initPro({ appId: 'hiring' })
@@ -12,6 +12,10 @@ type Draft = { id: string; recipient_email: string; subject: string; body: strin
 type StageEvent = { from_stage: string | null; to_stage: string; reason: string; actor_user_id: string; created_at: number }
 type AssignmentEvent = { from_user_id: string; to_user_id: string; reason: string; actor_user_id: string; created_at: number }
 type Audit = { action: string; actor_user_id: string; created_at: number }
+type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
+type Detail = { application_id: string; notes: Note[]; drafts: Draft[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
+const emptyWork: Omit<Work, 'brand_id'> = { requisitions: [], members: [], applications: [] }
+const emptyDetail: Omit<Detail, 'application_id'> = { notes: [], drafts: [], events: [], assignments: [], audit: [] }
 type Rows<T> = { rows: T[] }
 type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: number } }[] }
 const id = () => crypto.randomUUID()
@@ -34,36 +38,38 @@ export default function App() {
 }
 
 function WorkspaceView({ userId }: { userId: string }) {
-  const [spaces, setSpaces] = useState<Workspace[]>([])
+  const [spaces, setSpaces] = useState<Workspace[] | null>(null)
   const [selected, setSelected] = useState<string>('')
-  const [requisitions, setRequisitions] = useState<Requisition[]>([])
-  const [members, setMembers] = useState<Member[]>([])
-  const [applications, setApplications] = useState<Application[]>([])
+  const [work, setWork] = useState<Work | null>(null)
   const [activeId, setActiveId] = useState('')
-  const [notes, setNotes] = useState<Note[]>([])
-  const [drafts, setDrafts] = useState<Draft[]>([])
-  const [events, setEvents] = useState<StageEvent[]>([])
-  const [assignments, setAssignments] = useState<AssignmentEvent[]>([])
-  const [audit, setAudit] = useState<Audit[]>([])
+  const [detail, setDetail] = useState<Detail | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const space = spaces.find(s => s.brand_id === selected)
-  const active = applications.find(a => a.id === activeId)
+  const workSeq = useRef(0)
+  const detailSeq = useRef(0)
+  const space = spaces?.find(s => s.brand_id === selected)
   const scope = space ? { organization_id: space.organization_id, brand_id: space.brand_id } : null
+  // Data loaded for a previous workspace or application is never shown for the current one.
+  const { requisitions, members, applications } = work?.brand_id === selected ? work : emptyWork
+  const { notes, drafts, events, assignments, audit } = detail?.application_id === activeId ? detail : emptyDetail
+  const active = applications.find(a => a.id === activeId)
   const reloadSpaces = useCallback(async () => { const rows = await read<Workspace>('list_my_workspaces'); setSpaces(rows); setSelected(old => rows.some(s => s.brand_id === old) ? old : rows[0]?.brand_id ?? '') }, [])
   const reloadWork = useCallback(async () => {
+    const seq = ++workSeq.current
     if (!scope) return
     const [r, m, a] = await Promise.all([read<Requisition>('list_requisitions', scope), read<Member>('list_workspace_members', scope), read<Application>('list_applications', scope)])
-    setRequisitions(r); setMembers(m); setApplications(a)
+    if (seq === workSeq.current) setWork({ brand_id: scope.brand_id, requisitions: r, members: m, applications: a })
   }, [space?.organization_id, space?.brand_id])
   const reloadDetail = useCallback(async () => {
+    const seq = ++detailSeq.current
     if (!scope || !activeId) return
     const p = { ...scope, application_id: activeId }
     const [n, d, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
-    setNotes(n); setDrafts(d); setEvents(e); setAssignments(h); setAudit(a)
+    if (seq === detailSeq.current) setDetail({ application_id: activeId, notes: n, drafts: d, events: e, assignments: h, audit: a })
   }, [space?.organization_id, space?.brand_id, activeId])
-  useEffect(() => { reloadSpaces().catch(e => setError(String(e))).finally(() => setLoading(false)) }, [reloadSpaces])
+  const loadSpaces = useCallback(() => { setLoading(true); setError(''); reloadSpaces().catch(e => setError(String(e))).finally(() => setLoading(false)) }, [reloadSpaces])
+  useEffect(loadSpaces, [loadSpaces])
   useEffect(() => { reloadWork().catch(e => setError(String(e))) }, [reloadWork])
   useEffect(() => { reloadDetail().catch(e => setError(String(e))) }, [reloadDetail])
   const run = async (name: string, params: Record<string, unknown>, after?: () => void) => {
@@ -76,10 +82,10 @@ function WorkspaceView({ userId }: { userId: string }) {
     <PageHeader title="Recruiter workspace" description="Private sourcing, pipeline notes and unsent communications." />
     <p className="mt-2 text-xs text-[var(--muted)]">Your PAS staff ID: <code>{userId}</code></p>
     {error && <p role="alert" className="mt-5 rounded-lg border border-[var(--danger)] p-3 text-sm text-[var(--danger)]">{error}</p>}
-    {loading ? <p role="status" className="mt-6">Loading workspace…</p> : !space ? <Setup busy={busy} run={run} /> : <>
+    {loading ? <p role="status" className="mt-6">Loading workspace…</p> : !spaces ? <button type="button" className={button + ' mt-6'} onClick={loadSpaces}>Retry loading workspaces</button> : !space ? <Setup busy={busy} run={run} /> : <>
       <div className="my-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={selected} onChange={e => { setSelected(e.target.value); setActiveId('') }}>{spaces.map(s => <option value={s.brand_id} key={s.brand_id}>{s.organization_name} / {s.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
-        <div className="space-y-6"><CreateApplication scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />
+        <div className="space-y-6"><CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />
           <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <button key={a.id} type="button" onClick={() => setActiveId(a.id)} aria-label={`Open ${a.candidate_name} application`} className={'w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{a.stage.replaceAll('_',' ')}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></button>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
           <Admin scope={scope!} role={space.role} busy={busy} run={run} />
         </div>
