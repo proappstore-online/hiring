@@ -11,6 +11,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | [MAIL contract](mail-contract.md) | Provider-neutral messaging boundary and failure handling. |
 | [Hiring MCP contract](hiring-mcp-contract.md) | Safe agent tools, identity, authorization and mutation rules. |
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
+| [Google sign-in](google-sign-in.md) | Live PAS-native auth path and operator configuration. |
 
 This is a plan, not a claim that features exist or legal copy is approved. The runtime configuration remains a scaffold. Legal and platform capability decisions marked pending must be resolved in their issues before dependent launch work.
 

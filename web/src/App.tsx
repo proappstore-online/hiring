@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { initPro, ProShell, PageHeader, type NavItem } from '@proappstore/sdk'
+import { initPro, ProShell, PageHeader, SignInButton, useAuth, type NavItem } from '@proappstore/sdk'
 
 const app = initPro({ appId: 'hiring' })
 
@@ -15,10 +15,35 @@ const NAV: NavItem[] = [
 ]
 
 export default function App() {
+  const { user, loading } = useAuth(app)
+
+  if (loading) {
+    return <main className="flex min-h-dvh items-center justify-center px-6"><p role="status">Loading…</p></main>
+  }
+
+  if (!user) {
+    return <SignIn />
+  }
+
   return (
     <ProShell app={app} appName="hiring" nav={NAV} branding="app">
       <Screens />
     </ProShell>
+  )
+}
+
+function SignIn() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-6 py-10">
+      <section className="w-full max-w-sm rounded-xl border border-[var(--line-strong)] bg-[var(--panel)] p-8 text-center">
+        <h1 className="text-2xl font-semibold">Hiring</h1>
+        <p className="mt-3 text-sm text-[var(--muted)]">Sign in to your recruiting workspace.</p>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <SignInButton app={app} provider="google" label="Continue with Google" />
+          <SignInButton app={app} provider="github" label="Continue with GitHub" />
+        </div>
+      </section>
+    </main>
   )
 }
 
