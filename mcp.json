@@ -437,6 +437,88 @@
         }
       },
       "requires_auth": true
+    },
+    {
+      "name": "gateway_list_applications",
+      "description": "Gateway: paginated, redacted applications for a granted brand. Keyset cursor (cursor_at, cursor_id); 25 per page; no contact details or free text",
+      "operation": "query",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "gateway_get_application",
+      "description": "Gateway: one redacted application for a granted brand; not-granted and missing both return no row",
+      "operation": "query",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND a.id=:application_id LIMIT 1",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "gateway_list_requisitions",
+      "description": "Gateway: paginated requisitions for a granted brand. Keyset cursor (cursor_at, cursor_id); 25 per page",
+      "operation": "query",
+      "sql": "SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND (:cursor_at IS NULL OR r.created_at < :cursor_at OR (r.created_at = :cursor_at AND r.id > :cursor_id)) ORDER BY r.created_at DESC, r.id ASC LIMIT 25",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "gateway_get_requisition",
+      "description": "Gateway: one requisition for a granted brand; not-granted and missing both return no row",
+      "operation": "query",
+      "sql": "SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) LIMIT 1",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
     }
   ]
 }

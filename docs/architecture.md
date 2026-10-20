@@ -10,7 +10,7 @@ Verified against the platform source at `platform@ee78178` (`docs/app-workers.md
 - **Worker routes need a signed-in user.** `/.pas/worker/*` requires a signed-in user with CSRF checks and runs registered actions as that user. The worker has no URL of its own and no D1, KV, R2 or queue binding. Hooks have public URLs, but each delivery's signature is verified before app code runs; they are for provider callbacks, not candidate submissions.
 - **Anonymous writes are not supported.** `requires_auth: false` is allowed only for constrained public `query` tools with no `:__user_id`, no roles and `LIMIT` of at most 500. Anonymous action calls are limited to 120 per 60 seconds per app and client IP. Candidate writes must therefore be `requires_auth: true`, which means a signed-in platform user.
 - **Batch limits.** MCP `batch` tools run up to 25 statements in one D1 transaction with a shared params pool. The worker SDK's `pas.actions.batch` documents 500 statements and 1 MB per transaction. Hiring uses only MCP batch tools; its largest batch is 5 statements (`create_workspace`).
-- **Tool cap.** The source sets 500 tools per app (`MAX_TOOLS_PER_APP`, raised from 120 by #116). The public agent guide still says 120. Hiring registers 18.
+- **Tool cap.** The source sets 500 tools per app (`MAX_TOOLS_PER_APP`, raised from 120 by #116). The public agent guide still says 120. Hiring registers 22 (18 plus four gateway reads).
 - **Worker-backed authorization** exists through `callers: ["worker"]`, but a worker or hook runs as `system:worker` or `system:hook`, which holds no roles. A trusted gateway would have to check the signed-in user in worker code, and that needs admin enablement first.
 - **Typed results** are not documented in the platform sources checked. Treat them as unsupported until verified.
 - **`mcp.json` rules checked locally.** Every statement of an authenticated tool references `:__user_id` or a membership `EXISTS`, every `:param` is declared, and no statement contains a semicolon.
@@ -22,6 +22,8 @@ Migration `0002_hiring_runtime_gate` starts candidate intake closed. That public
 ## ADR-001 — Tenant authorization
 
 D1 is canonical. Every business record is organization-scoped and brand data is additionally brand-scoped. Platform auth identifies the user, and `app.roles` gates app-level administration; Hiring-owned membership/grant records express organization, brand, requisition and assignment scope. For the first internal workflow, registered PAS SQL actions enforce exact organization/brand membership in every statement and atomic batches record audit events with writes. Browser filters are display aids, never policy. Wider grant administration and high-impact workflows still need a stronger trusted authorization path.
+
+**Gateway boundary (issue #32, provisional pending #53).** The MCP gateway is enforced at the SQL layer: read-only registered actions that derive identity from `:__user_id`, require a brand membership with role `owner` or `recruiter`, return restricted fields and cap pages at 25. The worker route is admin-gated (`pas worker enable hiring`), not verified as enabled, and no worker is deployed, so per-user rate limits, denial audit and structured error codes are not enforced server-side. See [hiring MCP contract](hiring-mcp-contract.md#trusted-gateway-issue-32).
 
 ## ADR-002 — Candidate boundary
 
