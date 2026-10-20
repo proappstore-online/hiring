@@ -19,6 +19,10 @@
     {
       "name": "0005_operation_provenance",
       "sql": "ALTER TABLE hiring_notes ADD COLUMN operation_id TEXT; ALTER TABLE hiring_outbox ADD COLUMN operation_id TEXT; ALTER TABLE hiring_requisitions ADD COLUMN operation_id TEXT"
+    },
+    {
+      "name": "0006_optional_linkedin_profile",
+      "sql": "ALTER TABLE hiring_candidates ADD COLUMN linkedin_profile_url TEXT"
     }
   ]
 }

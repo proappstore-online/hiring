@@ -12,7 +12,8 @@ function fixture() {
   for (const migration of migrations.migrations) db.exec(migration.sql)
   const call = (name, user, values = {}) => {
     const tool = action(name)
-    const params = { ...values, __user_id: user, __now: Date.now(), __uuid: crypto.randomUUID() }
+    const optional = Object.fromEntries(Object.entries(tool.params ?? {}).filter(([, schema]) => schema.optional).map(([key]) => [key, null]))
+    const params = { ...optional, ...values, __user_id: user, __now: Date.now(), __uuid: crypto.randomUUID() }
     const statements = tool.statements ?? [tool.sql]
     const result = []
     db.exec('BEGIN')
@@ -79,6 +80,25 @@ test('authorized LinkedIn create accepts the bare host and makes an application 
   const lookalike = { ...candidate, candidate_id: 'lookalike', application_id: 'lookalike-app', operation_id: 'lookalike-op', linkedin_url: 'https://linkedin.com.example.org/in/not-linkedin' }
   assert.deepEqual(call('create_linkedin_application', 'staff-a', lookalike), [0, 0, 0, 0])
   assert.equal(call('list_applications', 'staff-a', scope).length, 1)
+})
+
+test('authorized LinkedIn create stores a missing profile URL as NULL and preserves audit and scope', () => {
+  for (const url of ['', '   ', null, undefined]) {
+    const { db, call } = fixture()
+    call('create_workspace', 'staff-a', bootstrap)
+    const input = { ...candidate, linkedin_url: url, source_detail: 'LinkedIn sourcing event recorded by recruiter', contact_context: 'No profile URL or contact details available' }
+    if (url === undefined) delete input.linkedin_url
+    assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [1, 1, 1, 1])
+    assert.equal(db.prepare('SELECT linkedin_profile_url FROM hiring_candidates WHERE id=?').get(input.candidate_id).linkedin_profile_url, null)
+    const rows = call('list_applications', 'staff-a', scope)
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].linkedin_url, null)
+    assert.equal(rows[0].source_detail, input.source_detail)
+    assert.equal(rows[0].contact_context, input.contact_context)
+    assert.equal(call('list_applications', 'outsider', scope).length, 0)
+    assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [0, 0, 0, 0])
+    assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.created'").get().n, 1)
+  }
 })
 
 test('failed assignment cannot strand a candidate, and owner grants exact PAS ID', () => {
