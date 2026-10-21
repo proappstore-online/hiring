@@ -8,13 +8,13 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (path) => JSON.parse(readFileSync(resolve(root, path), 'utf8'))
 
-test('runtime gate is default-closed and the only public action', () => {
+test('runtime gate is default-closed and only approved public queries are exposed', () => {
   const migrations = read('migrations.json').migrations
   const manifest = read('mcp.json')
   assert.equal(migrations[0].name, '0001_init')
   assert.equal(migrations[1].name, '0002_hiring_runtime_gate')
-  assert.deepEqual(manifest.tools.filter(({ requires_auth }) => !requires_auth).map(({ name }) => name), ['get_hiring_runtime_gate'])
-  assert.ok(manifest.tools.slice(1).every(({ requires_auth }) => requires_auth))
+  assert.deepEqual(manifest.tools.filter(({ requires_auth }) => !requires_auth).map(({ name }) => name), ['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job'])
+  assert.ok(manifest.tools.filter(t => !['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job'].includes(t.name)).every(({ requires_auth }) => requires_auth))
   assert.equal(manifest.tools[0].requires_auth, false)
   assert.match(manifest.tools[0].sql, /LIMIT 1$/)
 
@@ -47,8 +47,12 @@ test('registered actions cannot open intake or expose anonymous candidate data',
         assert.match(sql, /^SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1$/)
       } else {
         // Opening intake must be a deliberate reviewed release, never a client tool call.
-        assert.doesNotMatch(sql, /\bhiring_runtime_gate\b/i, tool.name)
-        assert.equal(tool.requires_auth, true, tool.name)
+        assert.doesNotMatch(sql, /(?:UPDATE|INTO|DELETE FROM)\s+hiring_runtime_gate\b/i, tool.name)
+        if (['list_public_jobs', 'get_public_job'].includes(tool.name)) {
+          assert.equal(tool.requires_auth, false)
+          assert.match(sql, /^SELECT /)
+          assert.doesNotMatch(sql, /hiring_candidates|hiring_applications|hiring_attachments/)
+        } else assert.equal(tool.requires_auth, true, tool.name)
       }
     }
   }

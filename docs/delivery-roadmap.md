@@ -26,3 +26,5 @@ The [capability and governance gate register](capability-governance-gates.md) id
 7. Private attachment and candidate token cannot be fetched by another candidate or unassigned staff.
 
 The [#53 ADR review](architecture.md#affected-backlog-dependencies) records resolved #52/#9 policy inputs and remaining implementation/capability dependencies, including the separate FAS mail route #58.
+
+Issue #3 progress: publication and authenticated intake actions/UI have been added with regression tests; intake remains closed pending trusted file scanning and assigned-reviewer byte serving. See [intake contract](candidate-intake.md). This progress does not complete Phase 2 or authorize closing the epic.

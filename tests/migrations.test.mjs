@@ -131,3 +131,15 @@ test('0010 upgrades populated 0009, preserves audit and memberships, replays and
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   db.close()
 })
+
+test('0011 expands populated legacy applications without changing source constraints or opening intake', () => {
+  const db = database()
+  apply(db, historical); seed(db)
+  apply(db, migrations); apply(db, migrations)
+  assert.equal(db.prepare("SELECT intake_source FROM hiring_applications WHERE id='app-a'").get().intake_source,'linkedin')
+  assert.equal(db.prepare('SELECT intake_status FROM hiring_runtime_gate').get().intake_status,'closed')
+  assert.throws(() => db.exec("UPDATE hiring_applications SET source='direct'"),/CHECK/)
+  assert.throws(() => db.exec("UPDATE hiring_requisitions SET status='published'"),/CHECK/)
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[])
+  db.close()
+})

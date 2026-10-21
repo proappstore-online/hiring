@@ -71,3 +71,7 @@ Use request IDs across UI, worker, D1, MAIL and MCP. Monitor queue age, failures
 - **#28–#31, #45:** revise #28's scheduler scope to indefinite retention with no automatic purge; explicit rights/deletion and processor propagation remain required. No legal-review approval gate.
 - **#32–#34:** SQL reads are the accepted current enforcement boundary; broader mutations, audit, per-user throttling and assignment scope remain future work. Closing #53 does not complete those controls.
 - **#46, #35, #37, #38, #54:** grant-filtered search, monitoring, security/restore evidence and policy verification remain release work; ADR acceptance does not waive these checks.
+
+## Issue #3 implementation revision
+
+Public job discovery and passkey-protected owner publication now have registered actions and UI. Candidate-owned submission is implemented behind the still-closed runtime gate. Private attachment reservations are quarantined; no scanner or brand-scoped reviewer byte-serving route is claimed available. Public discovery does not open intake. See [candidate intake contract](candidate-intake.md) for additive schema compatibility, SQL abuse limits and required release evidence.

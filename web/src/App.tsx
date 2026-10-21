@@ -4,6 +4,7 @@ import { app, read, write, stageLabel, type AgentActivity, type Application, typ
 import { ApplicationDetail } from './ApplicationDetail'
 import { Admin, CreateApplication, Setup } from './forms'
 import { button, date, field, panel } from './ui'
+import { Jobs, PublishJob } from './Jobs'
 
 const NAV: NavItem[] = [{ label: 'Workspace', href: '/', title: 'Hiring' }]
 type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
@@ -14,7 +15,8 @@ const emptyDetail: Omit<Detail, 'application_id'> = { notes: [], drafts: [], com
 export default function App() {
   const { user, loading } = useAuth(app)
   if (loading) return <main className="flex min-h-dvh items-center justify-center"><p role="status">Loading…</p></main>
-  if (!user) return <main className="flex min-h-dvh items-center justify-center px-6"><section className={panel + ' w-full max-w-sm text-center'}><h1 className="text-2xl font-semibold">Hiring</h1><p className="my-4 text-sm text-[var(--muted)]">Sign in to your private recruiting workspace.</p><div className="flex flex-col items-center gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></section></main>
+  if (new URLSearchParams(window.location.search).get('view') === 'jobs') return <Jobs userId={user?.id} />
+  if (!user) return <main className="flex min-h-dvh items-center justify-center px-6"><section className={panel + ' w-full max-w-sm text-center'}><h1 className="text-2xl font-semibold">Hiring</h1><p className="my-4 text-sm text-[var(--muted)]">Sign in to your private recruiting workspace.</p><a className="my-3 block underline" href="/?view=jobs">Browse jobs and apply</a><div className="flex flex-col items-center gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></section></main>
   return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><WorkspaceView userId={user.id} /></ProShell>
 }
 
@@ -60,6 +62,7 @@ function WorkspaceView({ userId }: { userId: string }) {
     finally { setBusy(false) }
   }
   return <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+    <a className="mb-3 block underline" href="/?view=jobs">Browse jobs and my applications</a>
     <PageHeader title="Recruiter workspace" description="Private sourcing, pipeline notes and unsent communications." />
     <p className="mt-2 text-xs text-[var(--muted)]">Your PAS staff ID: <code>{userId}</code></p>
     {error && <p role="alert" className="mt-5 rounded-lg border border-[var(--danger)] p-3 text-sm text-[var(--danger)]">{error}</p>}
@@ -68,6 +71,7 @@ function WorkspaceView({ userId }: { userId: string }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
         <div className="space-y-6"><CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />
           <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <button key={a.id} type="button" onClick={() => setActiveId(a.id)} aria-label={`Open ${a.candidate_name} application`} className={'w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></button>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
+          {space.role === 'owner' && <PublishJob key={selected} scope={scope!} requisitions={requisitions} />}
           <Admin scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} />
         </div>
         <div>{active ? <ApplicationDetail key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>

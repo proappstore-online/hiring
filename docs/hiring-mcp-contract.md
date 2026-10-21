@@ -60,3 +60,7 @@ Verified at `platform@ee78178` (see [architecture](architecture.md#capability-ch
 Owner: Serge. [Owner decisions](https://github.com/proappstore-online/hiring/issues/52#issuecomment-6309937556) approve many organizations, public organization sign-up and independent worker accounts/profiles. Authenticated worker actions must derive identity from the platform and enforce ownership of the worker/application link; recruiter membership checks do not authorize worker access. Anonymous writes and token-only D1 access are unsupported by the [#7 evidence](https://github.com/proappstore-online/hiring/issues/7). These actions and onboarding are not implemented by this review.
 
 Retain records indefinitely without an automatic purge; explicit rights/deletion flows remain scoped and audited. No legal-review gate applies to unpaid, internship or volunteer roles. See [ADR review and backlog dependencies](architecture.md#affected-backlog-dependencies).
+
+## Issue #3 action additions
+
+Public `list_public_jobs` / `get_public_job` expose approved published snapshots only. Owner publication/closure require platform passkey step-up. Authenticated worker-profile, submission, receipt and attachment actions derive identity from `:__user_id`; they do not grant staff permissions. Submission requires the runtime gate open; no registered action opens it. Attachments stay pending and no user-callable scan verdict or byte-download capability exists. Exact contracts and remaining #3 release gates: [candidate intake](candidate-intake.md).

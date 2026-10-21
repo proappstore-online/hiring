@@ -1,0 +1,66 @@
+import { useEffect, useRef, useState } from 'react'
+import { SignInButton } from '@proappstore/sdk'
+import { app, id, read, readPublic, write, type CandidateApplication, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
+import { Attachments } from './attachments'
+import { Form, MultilineField, TextField, button, field, panel, val } from './ui'
+import { registerPublicationPasskey, verifyPublicationPasskey } from './passkey'
+
+export function PublishJob({ scope, requisitions }: { scope: Scope; requisitions: Requisition[] }) {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [publications, setPublications] = useState<{ requisition_id: string; title: string; version: number; status: string }[]>([])
+  async function reload() { setPublications(await read('list_job_publications', scope)) }
+  useEffect(() => { reload().catch(() => setMessage('Publication states could not be loaded.')) }, [scope.organization_id, scope.brand_id])
+  async function act(task: () => Promise<void>) { setBusy(true); setMessage(''); try { await task() } catch (e) { setMessage(e instanceof Error ? e.message : 'Publication failed.') } finally { setBusy(false) } }
+  return <section className={panel}><h2 className="font-semibold">Publish a job</h2><p className="mt-2 text-sm">Only a brand owner can publish. Review the job, arrangement and privacy notice, then verify with your passkey.</p><div className="mt-3 flex gap-3"><button className={button} disabled={busy} onClick={() => act(async () => { await registerPublicationPasskey(); setMessage('Passkey registered.') })}>Register passkey</button><button className={button} disabled={busy} onClick={() => act(async () => { await verifyPublicationPasskey(); setMessage('Identity verified. Review and publish within five minutes.') })}>Verify with passkey</button></div>
+    <Form busy={busy} onSubmit={f => act(async () => { await write('publish_job_requisition', { ...scope, requisition_id: val(f, 'requisition_id'), description: val(f, 'description'), location: val(f, 'location'), arrangement: val(f, 'arrangement'), compensation: val(f, 'compensation'), notice_version: val(f, 'notice_version'), notice_text: val(f, 'notice_text'), contact: val(f, 'contact'), operation_id: id() }); await reload(); setMessage('Job published. Applications will be accepted once intake opens.') })}>
+      <label className="block text-sm">Requisition<select name="requisition_id" className={field} required>{requisitions.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label><MultilineField name="description" label="Job description" /><TextField name="location" label="Location" /><MultilineField name="arrangement" label="Arrangement, duties, duration and supervision" /><TextField name="compensation" label="Compensation and expenses" /><TextField name="contact" label="Organization contact" /><TextField name="notice_version" label="Privacy notice version" /><MultilineField name="notice_text" label="Candidate privacy notice (include retention and optional consent purposes)" /><label className="block text-sm"><input type="checkbox" required /> I have reviewed this public job and notice and authorize publication.</label>
+    </Form><p role="status" className="mt-3 text-sm">{message}</p><ul>{publications.map(p => <li className="mt-3" key={p.requisition_id}>{p.title} · {p.status}{p.status === 'published' && <button className={button + ' ml-3'} disabled={busy} onClick={() => act(async () => { await write('close_job_requisition', { ...scope, requisition_id: p.requisition_id, expected_version: p.version, operation_id: id() }); await reload(); setMessage('Job closed.') })}>Close job</button>}</li>)}</ul></section>
+}
+
+export function Jobs({ userId }: { userId?: string }) {
+  const [jobs, setJobs] = useState<PublicJob[]>([])
+  const [job, setJob] = useState<PublicJob | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [more, setMore] = useState(false)
+  const [available, setAvailable] = useState(false)
+  const [applications, setApplications] = useState<CandidateApplication[]>([])
+  const selection = useRef(0)
+  async function load(after = '') { setLoading(true); setError(''); try { const rows = await readPublic<PublicJob>('list_public_jobs', { after_id: after }); setJobs(old => after ? [...old, ...rows] : rows); setMore(rows.length === 25); const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate'); setAvailable(gates[0]?.intake_status === 'open') } catch { setError('Jobs could not be loaded. Please retry.') } finally { setLoading(false) } }
+  async function mine() { if (userId) setApplications(await read<CandidateApplication>('list_my_job_applications')) }
+  useEffect(() => { void load(); mine().catch(() => setError('Your applications could not be loaded.')) }, [userId])
+  async function select(row: PublicJob) { const seq = ++selection.current; setJob(null); setError(''); try { const rows = await readPublic<PublicJob>('get_public_job', row); if (seq === selection.current) { setJob(rows[0] ?? null); if (!rows.length) setError('This job is no longer available.') } } catch { if (seq === selection.current) setError('Job details could not be loaded.') } }
+  return <main className="mx-auto max-w-4xl space-y-5 px-4 py-8"><nav className="flex gap-5"><a href="/">Recruiter workspace</a><a href="/?view=jobs">Jobs and my applications</a></nav><h1 className="text-2xl font-semibold">Jobs</h1>{error && <p role="alert">{error}</p>}{loading && <p role="status">Loading jobs…</p>}<button className={button} disabled={loading} onClick={() => load()}>Refresh jobs</button><ul className="space-y-2">{jobs.map(j => <li key={j.requisition_id}><button className={panel + ' w-full text-left'} onClick={() => select(j)}>{j.title} · {j.brand_name} · {j.location}</button></li>)}</ul>{!loading && !jobs.length && <p>No published jobs are available.</p>}{more && <button className={button} disabled={loading} onClick={() => load(jobs.at(-1)!.requisition_id)}>More jobs</button>}
+    {job && <section className={panel}><h2 className="text-xl font-semibold">{job.title}</h2><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h3 className="mt-4 font-semibold">Arrangement</h3><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h3 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h3><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : !userId ? <div className="mt-4"><p>Sign in to apply with your own candidate account.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={mine} />}</section>}
+    {userId && <section className={panel}><h2 className="font-semibold">My applications</h2>{applications.map(a => <article className="mt-5" key={a.application_id}><h3>{a.title} · {a.brand_name}</h3><p>{a.stage.replaceAll('_', ' ')}</p><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></article>)}</section>}
+  </main>
+}
+
+function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [receipt, setReceipt] = useState<IntakeReceipt | null>(null)
+  // Kept for retries of this form, never regenerated after an uncertain response.
+  const ids = useRef({ application_id: id(), candidate_id: id(), operation_id: id(), idempotency_key: id() })
+  const submittedPayload = useRef<string | null>(null)
+  async function submit(f: FormData) {
+    setBusy(true); setError('')
+    const p = { ...ids.current, organization_id: job.organization_id, brand_id: job.brand_id, requisition_id: job.requisition_id, candidate_name: val(f, 'candidate_name'), email: val(f, 'email').toLowerCase(), phone: val(f, 'phone'), statement: val(f, 'statement'), notice_version: job.notice_version, expected_version: job.version, notice_acknowledged: f.has('notice_acknowledged') ? 1 : 0, talent_pool_consent: f.has('talent_pool_consent') ? 1 : 0, communications_consent: f.has('communications_consent') ? 1 : 0 }
+    const payload = { name: p.candidate_name, email: p.email, phone: p.phone, statement: p.statement, notice_version: p.notice_version, publication_version: p.expected_version, notice_acknowledged: p.notice_acknowledged, talent_pool_consent: p.talent_pool_consent, communications_consent: p.communications_consent, requisition_id: p.requisition_id, brand_id: p.brand_id, organization_id: p.organization_id }
+    try {
+      if (submittedPayload.current && submittedPayload.current !== JSON.stringify(payload)) throw new Error('A previous submission may have been saved. Restore the original form values and retry to check its receipt before starting another application.')
+      await write('save_my_worker_profile', { display_name: p.candidate_name })
+      submittedPayload.current = JSON.stringify(payload)
+      let failure: unknown
+      try { await write('submit_job_application', p) } catch (e) { failure = e }
+      const rows = await read<IntakeReceipt>('get_my_application_receipt', { idempotency_key: p.idempotency_key })
+      const saved = rows[0]
+      if (!saved) throw failure ?? new Error('Application was not saved. Check that applications are open, then retry. Submissions are limited to ten per day and one per ten seconds.')
+      if (JSON.stringify(JSON.parse(saved.payload_json)) !== JSON.stringify(payload)) throw new Error('Submission conflict. The saved application differs from this form.')
+      setReceipt(saved); await onSaved()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Application could not be saved.') } finally { setBusy(false) }
+  }
+  if (receipt) return <p role="status" className="mt-4">Application saved for {job.brand_name}. Reference: {receipt.application_id}. You can manage attachments under My applications.</p>
+  return <div className="mt-5"><h3 className="font-semibold">Apply to {job.brand_name}</h3>{error && <p role="alert">{error}</p>}<Form busy={busy} onSubmit={submit}><TextField name="candidate_name" label="Your name" /><TextField name="email" label="Email" type="email" /><TextField name="phone" label="Phone (optional)" required={false} /><label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} /></label><label className="block text-sm"><input name="notice_acknowledged" type="checkbox" required /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label><label className="block text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label><label className="block text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label></Form></div>
+}

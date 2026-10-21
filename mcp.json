@@ -140,7 +140,7 @@
       "name": "list_applications",
       "description": "list applications",
       "operation": "query",
-      "sql": "SELECT a.id,a.stage,a.version,a.source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id JOIN hiring_requisitions r ON r.id=a.requisition_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) ORDER BY a.updated_at DESC LIMIT 100",
+      "sql": "SELECT a.id,a.stage,a.version,a.intake_source AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id JOIN hiring_requisitions r ON r.id=a.requisition_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id) ORDER BY a.updated_at DESC LIMIT 100",
       "params": {
         "organization_id": {
           "type": "string"
@@ -666,7 +666,7 @@
       "name": "gateway_list_applications",
       "description": "Gateway: paginated, redacted applications for a granted brand. Keyset cursor (cursor_at, cursor_id); 25 per page; no contact details or free text",
       "operation": "query",
-      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.intake_source AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25",
       "params": {
         "organization_id": {
           "type": "string"
@@ -689,7 +689,7 @@
       "name": "gateway_get_application",
       "description": "Gateway: one redacted application for a granted brand; not-granted and missing both return no row",
       "operation": "query",
-      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND a.id=:application_id LIMIT 1",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,a.intake_source AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id = :organization_id AND m.brand_id = :brand_id AND m.user_id = :__user_id AND m.role IN ('owner','recruiter')) AND a.id=:application_id LIMIT 1",
       "params": {
         "organization_id": {
           "type": "string"
@@ -743,6 +743,337 @@
         }
       },
       "requires_auth": true
+    },
+    {
+      "name": "publish_job_requisition",
+      "description": "Publish immutable job and notice snapshot. Brand owner and recent app passkey step-up required; never use a model confirmation flag.",
+      "operation": "batch",
+      "params": {
+        "requisition_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "arrangement": {
+          "type": "string"
+        },
+        "compensation": {
+          "type": "string"
+        },
+        "notice_version": {
+          "type": "string"
+        },
+        "notice_text": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND m.user_id=:__user_id AND m.role='owner') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.published',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ],
+      "step_up": true
+    },
+    {
+      "name": "close_job_requisition",
+      "description": "Close publication with version and audit; legacy draft requisition remains compatible.",
+      "operation": "batch",
+      "params": {
+        "requisition_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE hiring_job_publications SET status='closed',version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND status='published' AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND m.user_id=:__user_id AND m.role='owner') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.closed',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ],
+      "step_up": true
+    },
+    {
+      "name": "list_public_jobs",
+      "description": "Public published job summaries only; use after_id for pagination.",
+      "operation": "query",
+      "params": {
+        "after_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": false,
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,b.name AS brand_name,o.name AS organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+    },
+    {
+      "name": "get_public_job",
+      "description": "Public approved job/notice snapshot; no candidate or internal fields.",
+      "operation": "query",
+      "params": {
+        "requisition_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": false,
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,b.name AS brand_name,o.name AS organization_name,j.description,j.location,j.arrangement,j.compensation,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+    },
+    {
+      "name": "save_my_worker_profile",
+      "description": "Create or update only your independent worker profile. Never grants staff access.",
+      "operation": "batch",
+      "params": {
+        "display_name": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "INSERT INTO hiring_worker_profiles(user_id,display_name,created_at,updated_at) SELECT :__user_id,:display_name,:__now,:__now WHERE length(trim(:display_name)) BETWEEN 1 AND 200 ON CONFLICT(user_id) DO UPDATE SET display_name=excluded.display_name,updated_at=excluded.updated_at"
+      ]
+    },
+    {
+      "name": "get_my_worker_profile",
+      "description": "Read your worker profile only.",
+      "operation": "query",
+      "params": {},
+      "requires_auth": true,
+      "sql": "SELECT display_name,created_at,updated_at FROM hiring_worker_profiles WHERE user_id=:__user_id LIMIT 1"
+    },
+    {
+      "name": "submit_job_application",
+      "description": "Authenticated candidate submission. Exact published scope, notice acknowledgement, optional consent, snapshot, per-user SQL abuse limits and atomic receipt/history/audit. Closed runtime gate refuses writes.",
+      "operation": "batch",
+      "params": {
+        "candidate_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "candidate_name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "notice_version": {
+          "type": "string"
+        },
+        "notice_acknowledged": {
+          "type": "integer"
+        },
+        "talent_pool_consent": {
+          "type": "integer"
+        },
+        "communications_consent": {
+          "type": "integer"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "INSERT INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at,worker_user_id) SELECT :candidate_id,:organization_id,:brand_id,:candidate_name,lower(trim(:email)),NULLIF(:phone,''),'',:__user_id,:__now,:__user_id WHERE EXISTS (SELECT 1 FROM hiring_runtime_gate WHERE id=1 AND intake_status='open') AND EXISTS (SELECT 1 FROM hiring_worker_profiles WHERE user_id=:__user_id) AND EXISTS (SELECT 1 FROM hiring_job_publications j JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.status='published' AND j.version=:expected_version AND j.notice_version=:notice_version AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_memberships WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner') AND :notice_acknowledged=1 AND :talent_pool_consent IN (0,1) AND :communications_consent IN (0,1) AND length(trim(:candidate_name)) BETWEEN 1 AND 200 AND length(trim(:email)) BETWEEN 3 AND 254 AND instr(:email,'@')>1 AND length(:phone)<=100 AND length(:statement)<=10000 AND length(trim(:application_id)) BETWEEN 1 AND 128 AND length(trim(:candidate_id)) BETWEEN 1 AND 128 AND length(trim(:idempotency_key)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND idempotency_key=:idempotency_key) AND NOT EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id) AND NOT EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id) AND (SELECT count(*) FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-86400000)<10 AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-10000)",
+        "INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,intake_source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at,submitted_snapshot_json,notice_version,idempotency_key) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:candidate_id,'linkedin','direct','Direct application',:notice_version,'Candidate supplied', (SELECT user_id FROM hiring_memberships WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner' ORDER BY created_at,user_id LIMIT 1),'submitted',1,:__user_id,:__now,:__now,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:notice_version,:idempotency_key WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id AND worker_user_id=:__user_id AND organization_id=:organization_id AND brand_id=:brand_id)",
+        "INSERT INTO hiring_intake_receipts(application_id,organization_id,brand_id,requisition_id,worker_user_id,idempotency_key,payload_json,created_at) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:__user_id,:idempotency_key,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id AND created_by=:__user_id)",
+        "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application_notice','contract',:notice_version,json_object('affirmative_action','application_submit','notice_text',j.notice_text,'publication_version',j.version),:__user_id,:__now FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND changes()=1",
+        "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id||':'||p.purpose,:organization_id,:brand_id,:application_id,p.purpose,'consent',:notice_version,'Optional unchecked checkbox selected at submission',:__user_id,:__now FROM (SELECT 'talent_pool' AS purpose,:talent_pool_consent AS selected UNION ALL SELECT 'communications',:communications_consent) p WHERE p.selected=1 AND EXISTS (SELECT 1 FROM hiring_consent_records WHERE id=:operation_id AND actor_user_id=:__user_id AND application_id=:application_id)",
+        "INSERT INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,NULL,'submitted',1,'Candidate submitted',:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_consent_records WHERE id=:operation_id AND actor_user_id=:__user_id AND application_id=:application_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.submitted',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "get_my_application_receipt",
+      "description": "Read original receipt for authenticated retry reconciliation; compare payload before treating replay as success.",
+      "operation": "query",
+      "params": {
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.payload_json,r.created_at,a.stage FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id WHERE r.worker_user_id=:__user_id AND r.idempotency_key=:idempotency_key LIMIT 1"
+    },
+    {
+      "name": "list_my_job_applications",
+      "description": "Candidate-owned applications; excludes staff notes, contact provenance and other candidates.",
+      "operation": "query",
+      "params": {},
+      "requires_auth": true,
+      "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.created_at,a.stage,q.title,b.name AS brand_name FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id JOIN hiring_requisitions q ON q.id=r.requisition_id JOIN hiring_brands b ON b.id=r.brand_id WHERE r.worker_user_id=:__user_id ORDER BY r.created_at DESC,r.application_id LIMIT 100"
+    },
+    {
+      "name": "create_application_attachment",
+      "description": "Reserve private uploader-scoped object path; pending scan, never a reviewer download authorization. Metadata is unverified until trusted scanner integration.",
+      "operation": "batch",
+      "params": {
+        "attachment_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "checksum": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "INSERT INTO hiring_attachments(id,organization_id,brand_id,application_id,uploader_user_id,filename,storage_path,mime_type,size_bytes,checksum,operation_id,created_at) SELECT :attachment_id,:organization_id,:brand_id,:application_id,:__user_id,:filename,'intake/'||:attachment_id,:mime_type,:size_bytes,:checksum,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=:application_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.worker_user_id=:__user_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(:attachment_id) BETWEEN 1 AND 128 AND :attachment_id NOT GLOB '*[^a-zA-Z0-9-]*' AND length(trim(:filename)) BETWEEN 1 AND 200 AND :mime_type IN ('application/pdf','text/plain') AND :size_bytes BETWEEN 1 AND 5242880 AND length(:checksum)=64 AND :checksum NOT GLOB '*[^0-9a-f]*' AND (SELECT count(*) FROM hiring_attachments WHERE application_id=:application_id AND scan_state<>'deleted')<3 AND NOT EXISTS (SELECT 1 FROM hiring_attachments WHERE id=:attachment_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attachment.created',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "list_application_attachments",
+      "description": "Attachment metadata for uploader or exact assigned brand member; private paths never returned.",
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.scan_state,x.uploader_user_id,x.created_at FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.application_id=:application_id AND x.scan_state<>'deleted' AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=x.organization_id AND m.brand_id=x.brand_id AND m.user_id=:__user_id))) ORDER BY x.created_at LIMIT 3"
+    },
+    {
+      "name": "delete_application_attachment",
+      "description": "Uploader tombstones attachment before deleting their private object; downloads must refuse tombstones. Retriable object cleanup uses deterministic path.",
+      "operation": "batch",
+      "params": {
+        "attachment_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE hiring_attachments SET scan_state='deleted',deleted_at=:__now WHERE id=:attachment_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND uploader_user_id=:__user_id AND scan_state<>'deleted' AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=:application_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.worker_user_id=:__user_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attachment.deleted',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "get_application_attachment",
+      "description": "Clean attachment authorization only; no storage capability URL. Trusted scan and reviewer byte-serving integration still required.",
+      "operation": "query",
+      "params": {
+        "attachment_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.checksum FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.id=:attachment_id AND x.application_id=:application_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.scan_state='clean' AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=x.organization_id AND m.brand_id=x.brand_id AND m.user_id=:__user_id))) LIMIT 1"
+    },
+    {
+      "name": "list_job_publications",
+      "description": "Staff publication state for an exact granted brand, including closed jobs.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT j.requisition_id,j.version,j.status,r.title FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_memberships m WHERE m.organization_id=j.organization_id AND m.brand_id=j.brand_id AND m.user_id=:__user_id) ORDER BY j.created_at DESC LIMIT 100"
     }
   ]
 }
