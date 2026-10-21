@@ -3,9 +3,11 @@ import { read, type Communication, type Draft, type EmailStatusEvent, type Scope
 import { emailCards, statusLabel } from './email-model'
 import { date } from './ui'
 
-export function Communications({ scope, applicationId, drafts, communications }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[] }) {
+export function Communications({ scope, applicationId, drafts, communications, loading = false, error = '', onRetry }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[]; loading?: boolean; error?: string; onRetry?: () => void }) {
   const cards = emailCards(drafts, communications)
-  return cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={`${card.key}:${card.at}:${card.status}`} card={card} scope={scope} applicationId={applicationId} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>
+  if (loading && !cards.length) return <p role="status" className="mt-4">Loading communications…</p>
+  if (error) return <div role="alert" className="mt-4">Could not load communications. {onRetry && <button type="button" className="min-h-[44px] min-w-[44px] underline" onClick={onRetry}>Retry communications</button>}</div>
+  return cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, card.logicalId || card.key])} card={card} scope={scope} applicationId={applicationId} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>
 }
 function EmailCard({ card, scope, applicationId }: { card: ReturnType<typeof emailCards>[number]; scope: Scope; applicationId: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -31,14 +33,14 @@ function EmailCard({ card, scope, applicationId }: { card: ReturnType<typeof ema
     <h4 className="mt-1 font-medium">{card.subject}</h4>
     <p className="text-xs">From: {card.from || 'Not recorded'} · To: {card.to}{card.provider && ` · ${card.provider === 'gmail' ? 'Gmail' : 'Cloudflare email'}`}</p>
     <p className="mt-2 whitespace-pre-wrap">{card.body}</p>
-    <button type="button" className="mt-3 underline" aria-expanded={expanded} aria-controls={`history-${card.key}`} onClick={() => { setExpanded(!expanded); if (!expanded && !loaded) void load() }}>Status history</button>
+    <button type="button" className="mt-3 min-h-[44px] min-w-[44px] underline" aria-expanded={expanded} aria-controls={`history-${card.key}`} onClick={() => { setExpanded(!expanded); if (!expanded && !loaded) void load() }}>Status history</button>
     {expanded && <div id={`history-${card.key}`} className="mt-2" aria-busy={loading}>
       {card.reference && <p className="text-xs">Provider reference: {card.reference}</p>}
       {loading && <p role="status">Loading history…</p>}
-      {error && <p role="alert">{error} <button type="button" className="underline" onClick={() => void load()}>Retry</button></p>}
+      {error && <p role="alert">{error} <button type="button" className="min-h-[44px] min-w-[44px] underline" onClick={() => void load()}>Retry</button></p>}
       {(!card.logicalId || (loaded && !events.length)) && <p>Status history unavailable for this record.</p>}
       <ol className="space-y-2">{events.map(e => <li key={e.id}><time dateTime={new Date(e.timestamp).toISOString()}>{date(e.timestamp)}</time> · {statusLabel(e.status)} · {e.actor}{e.attempt_number != null && ` · Attempt ${e.attempt_number}`}{e.provider_reference && <span className="block text-xs">Provider reference: {e.provider_reference}</span>}</li>)}</ol>
-      {more && <button type="button" disabled={loading} className="mt-2 underline" onClick={() => void load()}>Load more history</button>}
+      {more && <button type="button" disabled={loading} className="mt-2 min-h-[44px] min-w-[44px] underline" onClick={() => void load()}>Load more history</button>}
     </div>}
   </li>
 }

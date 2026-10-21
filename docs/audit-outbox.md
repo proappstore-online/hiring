@@ -132,3 +132,18 @@ per-email history is independently paginated without truncating older events.
 
 Validation uses synthetic SQLite fixtures and React server rendering, not a live
 provider send, candidate mutation, or browser authentication ceremony.
+
+### Communications UI verification
+
+The Communications list distinguishes initial detail loading and fetch failure from
+an empty result, with an in-section retry. Email card identity includes workspace,
+application and logical email identity: status/activity updates preserve expansion,
+while scope changes reset history. History controls have 44px minimum touch targets.
+Provider receipt/event references remain available inside the expanded history.
+
+Run `pnpm exec playwright install --with-deps chromium` once before `pnpm test`.
+The browser regression suite uses synthetic fixtures, real React and Tailwind,
+and a local Vite server with only the API read boundary mocked. It exercises
+keyboard expansion/collapse, loading/error/retry, pagination, pending requests
+across applications, stable card identity, and the 375px layout. CI installs
+Chromium before running the same full suite.

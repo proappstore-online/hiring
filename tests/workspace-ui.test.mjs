@@ -11,7 +11,7 @@ const source = () => readdirSync(dir).filter(f => /\.tsx?$/.test(f)).map(f => re
 test('workspace and application data are keyed so stale loads never render under another record', () => {
   const app = source()
   assert.match(app, /work\?\.brand_id === selected \? work : emptyWork/)
-  assert.match(app, /detail\?\.application_id === activeId \? detail : emptyDetail/)
+  assert.match(app, /detail\?\.scope_key === detailKey \? detail : emptyDetail/)
   assert.match(app, /if \(seq === workSeq\.current\)/)
   assert.match(app, /if \(seq === detailSeq\.current\)/)
 })

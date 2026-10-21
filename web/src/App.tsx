@@ -8,9 +8,9 @@ import { Jobs, PublishJob } from './Jobs'
 
 const NAV: NavItem[] = [{ label: 'Workspace', href: '/', title: 'Hiring' }]
 type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
-type Detail = { application_id: string; notes: Note[]; drafts: Draft[]; communications: Communication[]; activities: AgentActivity[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
+type Detail = { scope_key: string; application_id: string; notes: Note[]; drafts: Draft[]; communications: Communication[]; activities: AgentActivity[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
 const emptyWork: Omit<Work, 'brand_id'> = { requisitions: [], members: [], applications: [] }
-const emptyDetail: Omit<Detail, 'application_id'> = { notes: [], drafts: [], communications: [], activities: [], events: [], assignments: [], audit: [] }
+const emptyDetail: Omit<Detail, 'application_id' | 'scope_key'> = { notes: [], drafts: [], communications: [], activities: [], events: [], assignments: [], audit: [] }
 
 export default function App() {
   const { user, loading } = useAuth(app)
@@ -26,6 +26,7 @@ function WorkspaceView({ userId }: { userId: string }) {
   const [work, setWork] = useState<Work | null>(null)
   const [activeId, setActiveId] = useState('')
   const [detail, setDetail] = useState<Detail | null>(null)
+  const [detailFetch, setDetailFetch] = useState({ key: '', loading: false, error: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -33,9 +34,12 @@ function WorkspaceView({ userId }: { userId: string }) {
   const detailSeq = useRef(0)
   const space = spaces?.find(s => s.brand_id === selected)
   const scope = space ? { organization_id: space.organization_id, brand_id: space.brand_id } : null
+  const detailKey = JSON.stringify([scope?.organization_id, scope?.brand_id, activeId])
+  const detailLoading = detailFetch.key !== detailKey || detailFetch.loading
+  const detailError = detailFetch.key === detailKey ? detailFetch.error : ''
   // Data loaded for a previous workspace or application is never shown for the current one.
   const { requisitions, members, applications } = work?.brand_id === selected ? work : emptyWork
-  const { notes, drafts, communications, activities, events, assignments, audit } = detail?.application_id === activeId ? detail : emptyDetail
+  const { notes, drafts, communications, activities, events, assignments, audit } = detail?.scope_key === detailKey ? detail : emptyDetail
   const active = applications.find(a => a.id === activeId)
   const reloadSpaces = useCallback(async () => { const rows = await read<Workspace>('list_my_workspaces'); setSpaces(rows); setSelected(old => rows.some(s => s.brand_id === old) ? old : rows[0]?.brand_id ?? '') }, [])
   const reloadWork = useCallback(async () => {
@@ -47,9 +51,17 @@ function WorkspaceView({ userId }: { userId: string }) {
   const reloadDetail = useCallback(async () => {
     const seq = ++detailSeq.current
     if (!scope || !activeId) return
+    const key = JSON.stringify([scope.organization_id, scope.brand_id, activeId])
+    setDetailFetch({ key, loading: true, error: '' })
     const p = { ...scope, application_id: activeId }
-    const [n, d, c, x, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<Communication>('list_application_communications', p), read<AgentActivity>('list_application_agent_activity', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
-    if (seq === detailSeq.current) setDetail({ application_id: activeId, notes: n, drafts: d, communications: c, activities: x, events: e, assignments: h, audit: a })
+    try {
+      const [n, d, c, x, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<Communication>('list_application_communications', p), read<AgentActivity>('list_application_agent_activity', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
+      if (seq === detailSeq.current) setDetail({ scope_key: key, application_id: activeId, notes: n, drafts: d, communications: c, activities: x, events: e, assignments: h, audit: a })
+    } catch {
+      if (seq === detailSeq.current) setDetailFetch({ key, loading: false, error: 'Could not load communications.' })
+    } finally {
+      if (seq === detailSeq.current) setDetailFetch(old => ({ ...old, loading: false }))
+    }
   }, [space?.organization_id, space?.brand_id, activeId])
   const loadSpaces = useCallback(() => { setLoading(true); setError(''); reloadSpaces().catch(e => setError(String(e))).finally(() => setLoading(false)) }, [reloadSpaces])
   useEffect(loadSpaces, [loadSpaces])
@@ -74,7 +86,7 @@ function WorkspaceView({ userId }: { userId: string }) {
           {space.role === 'owner' && <PublishJob key={selected} scope={scope!} requisitions={requisitions} />}
           <Admin onChanged={async () => { await reloadSpaces(); await reloadWork(); await reloadDetail() }} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} />
         </div>
-        <div>{active ? <ApplicationDetail key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>
+        <div>{active ? <ApplicationDetail detailLoading={detailLoading} detailError={detailError} retryDetail={() => void reloadDetail()} key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>
       </div>
     </>}
   </div>
