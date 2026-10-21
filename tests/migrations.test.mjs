@@ -94,10 +94,10 @@ test('every legacy application child rejects mismatched scope on insert and upda
     const params = columns.map(c => values[c.name] ?? (c.type === 'INTEGER' ? 1 : 'value'))
     const sql = `INSERT INTO ${table} (${columns.map(c => c.name).join(',')}) VALUES (${columns.map(() => '?').join(',')})`
     db.prepare(sql).run(...params)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch/, table)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch|audit is append-only/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch|audit is append-only/, table)
     const bad = [...params]; bad[columns.findIndex(c => c.name === 'id')] += '-bad'; bad[columns.findIndex(c => c.name === 'application_id')] = 'app-b'
-    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch/, table)
+    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch|audit is append-only/, table)
   }
   db.close()
 })
@@ -110,4 +110,24 @@ test('deploy stops on migration failure before worker, actions and frontend', ()
   assert.match(workflow.slice(start, end), /exit 1/)
   assert.doesNotMatch(workflow.slice(start, end), /continue-on-error/)
   for (const step of ['Deploy app worker', 'Register app tools', 'Upload to R2']) assert.ok(workflow.indexOf('- name: ' + step) > start, step)
+})
+
+
+test('0010 upgrades populated 0009, preserves audit and memberships, replays and enforces immutable audit', () => {
+  const db = database()
+  const baseline = JSON.parse(read('tests/fixtures/migrations-0001-0009.json')).migrations
+  assert.deepEqual(migrations.slice(0, baseline.length), baseline)
+  apply(db, historical); seed(db); apply(db, baseline)
+  db.exec("INSERT INTO hiring_memberships VALUES ('member','org-a','brand-a','staff','owner',0)")
+  db.exec("INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at) VALUES ('audit','org-a','brand-a','workspace.created','staff','op',0)")
+  const audits = db.prepare('SELECT * FROM hiring_audit_events').all()
+  const members = db.prepare('SELECT * FROM hiring_memberships').all()
+  apply(db, migrations); apply(db, migrations)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_audit_events').all(), audits)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_memberships').all(), members)
+  assert.equal(db.prepare('SELECT operation_id FROM hiring_brands LIMIT 1').get().operation_id, null)
+  assert.throws(() => db.exec("UPDATE hiring_audit_events SET actor_user_id='forged'"), /append-only/)
+  assert.throws(() => db.exec('DELETE FROM hiring_audit_events'), /append-only/)
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
+  db.close()
 })

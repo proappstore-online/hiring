@@ -303,10 +303,13 @@ test('Cloudflare archives preserve owner, brand, application, candidate and mail
   assert.equal(call('get_worker_candidate_email', 'staff-b', workerMail).length, 0)
   assert.equal(call('list_application_communications', 'staff-b', workerMail).length, 0)
   // An orphaned archive cannot be used to recreate an audit after the actor loses membership.
-  db.prepare('DELETE FROM hiring_audit_events WHERE operation_id=?').run(workerMail.operation_id)
+  // Simulate a legacy orphan directly: production audit rows can no longer be deleted.
+  const orphan = { ...db.prepare('SELECT * FROM hiring_worker_communication_events WHERE id=?').get(workerMail.communication_id), id: 'orphan-email', operation_id: 'orphan-op', provider_message_id: 'orphan-message', provider_receipt_id: null, provider_event_id: null }
+  const keys = Object.keys(orphan)
+  db.prepare(`INSERT INTO hiring_worker_communication_events (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`).run(...Object.values(orphan))
   db.exec("DELETE FROM hiring_memberships WHERE user_id='staff-a'")
-  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [0, 0])
-  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_audit_events WHERE operation_id=?').get(workerMail.operation_id).n, 0)
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, communication_id: orphan.id, operation_id: orphan.operation_id, provider_message_id: orphan.provider_message_id, provider_receipt_id: null }), [0, 0])
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_audit_events WHERE operation_id=?').get(orphan.operation_id).n, 0)
   db.close()
 })
 

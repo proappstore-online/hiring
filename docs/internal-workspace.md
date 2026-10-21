@@ -12,9 +12,18 @@ Migration `0004_assignment_history` adds versioned reassignment history. Reassig
 
 ## Operator steps
 
-1. Confirm main deploy applied migrations `0003_internal_workspace` through `0006_optional_linkedin_profile`, registered the actions, and uploaded the frontend. A failed migration or action registration stops the deploy.
+1. Confirm main deploy applied migrations `0003_internal_workspace` through `0010_secure_multibrand_administration`, registered the actions, and uploaded the frontend. A failed migration or action registration stops the deploy.
 2. Sign in at `https://hiring.proappstore.online/` with GitHub or configured Google, then create the internal workspace. Use a real organization and brand name. The initial requisition remains draft and is for internal sourcing only.
 3. Have each recruiter sign in once and send the owner their displayed PAS staff ID. The owner grants that exact ID under **Workspace setup**. Do not grant access based on a matching email address.
 4. Before entering live candidate data, confirm the organization's lawful basis, privacy notice, retention/deletion process, and authority to contact that candidate. The UI records basis and contact context, but policy approval is an operator responsibility.
 
-Current limits: one brand is created per workspace; additional brands, grant revocation, candidate editing/deletion/rights requests, attachments, public application intake and communication sending require later issues. Draft requisitions cannot be published through this workflow. The public intake gate remains closed.
+Current limits: grant revocation, candidate editing/deletion/rights requests, attachments, public application intake and communication sending require later issues. Draft requisitions cannot be published through this workflow. The public intake gate remains closed.
+
+
+## Multiple brands and administration integrity (issue #2)
+
+The organization creator can use **Workspace setup → Add brand to this organization** to create another brand and its first draft requisition. The server derives this authority from `hiring_organizations.created_by`, never a client claim or ownership of another brand. `create_workspace` accepts an existing organization ID only for its creator; the supplied organization name does not rename it. Each new brand receives a separate owner membership. Recruiters receive access only to the exact brand granted by its owner; membership in one brand gives no access to sibling brands, including their audit records. The workspace selector lists only granted brands.
+
+Migration `0010_secure_multibrand_administration` adds nullable brand operation provenance and database triggers rejecting audit UPDATE and DELETE statements. Existing records and migrations are preserved. Workspace setup checks identifier collisions before creating any records, and configuration audits require this operation's brand and owner membership. Member grants bind their audit marker to the exact member and scope. Every mutation rejects an already audited operation ID before writing and emits its final audit marker only after a write in the same batch. Stage and assignment history also require the preceding write to succeed. Retries and rejected administration calls leave records unchanged.
+
+The regression suite configures sibling brands through registered actions, verifies all scoped reads and major mutations against other-brand staff and outsiders, tests mixed record IDs even for an owner of both brands, and checks relational constraints, audit attribution, replay/collisions, and populated migration upgrades. Authorization remains based on the owner/recruiter memberships; the broader `hiring_grants` schema is reserved for later scoped-role workflows. SQL reads do not produce denial/read audit events, and database triggers do not protect against an operator who can remove triggers.
