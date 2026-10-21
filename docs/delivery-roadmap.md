@@ -4,7 +4,7 @@ GitHub issues are the execution queue, with explicit dependencies. Work lands di
 
 | Phase | Outcome and gate |
 | --- | --- |
-| 0. Capability and policy | Verify worker/public endpoint, D1, MCP and MAIL; owner/contact, legal basis, retention and unpaid-review owner. Block intake if unresolved. |
+| 0. Capability and policy | Verify worker/public endpoint, D1, MCP and MAIL; owner/contact, legal basis, indefinite retention and owner-approved arrangement disclosures. Block intake if unresolved. |
 | 1. Secure core | Additive schema, tenant/grant enforcement, audit/outbox, organization/brand/requisition management. Prove cross-brand denial and migration order. |
 | 2. Intake | Brand forms, protected endpoint, attachments, consent, candidate token, application pipeline and reviewer access. Two-brand E2E. |
 | 3. Decisions and messaging | Interviews, scorecards, human decisions/offers, MAIL send/reconcile and retry. No duplicate send. |
@@ -18,7 +18,9 @@ Every development issue includes appropriate authorization/data handling, useful
 1. Brand A recruiter cannot discover or mutate Brand B through UI, URL, export or MCP.
 2. Same-email applicants across brands remain separate absent an authorized audited merge.
 3. Candidate applies, receives branded receipt, withdraws and requests export/deletion without a recruiter account.
-4. Unpaid trial cannot publish or send an offer without current legal approval.
-5. MAIL timeout, duplicate callback, quota exhaustion and bounce preserve business state and expose delivery status.
+4. Unpaid, internship and volunteer roles use accurate disclosures and ordinary human publication/offer authorization, with no legal-review gate.
+5. MAIL timeout and quota exhaustion preserve business state; unknown sends require manual reconciliation. Test callbacks/bounces only on a provider that supports them.
 6. Schema expansion precedes dependent tools/client; failed migration blocks release.
 7. Private attachment and candidate token cannot be fetched by another candidate or unassigned staff.
+
+The [#53 ADR review](architecture.md#affected-backlog-dependencies) records resolved #52/#9 policy inputs and remaining implementation/capability dependencies, including the separate FAS mail route #58.

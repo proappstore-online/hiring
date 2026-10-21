@@ -13,8 +13,8 @@ Platform-authenticated caller, explicit organization/brand selection, validated 
 | `list_applications`, `get_application` | Recruiter/assigned manager, strict brand filter; interviewer view redacted. |
 | `get_candidate` | Explicit application context and need-to-know grant; audit read. |
 | `list_interviews`, `get_scorecard` | Assigned reviewer or recruiter, limited packet. |
-| `create_requisition`, `update_requisition` | Recruiter/owner, version check; invalidate changed unpaid approval. |
-| `publish_requisition` | Authorized human and approved notice/arrangement. |
+| `create_requisition`, `update_requisition` | Recruiter/owner, version check; preserve arrangement disclosure history; no legal-review approval. |
+| `publish_requisition` | Authorized human and approved notice/accurate arrangement disclosure; no legal-review gate. |
 | `advance_application` | Allowed transition, reason, human attribution, version. |
 | `submit_scorecard` | Assigned reviewer, structured criteria, own submission only. |
 | `record_decision` | Authorized human, reason and audit. |
@@ -42,4 +42,10 @@ Verified at `platform@ee78178` (see [architecture](architecture.md#capability-ch
 - **Rate limits:** SQL tools cannot throttle per user. Only the platform's limit on anonymous calls was verified (120 per 60 seconds per app and client IP); the authenticated limit was not. `createRateLimiter` is for a future worker and is not enforced today.
 - **Structured errors:** the platform returns rows or change counts, not error codes. The codes above are applied by the caller through the helpers. Typed results remain unsupported.
 - **Worker route:** a trusted worker needs `pas worker enable hiring` by a platform admin. Enablement is unverified, and the worker runs as `system:worker` with no roles, so it would have to check the signed-in user itself. No worker is deployed.
-- **#53:** ADR-001 to ADR-005 are still unreviewed, so this boundary is provisional until #53 records the owner decision.
+- **#53 review:** ADR-001 accepts this SQL enforcement boundary for the current restricted reads. Worker enablement, server throttling, structured errors and read/denial audit remain gaps, not capabilities conferred by this decision.
+
+## Approved onboarding and retention boundary (#53)
+
+Owner: Serge. [Owner decisions](https://github.com/proappstore-online/hiring/issues/52#issuecomment-6309937556) approve many organizations, public organization sign-up and independent worker accounts/profiles. Authenticated worker actions must derive identity from the platform and enforce ownership of the worker/application link; recruiter membership checks do not authorize worker access. Anonymous writes and token-only D1 access are unsupported by the [#7 evidence](https://github.com/proappstore-online/hiring/issues/7). These actions and onboarding are not implemented by this review.
+
+Retain records indefinitely without an automatic purge; explicit rights/deletion flows remain scoped and audited. No legal-review gate applies to unpaid, internship or volunteer roles. See [ADR review and backlog dependencies](architecture.md#affected-backlog-dependencies).

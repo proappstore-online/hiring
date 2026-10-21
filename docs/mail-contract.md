@@ -2,6 +2,8 @@
 
 `MAIL` is the planned messaging boundary, not an assumed installed product or verified API. Discovery must confirm service owner, endpoints, auth, quotas, webhooks, processing terms and deletion capability. Implement behind a provider-neutral adapter until verified.
 
+The Outbound and Inbound sections describe the target adapter contract. The verified-interface table and ADR-004 review below define the supported subset and take precedence for implementation; provider IDs, callbacks and retry idempotency must not be assumed.
+
 ## Outbound
 
 `SendMessage` carries `operation_id`, `organization_id`, `brand_id`, `application_id`, purpose, template ID/version, recipient, reply identity, locale, approved variables, requesting actor, consent/basis reference and correlation ID. Store minimal metadata and body hash in Hiring. Render approved brand templates, escape variables, and prevent recipient enumeration or cross-brand identity leakage. MAIL returns provider message ID, acceptance time and status. `operation_id` is idempotent across retries. No offer/rejection email without an authorized committed decision; transactional consent never authorizes marketing.
@@ -12,7 +14,7 @@ Events carry message/operation/event IDs, event type (`accepted`, `sent`, `deliv
 
 ## Reliability and privacy
 
-Outbox owns retry/backoff; MAIL outages leave business state committed with visible pending/failed delivery. Terminal failures allow operator retry or alternate contact. Reconcile timeouts by idempotency key; respect provider quota. Send only rendering fields. Agree body retention, suppression, deletion propagation and processor terms with legal review. Never log body, recipient address, candidate token or secret. Test invalid signatures, duplicates, out-of-order callbacks, bounce, ambiguous reply, quota and timeout.
+Outbox owns retry/backoff; MAIL outages leave business state committed with visible pending/failed delivery. Terminal failures allow operator retry or alternate contact. Reconcile timeouts by idempotency key; respect provider quota. Send only rendering fields. The owner confirms processor terms, suppression and deletion propagation; no external legal-review gate applies. Hiring message bodies are retained indefinitely unless explicitly deleted. Never log body, recipient address, candidate token or secret. Test invalid signatures, duplicates, out-of-order callbacks, bounce, ambiguous reply, quota and timeout.
 
 Adapter-selection issue must document actual API/SDK, credential storage, verification, guarantees, idempotency, rates and deletion. Missing guarantees need compensating controls or a launch hold. Platform `app.email` offers transactional send with a documented 100/day limit but is not automatically the full MAIL contract.
 
@@ -25,14 +27,14 @@ Verified against `proappstore-online/platform@4ad0753` (`packages/sdk/src/email.
 | Provider | Resend HTTPS API (`POST https://api.resend.com/emails`), called by the PAS backend worker. No SDK, no other provider. |
 | App interface | `app.email.send(to, subject, body, { replyTo })` → `POST https://api.proappstore.online/v1/email/send` with the caller's session. Returns `{ ok: true }` only. |
 | Credentials | Platform-owned Worker secrets `RESEND_API_KEY` and `EMAIL_FROM` on the PAS backend; the app never holds a key. Default sender `ProAppStore <noreply@proappstore.online>`, platform-wide. Per-brand from-identity is not possible; only `replyTo` is app-controlled. |
-| Live status | **Not configured.** An unauthenticated probe returns `503` (the secret check runs before auth), so production has no `RESEND_API_KEY`. No Resend entry exists in the secrets inventory. |
+| Live status | **Not configured at the 2026-10-20 probe.** An unauthenticated probe returned `503` (the secret check runs before auth), indicating production then had no `RESEND_API_KEY`. No Resend entry was recorded in the inspected secrets inventory. |
 | Who may send | Signed-in app owner, platform admin, or a user holding the `editor` app role (`app_roles`). Hiring memberships do not grant this, and MCP actions (SQL-only) cannot send. |
 | Limits | 100 sends/day per app (rolling 24 h, reserved atomically before send and released if Resend fails); subject ≤ 200 chars, body ≤ 50 KB, one recipient. Notify-user email shares the 100/day budget. Errors: 400/401/403/404/429/503. |
 | Body handling | The same string goes to Resend as both `html` and `text`, unescaped and unmoderated. Hiring must render and escape it. |
 | Message ID / status | Not returned. No delivery status, no Resend message ID. |
 | Idempotency | None. No `Idempotency-Key` is forwarded to Resend; a retry after a timeout can double-send. |
 | Callbacks / inbound | None. No Resend webhook receiver, no bounce/complaint/delivered events, no inbound reply handling. |
-| Suppression / unsubscribe | Only for notify-user email to platform members (`notification_email_optout`, RFC 8058 one-click). Candidates are not platform users, so this does not apply to `app.email.send`. |
+| Suppression / unsubscribe | Only for notify-user email to platform members (`notification_email_optout`, RFC 8058 one-click). This does not apply to `app.email.send`, including mail to an approved self-registered worker. |
 | Retention / deletion | Platform stores only `email_usage(app_id, user_id, sent_at)`: no recipient, subject or body. There is no API to delete a sent message at Resend; Resend-side retention follows the platform's Resend account. |
 
 **Owner:** The ProAppStore platform (`proappstore-online/platform`, backend worker) owns the provider, the account, the secrets and the sending domain. Serge (`serge-ivo`) is the platform owner and the only person who can configure it. Hiring owns the adapter, the outbox, templates and the compensating controls below.
@@ -50,10 +52,18 @@ Verified against `proappstore-online/platform@4ad0753` (`packages/sdk/src/email.
 | Sender authorization | Requires platform `editor` | A sending recruiter needs both a Hiring membership and the platform `editor` app role. Keep the Hiring permission check as the primary gate, because the platform role is coarser. |
 | Suppression | None for candidates | Keep a Hiring-side suppression list (candidate opted out, or undeliverable) checked before send. Do not rely on the platform. |
 | Quota | 100/day shared | Show remaining-quota errors (`429`) as visible `failed` with retry next day. No bulk send. |
-| Deletion propagation | No provider delete | Privacy notice states that sent mail is held by the processor (Resend) under the platform's terms. Hiring deletes its own outbox rows and body copies on erasure. Processor terms need legal review (see `privacy-governance.md`). |
+| Deletion propagation | No provider delete | Privacy notice states that sent mail is held by the processor (Resend) under the platform's terms. Hiring deletes its own outbox rows and body copies on erasure. The owner confirms processor terms without an external legal-review gate (see `privacy-governance.md`). |
 
 ### Needs Serge
 
 1. Create/confirm the Resend account and a verified sending domain for `proappstore.online`. Store `RESEND_API_KEY` (and `EMAIL_FROM` if it is not the default) via `ops put` and set them on the PAS backend worker.
 2. Decide whether the platform will add Resend `Idempotency-Key` forwarding, return the Resend message ID, and add a signed Resend webhook. These are platform changes. Hiring launches without them under the controls above.
 3. Confirm the Resend DPA/retention terms for candidate mail.
+
+## ADR-004 review (#53, 2026-10-21)
+
+**Revised; owner: Serge.** The [#8 discovery](https://github.com/proappstore-online/hiring/issues/8#issuecomment-6286791370) is evidence for the PAS/Resend interface above, not a claim that the full outbound/inbound target contract is supported. Unknown send outcomes require manual reconciliation; automatic retry cannot safely guarantee deduplication. Sending remains unavailable until provider setup and adapter controls are verified.
+
+The newer [FAS mail epic #58](https://github.com/proappstore-online/hiring/issues/58) selects a dedicated Cloudflare/PAGS bridge for the approved FAS identity. Its tools exist, but the recorded live check found no configured bridge and no successful mail roundtrip. Secure connection management (PAGS #1277), recipient isolation and bounded incremental reads (#1278), sender approval and a controlled roundtrip remain prerequisites. See [operations runbook](hiring-agent-operations.md). Do not substitute PAS email or unrelated Gmail credentials for that route. Existing communication-event recording proves storage/audit, not delivery.
+
+The approved multi-tenant model requires every message to map to its organization, brand and application; worker self-registration grants no cross-tenant mailbox access. #25/#26/#27/#47 retain their broader adapter, callback, template and receipt work. Indefinite Hiring retention and explicit deletion follow [#9](https://github.com/proappstore-online/hiring/issues/9); provider retention/deletion limitations need owner confirmation, not lawyer sign-off.
