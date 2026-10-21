@@ -216,3 +216,48 @@ test('new action SQL has declared params, authenticated writes, no identity inpu
     else { assert.match(sql,/LIMIT (1|25)$/); assert.doesNotMatch(sql,/hiring_candidates|hiring_applications|hiring_attachments/) }
   }
 })
+
+test('staged review binds exact content and classification with versioned owner approval', () => {
+  const { db, call } = fixture()
+  const draft = { ...publication(), compensation_type: 'unpaid', expected_version: 0, state: 'draft', operation_id: 'draft-save' }
+  assert.deepEqual(call('save_requisition_review','staff-a',draft), [0,0])
+  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, requisition_id:B.requisition_id }), [0,0])
+  assert.deepEqual(call('save_requisition_review','owner',draft), [1,1])
+  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, operation_id:'stale' }), [0,0])
+  assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [0,0])
+  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, state:'pending_review', expected_version:1, operation_id:'review-submit' }), [1,1])
+  assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid', notice_text:'changed notice' }), [0,0])
+  assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [1,1])
+  assert.equal(call('get_public_job',null,A)[0].compensation_type,'unpaid')
+  assert.throws(() => db.prepare("UPDATE hiring_job_publications SET compensation_type='paid'").run(), /immutable/)
+  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, expected_version:2, operation_id:'edit-published' }), [0,0])
+  db.close()
+})
+
+test('pause hides discovery and denies submissions; resume and closure use optimistic versions', () => {
+  const { db, call, publish } = fixture()
+  publish()
+  const change = { ...A, expected_version:1, operation_id:'pause' }
+  assert.deepEqual(call('pause_job_requisition','staff-a',change), [0,0,0])
+  assert.deepEqual(call('pause_job_requisition','owner',{ ...change, requisition_id:B.requisition_id }), [0,0,0])
+  assert.deepEqual(call('pause_job_requisition','owner',change), [1,1,1])
+  assert.equal(call('get_public_job',null,A).length,0)
+  assert.equal(call('list_public_jobs',null,{ after_id:'' }).length,1)
+  assert.ok(call('submit_job_application','worker',application()).every(n => n===0))
+  assert.deepEqual(call('resume_job_requisition','owner',{ ...change, operation_id:'stale-resume' }), [0,0,0])
+  assert.deepEqual(call('resume_job_requisition','owner',{ ...change, expected_version:2, operation_id:'resume' }), [1,1,1])
+  assert.equal(call('get_public_job',null,A)[0].version,3)
+  assert.deepEqual(call('pause_job_requisition','owner',{ ...change, expected_version:3, operation_id:'pause-again' }), [1,1,1])
+  assert.deepEqual(call('close_job_requisition','owner',{ ...change, expected_version:4, operation_id:'close-paused' }), [1,1])
+  assert.deepEqual(call('resume_job_requisition','owner',{ ...change, expected_version:5, operation_id:'resume-closed' }), [0,0,0])
+  db.close()
+})
+
+test('lifecycle audit failure rolls back availability and version', () => {
+  const { db, call, publish } = fixture()
+  publish()
+  db.exec("CREATE TRIGGER fail_pause BEFORE INSERT ON hiring_audit_events WHEN NEW.action='requisition.paused' BEGIN SELECT RAISE(ABORT,'audit failure'); END")
+  assert.throws(() => call('pause_job_requisition','owner',{ ...A, expected_version:1, operation_id:'pause-fail' }), /audit failure/)
+  assert.equal(call('get_public_job',null,A)[0].version,1)
+  db.close()
+})

@@ -781,11 +781,15 @@
         },
         "operation_id": {
           "type": "string"
+        },
+        "compensation_type": {
+          "type": "string",
+          "optional": true
         }
       },
       "requires_auth": true,
       "statements": [
-        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id)",
+        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,compensation_type,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,coalesce(:compensation_type,'unspecified'),:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id) AND coalesce(:compensation_type,'unspecified') IN ('unspecified','paid','unpaid','internship','volunteer') AND NOT EXISTS (SELECT 1 FROM hiring_requisition_reviews v WHERE v.requisition_id=r.id AND (v.state!='pending_review' OR v.payload!=json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified'))))",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.published',:__user_id,:operation_id,:__now WHERE changes()=1"
       ],
       "step_up": true
@@ -828,7 +832,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
     },
     {
       "name": "get_public_job",
@@ -846,7 +850,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
     },
     {
       "name": "save_my_worker_profile",
@@ -926,7 +930,7 @@
       },
       "requires_auth": true,
       "statements": [
-        "INSERT INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at,worker_user_id) SELECT :candidate_id,:organization_id,:brand_id,:candidate_name,lower(trim(:email)),NULLIF(:phone,''),'',:__user_id,:__now,:__user_id WHERE EXISTS (SELECT 1 FROM hiring_runtime_gate WHERE id=1 AND intake_status='open') AND EXISTS (SELECT 1 FROM hiring_worker_profiles WHERE user_id=:__user_id) AND EXISTS (SELECT 1 FROM hiring_job_publications j JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.status='published' AND j.version=:expected_version AND j.notice_version=:notice_version AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_effective_access WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner' AND requisition_id IS NULL) AND :notice_acknowledged=1 AND :talent_pool_consent IN (0,1) AND :communications_consent IN (0,1) AND length(trim(:candidate_name)) BETWEEN 1 AND 200 AND length(trim(:email)) BETWEEN 3 AND 254 AND instr(:email,'@')>1 AND length(:phone)<=100 AND length(:statement)<=10000 AND length(trim(:application_id)) BETWEEN 1 AND 128 AND length(trim(:candidate_id)) BETWEEN 1 AND 128 AND length(trim(:idempotency_key)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND idempotency_key=:idempotency_key) AND NOT EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id) AND NOT EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id) AND (SELECT count(*) FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-86400000)<10 AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-10000)",
+        "INSERT INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at,worker_user_id) SELECT :candidate_id,:organization_id,:brand_id,:candidate_name,lower(trim(:email)),NULLIF(:phone,''),'',:__user_id,:__now,:__user_id WHERE EXISTS (SELECT 1 FROM hiring_runtime_gate WHERE id=1 AND intake_status='open') AND EXISTS (SELECT 1 FROM hiring_worker_profiles WHERE user_id=:__user_id) AND EXISTS (SELECT 1 FROM hiring_job_publications j JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND j.version=:expected_version AND j.notice_version=:notice_version AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_effective_access WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner' AND requisition_id IS NULL) AND :notice_acknowledged=1 AND :talent_pool_consent IN (0,1) AND :communications_consent IN (0,1) AND length(trim(:candidate_name)) BETWEEN 1 AND 200 AND length(trim(:email)) BETWEEN 3 AND 254 AND instr(:email,'@')>1 AND length(:phone)<=100 AND length(:statement)<=10000 AND length(trim(:application_id)) BETWEEN 1 AND 128 AND length(trim(:candidate_id)) BETWEEN 1 AND 128 AND length(trim(:idempotency_key)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND idempotency_key=:idempotency_key) AND NOT EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id) AND NOT EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id) AND (SELECT count(*) FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-86400000)<10 AND NOT EXISTS (SELECT 1 FROM hiring_intake_receipts WHERE worker_user_id=:__user_id AND created_at>:__now-10000)",
         "INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at,submitted_snapshot_json,notice_version,idempotency_key) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:candidate_id,'linkedin','Direct application',:notice_version,'Candidate supplied', (SELECT user_id FROM hiring_effective_access WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner' AND requisition_id IS NULL ORDER BY created_at,user_id LIMIT 1),'submitted',1,:__user_id,:__now,:__now,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:notice_version,:idempotency_key WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id AND worker_user_id=:__user_id AND organization_id=:organization_id AND brand_id=:brand_id)",
         "INSERT INTO hiring_intake_receipts(application_id,organization_id,brand_id,requisition_id,worker_user_id,idempotency_key,payload_json,created_at) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:__user_id,:idempotency_key,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id AND created_by=:__user_id)",
         "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application_notice','contract',:notice_version,json_object('affirmative_action','application_submit','notice_text',j.notice_text,'publication_version',j.version),:__user_id,:__now FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND changes()=1",
@@ -1073,7 +1077,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT j.requisition_id,j.version,j.status,r.title FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) ORDER BY j.created_at DESC LIMIT 100"
+      "sql": "SELECT j.requisition_id,j.version,CASE WHEN j.status='closed' THEN 'closed' WHEN EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) THEN 'paused' ELSE 'published' END AS status,r.title FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) ORDER BY j.created_at DESC LIMIT 100"
     },
     {
       "name": "grant_workspace_access",
@@ -1416,6 +1420,136 @@
         }
       },
       "sql": "SELECT m.id,m.user_id,m.role,'brand' AS scope_type,m.brand_id AS scope_id,m.brand_id,NULL AS requisition_id,m.created_at AS granted_at,'membership' AS source FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND NOT EXISTS (SELECT 1 FROM hiring_membership_revocations r WHERE r.membership_id=m.id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION ALL SELECT g.id,g.user_id,g.role,CASE WHEN g.requisition_id IS NOT NULL THEN 'requisition' WHEN g.brand_id IS NOT NULL THEN 'brand' ELSE 'organization' END,coalesce(g.requisition_id,g.brand_id,g.organization_id),g.brand_id,g.requisition_id,g.created_at,'grant' FROM hiring_grants g WHERE g.organization_id=:organization_id AND g.status='active' AND g.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY granted_at,id LIMIT 500"
+    },
+    {
+      "name": "save_requisition_review",
+      "description": "Owner saves draft or submits exact job and notice for review. Version zero creates; pending review may return to draft. No legal-review gate per owner decision #52.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "arrangement": {
+          "type": "string"
+        },
+        "compensation": {
+          "type": "string"
+        },
+        "notice_version": {
+          "type": "string"
+        },
+        "notice_text": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "compensation_type": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_requisition_reviews(requisition_id,state,payload,actor_user_id) SELECT :requisition_id,:state,json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')),:__user_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :state IN ('draft','pending_review') AND :compensation_type IN ('paid','unpaid','internship','volunteer') AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 2000 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 2000 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 2000 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT version FROM hiring_requisition_reviews WHERE requisition_id=r.id),0) ON CONFLICT(requisition_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,actor_user_id=excluded.actor_user_id,version=version+1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.review_saved',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "pause_job_requisition",
+      "description": "Owner changes publication availability with version and atomic audit.",
+      "operation": "batch",
+      "requires_auth": true,
+      "step_up": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_job_publications SET version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND status='published' AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_publication_controls WHERE requisition_id=:requisition_id AND paused=0)",
+        "UPDATE hiring_publication_controls SET paused=1 WHERE requisition_id=:requisition_id AND changes()=1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.paused',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "resume_job_requisition",
+      "description": "Owner changes publication availability with version and atomic audit.",
+      "operation": "batch",
+      "requires_auth": true,
+      "step_up": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_job_publications SET version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND status='published' AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_publication_controls WHERE requisition_id=:requisition_id AND paused=1)",
+        "UPDATE hiring_publication_controls SET paused=0 WHERE requisition_id=:requisition_id AND changes()=1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.resumed',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "get_requisition_review",
+      "description": "Owner reads staged public content and review version in exact brand.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT v.* FROM hiring_requisition_reviews v JOIN hiring_requisitions r ON r.id=v.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL)"
     }
   ]
 }
