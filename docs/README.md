@@ -4,6 +4,7 @@ These documents are the implementation baseline. Changes to a decision require a
 
 | Document | Purpose |
 | --- | --- |
+| [Capability and governance gates](capability-governance-gates.md) | Issue #1 decisions, accountable owner, evidence and downstream unblock conditions. |
 | [Product boundary](product-boundary.md) | Actors, release scope, brand separation, exclusions. |
 | [Domain model](domain-model.md) | Canonical records, invariants, state transitions. |
 | [Internal workspace](internal-workspace.md) | Staff setup, scope, and current limits. |
@@ -15,7 +16,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
 | [Google sign-in](google-sign-in.md) | Live PAS-native auth path and operator configuration. |
 
-This is a plan, not a claim that features exist or legal copy is approved. The runtime configuration remains a scaffold. Legal and platform capability decisions marked pending must be resolved in their issues before dependent launch work.
+This is a plan, not a claim that features exist or legal copy is approved. The runtime configuration remains a scaffold. Capability and policy discovery is recorded in the gate register; its remaining implementation and release gates must be verified before dependent launch work.
 
 ## Delivery environment prerequisite
 

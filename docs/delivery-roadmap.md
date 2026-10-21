@@ -13,6 +13,8 @@ GitHub issues are the execution queue, with explicit dependencies. Work lands di
 
 Every development issue includes appropriate authorization/data handling, useful failure states, targeted tests and doc updates for contract changes. On main, check CI, deploy and live behavior before closure. No planning assumption becomes a public promise without owner approval.
 
+The [capability and governance gate register](capability-governance-gates.md) identifies Serge as accountable owner and links evidence and unblock conditions for downstream work. Completing discovery epic #1 does not open intake or authorize sending.
+
 ## Release scenarios
 
 1. Brand A recruiter cannot discover or mutate Brand B through UI, URL, export or MCP.

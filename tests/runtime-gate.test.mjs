@@ -38,3 +38,18 @@ test('deploy applies migrations before registering dependent actions', () => {
   const workflow = readFileSync(resolve(root, '.github/workflows/deploy.yml'), 'utf8')
   assert.ok(workflow.indexOf('Apply D1 migrations') < workflow.indexOf('Register app tools'))
 })
+
+test('registered actions cannot open intake or expose anonymous candidate data', () => {
+  const tools = read('mcp.json').tools
+  for (const tool of tools) {
+    for (const sql of tool.statements ?? [tool.sql]) {
+      if (tool.name === 'get_hiring_runtime_gate') {
+        assert.match(sql, /^SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1$/)
+      } else {
+        // Opening intake must be a deliberate reviewed release, never a client tool call.
+        assert.doesNotMatch(sql, /\bhiring_runtime_gate\b/i, tool.name)
+        assert.equal(tool.requires_auth, true, tool.name)
+      }
+    }
+  }
+})
