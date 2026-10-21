@@ -39,7 +39,17 @@ routing verification is dated 2026-10-17. This is a routed alias, **not a Google
 to authorize with Gmail OAuth. The earlier instruction to sign into Google as that alias
 was incorrect.
 
-Use a dedicated Cloudflare bridge implementing PAGS `email-worker/v1`.
+Compare two supported paths; a bridge is not inherently required to receive forwarded mail.
+
+| Path | Receive | Send as FAS | Isolation and cost controls |
+| --- | --- | --- | --- |
+| Gmail forwarding | Authorize the receiving mailbox `serge.the.dev@gmail.com`, then pin this instance | Requires an already verified Gmail send-as alias for `admin@freeappstore.online`; forwarding alone is insufficient | PAGS #1279 adds an account-bound recipient/sender policy, provider-side search, direct-ID checks, metadata pages and bounded body windows |
+| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 must enforce recipient isolation, paging and bounded reads; #1277 supplies secret-safe MCP connection management |
+
+Do not present code or unit tests as a live connection or delivery result. Gmail must not
+be enabled until the correct account is connected, the sender is verified and its scoped
+policy is read back. The old unrelated pin must never be used as a fallback.
+
 [PAGS #1269](https://github.com/ProAgentStore/platform/issues/1269) and
 [#1270](https://github.com/ProAgentStore/platform/issues/1270) delivered connector foundations.
 A receive route does not authorize sending: the domain needs sending onboarding, the
@@ -88,9 +98,18 @@ The original thirteen PAS grants are:
    storage across routes, ignores list cursors, considers only the first 200 keys and
    returns `nextCursor: null`; reads can return up to 200,000 raw MIME characters.
    Prompt instructions do not fix those implementation gaps.
-3. Provision and securely connect a dedicated bridge, approve the sender/reply identity,
-   pin this instance and verify routing/health. Credentials belong in approved secret
-   storage, never instructions, memory, tickets or this repository.
+3. [PAGS #1279](https://github.com/ProAgentStore/platform/issues/1279): finish deploying
+   and verifying Gmail exact-account OAuth handoff, recipient/sender enforcement and
+   bounded reads. Use `start_gmail_connection` for `serge.the.dev@gmail.com`; the owner
+   independently signs into the same PAGS account and approves Google. Inspect identities,
+   pin that mailbox and set/read back recipient and sender `admin@freeappstore.online`.
+   Enable only the required tools and instance email permission, keeping write consent
+   off until the labeled send test is ready. Alias verification may require owner setup
+   in Gmail; never substitute another From address to make a test pass.
+4. Provision and securely connect the bridge for the comparison, approve the sender/reply
+   identity, pin this instance and verify routing/health. Credentials belong in approved
+   secret storage, never instructions, memory, tickets or this repository. Preserve the
+   existing forwarding route and test one outbound path at a time.
 
 Until prerequisites pass, leave sending unavailable. Do not expand administrative Hiring
 grants merely to repair an email connection.
@@ -98,7 +117,8 @@ grants merely to repair an email connection.
 ## Read budget and application audit
 
 Instance rules require metadata first, at most ten summaries and three relevant body reads
-per run, at most 6,000 body characters each. Persist provider IDs/checkpoints only after
+per run, at most 4,000 body characters each. Continuation pages count toward the same run
+budget, not as permission for an unbounded loop. Persist provider IDs/checkpoints only after
 successful Hiring recording. Scope, pagination and output limits must be enforced and
 tested by the connector; stop with an actionable blocker if unavailable.
 
@@ -121,9 +141,16 @@ MCP connection and read back on application `8729c34d-cab9-4f5d-bafc-6c96e749dc0
 It explicitly labels itself an integration check, says no email was read/sent and makes
 no candidate decision. This verifies app recording, not mail delivery.
 
-After provisioning, send a labeled test to an owner-controlled address; independently
+For each path, after connection, send a labeled test to an owner-controlled address; independently
 verify receipt, agent read, reply From/thread identity and retries/deduplication. Record
 actual correspondence on a verified test contact/application and read it back. The owner
 authorized setup test mail on 2026-10-21. Do not use candidates as test recipients or claim
 delivery from an accepted-send receipt alone.
+
+Also send an unrelated-mail negative control to the same receiving Gmail mailbox without
+the FAS recipient. Verify it is excluded by search and refused by direct message-ID read,
+attachment and reply. Repeating a scan must skip processed provider IDs. Gmail sends are
+not currently provider-idempotent: after a timeout inspect Sent/thread evidence before any
+retry; never automatically resend an uncertain send. Keep the epic open until both paths'
+actual receipts and limitations are recorded and the owner chooses the operating path.
 
