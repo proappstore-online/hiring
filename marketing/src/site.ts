@@ -21,7 +21,7 @@ export const site = {
   /** Jurisdiction whose law governs the Terms. Leave empty to omit the clause. */
   governingLaw: '',
   /** Shown on the legal pages; update it whenever you change them. */
-  legalUpdated: '2026-10-18',
+  legalUpdated: '2026-10-21',
   /** Brand colours, mapped into the Tailwind theme (bg-accent, text-accent-deep, ...). */
   colors: {
     accent: '#d86f4d',
