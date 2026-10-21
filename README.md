@@ -1,6 +1,6 @@
 # Hiring
 
-Hiring is an early multi-brand applicant tracking system. The first private recruiter workflow is live; public intake and communication sending remain closed. The implementation baseline is [docs/README.md](docs/README.md).
+Hiring is an early multi-brand applicant tracking system. The first private recruiter workflow is live; public intake and communication sending remain closed. The implementation baseline is [docs/README.md](docs/README.md). Navigation uses [public and scoped recruiter routes](docs/routing.md).
 
 - `web/`: Vite/React shell with PAS-native Google and GitHub staff sign-in; candidate intake remains closed.
 - `marketing/`: Astro starter copy and draft legal pages, not approved Hiring claims.

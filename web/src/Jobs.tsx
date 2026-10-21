@@ -1,3 +1,5 @@
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { LoadingState, EmptyState, ErrorState, NotFound } from './route-ui'
 import { useEffect, useRef, useState } from 'react'
 import { SignInButton } from '@proappstore/sdk'
 import { app, id, read, readPublic, write, type CandidateApplication, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
@@ -21,7 +23,11 @@ export function PublishJob({ scope, requisitions }: { scope: Scope; requisitions
     </Form><p role="status" className="mt-3 text-sm">{message}</p><ul>{publications.map(p => <li className="mt-3" key={p.requisition_id}>{p.title} · {p.status}{p.status !== 'closed' && <><button className={button + ' ml-3'} disabled={busy} onClick={() => act(async () => { await write(p.status === 'paused' ? 'resume_job_requisition' : 'pause_job_requisition', { ...scope, requisition_id: p.requisition_id, expected_version: p.version, operation_id: id() }); await reload() })}>{p.status === 'paused' ? 'Resume' : 'Pause'}</button></>}{p.status !== 'closed' && <button className={button + ' ml-3'} disabled={busy} onClick={() => act(async () => { await write('close_job_requisition', { ...scope, requisition_id: p.requisition_id, expected_version: p.version, operation_id: id() }); await reload(); setMessage('Job closed.') })}>Close job</button>}</li>)}</ul></section>
 }
 
-export function Jobs({ userId }: { userId?: string }) {
+export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list' | 'detail' | 'apply' }) {
+  const { jobId } = useParams()
+  const [query] = useSearchParams()
+  const organization_id = query.get('organization_id') ?? ''
+  const brand_id = query.get('brand_id') ?? ''
   const [jobs, setJobs] = useState<PublicJob[]>([])
   const [job, setJob] = useState<PublicJob | null>(null)
   const [error, setError] = useState('')
@@ -29,15 +35,55 @@ export function Jobs({ userId }: { userId?: string }) {
   const [more, setMore] = useState(false)
   const [available, setAvailable] = useState(false)
   const [applications, setApplications] = useState<CandidateApplication[]>([])
+  const [mineLoading, setMineLoading] = useState(Boolean(userId))
+  const [mineError, setMineError] = useState(false)
   const selection = useRef(0)
-  async function load(after = '') { setLoading(true); setError(''); try { const rows = await readPublic<PublicJob>('list_public_jobs', { after_id: after }); setJobs(old => after ? [...old, ...rows] : rows); setMore(rows.length === 25); const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate'); setAvailable(gates[0]?.intake_status === 'open') } catch { setError('Jobs could not be loaded. Please retry.') } finally { setLoading(false) } }
-  async function mine() { if (userId) setApplications(await read<CandidateApplication>('list_my_job_applications')) }
-  useEffect(() => { const query = new URLSearchParams(window.location.search); if (query.get('requisition_id')) void select({ organization_id: query.get('organization_id') ?? '', brand_id: query.get('brand_id') ?? '', requisition_id: query.get('requisition_id')! }); void load(); mine().catch(() => setError('Your applications could not be loaded.')) }, [userId])
-  async function select(row: Pick<PublicJob, 'organization_id' | 'brand_id' | 'requisition_id'>) { const seq = ++selection.current; setJob(null); setError(''); try { const rows = await readPublic<PublicJob>('get_public_job', row); if (seq === selection.current) { setJob(rows[0] ?? null); if (!rows.length) setError('This job is no longer available.') } } catch { if (seq === selection.current) setError('Job details could not be loaded.') } }
-  return <main className="mx-auto max-w-4xl space-y-5 px-4 py-8"><nav className="flex gap-5"><a href="/">Recruiter workspace</a><a href="/?view=jobs">Jobs and my applications</a></nav><h1 className="text-2xl font-semibold">Jobs</h1>{error && <p role="alert">{error}</p>}{loading && <p role="status">Loading jobs…</p>}<button className={button} disabled={loading} onClick={() => load()}>Refresh jobs</button><ul className="space-y-2">{jobs.map(j => <li key={j.requisition_id}><button className={panel + ' w-full text-left'} onClick={() => select(j)}>{j.title} · {j.brand_name} · {j.location}</button></li>)}</ul>{!loading && !jobs.length && <p>No published jobs are available.</p>}{more && <button className={button} disabled={loading} onClick={() => load(jobs.at(-1)!.requisition_id)}>More jobs</button>}
-    {job && <section className={panel}><h2 className="text-xl font-semibold">{job.title}</h2><a className="underline" href={`/?view=jobs&organization_id=${encodeURIComponent(job.organization_id)}&brand_id=${encodeURIComponent(job.brand_id)}&requisition_id=${encodeURIComponent(job.requisition_id)}`}>Link to this vacancy</a><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h3 className="mt-4 font-semibold">Arrangement</h3><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h3 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h3><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : !userId ? <div className="mt-4"><p>Sign in to apply with your own candidate account.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={mine} />}</section>}
-    {userId && <section className={panel}><h2 className="font-semibold">My applications</h2>{applications.map(a => <article className="mt-5" key={a.application_id}><h3>{a.title} · {a.brand_name}</h3><p>{a.stage.replaceAll('_', ' ')}</p><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></article>)}</section>}
-  </main>
+  const link = (row: Pick<PublicJob, 'organization_id' | 'brand_id' | 'requisition_id'>, prefix = '/jobs/') => prefix + encodeURIComponent(row.requisition_id) + '?' + new URLSearchParams({ organization_id: row.organization_id, brand_id: row.brand_id })
+  async function load(after = '') {
+    const seq = ++selection.current
+    setLoading(true); setError('')
+    try {
+      if (mode === 'list') {
+        const rows = await readPublic<PublicJob>('list_public_jobs', { after_id: after })
+        if (seq === selection.current) { setJobs(old => after ? [...old, ...rows] : rows); setMore(rows.length === 25) }
+      } else {
+        let jobScope = { organization_id, brand_id }
+        // Bare job URLs resolve scope from approved public summaries only.
+        if (!organization_id && !brand_id) {
+          let after_id = ''
+          while (seq === selection.current) {
+            const page = await readPublic<PublicJob>('list_public_jobs', { after_id })
+            const found = page.find(row => row.requisition_id === jobId)
+            if (found) { jobScope = found; break }
+            const next = page.at(-1)?.requisition_id ?? ''
+            if (page.length < 25 || next <= after_id) break
+            after_id = next
+          }
+        }
+        if (seq !== selection.current) return
+        const rows = jobScope.organization_id && jobScope.brand_id ? await readPublic<PublicJob>('get_public_job', { organization_id: jobScope.organization_id, brand_id: jobScope.brand_id, requisition_id: jobId }) : []
+        const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate')
+        if (seq === selection.current) { setJob(rows[0] ?? null); setAvailable(gates[0]?.intake_status === 'open') }
+      }
+    } catch { if (seq === selection.current) setError('Jobs could not be loaded. Please retry.') }
+    finally { if (seq === selection.current) setLoading(false) }
+  }
+  async function mine() {
+    if (!userId) return
+    setMineLoading(true); setMineError(false)
+    try { setApplications(await read<CandidateApplication>('list_my_job_applications')) }
+    catch { setMineError(true) }
+    finally { setMineLoading(false) }
+  }
+  useEffect(() => { void load(); void mine(); return () => { ++selection.current } }, [])
+  if (loading && !jobs.length) return <LoadingState>Loading jobs…</LoadingState>
+  if (error) return <ErrorState retry={() => void load()}>{error}</ErrorState>
+  if (mode !== 'list' && !job) return <NotFound>This job is no longer available. Open a vacancy link from the jobs list to include its organization and brand.</NotFound>
+  return <div className="mx-auto max-w-4xl space-y-5 px-4 py-8">
+    {mode === 'list' && <><h1 className="text-2xl font-semibold">Jobs</h1><button className={button} disabled={loading} onClick={() => void load()}>Refresh jobs</button><ul className="space-y-2">{jobs.map(j => <li key={j.requisition_id}><Link className={panel + ' block min-h-[44px] text-left'} to={link(j)}>{j.title} · {j.brand_name} · {j.location}</Link></li>)}</ul>{!jobs.length && <EmptyState>No published jobs are available.</EmptyState>}{loading && <LoadingState />}{more && <button className={button} disabled={loading} onClick={() => void load(jobs.at(-1)!.requisition_id)}>More jobs</button>}</>}
+    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={link(job, '/apply/')}>Apply for this job</Link> : !userId ? <div className="mt-4"><p>Sign in to apply with your own candidate account.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={mine} />}</section>}
+    {userId && <section className={panel}><h2 className="font-semibold">My applications</h2>{mineLoading ? <LoadingState>Loading your applications…</LoadingState> : mineError ? <ErrorState retry={() => void mine()}>Your applications could not be loaded.</ErrorState> : !applications.length ? <EmptyState>No applications recorded yet.</EmptyState> : applications.map(a => <article className="mt-5" key={a.application_id}><h3>{a.title} · {a.brand_name}</h3><p>{a.stage.replaceAll('_', ' ')}</p><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></article>)}</section>}
+  </div>
 }
 
 function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promise<void> }) {

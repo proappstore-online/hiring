@@ -18,7 +18,7 @@ accepted even with new IDs or retry keys. `get_my_requisition_receipt` reconcile
 such retries within the caller's exact scope. Changed payloads report a conflict.
 The atomic batch records the published notice, actor, time and optional consent.
 
-External vacancy links use `/?view=jobs&organization_id=…&brand_id=…&requisition_id=…`.
+External vacancy links use `/jobs/:jobId?organization_id=…&brand_id=…`.
 The same link loads the current published snapshot and survives sign-in. Paused,
 closed, stale and mixed-scope jobs refuse submission. No recruiter access is
 needed or granted by this path.
@@ -34,7 +34,7 @@ Implementation revision, 21 October 2026. Issue #3 remains a release gate until 
 
 Owners publish an immutable job and notice snapshot with `publish_job_requisition`. The platform requires recent app-origin passkey step-up (`step_up: true`); personal app tokens and model-supplied confirmation flags cannot satisfy it. The UI provides passkey registration/verification and requires review of public content. `close_job_requisition` checks version and records closure atomically with audit. Ordinary recruiter membership cannot publish. A publication is separate from the legacy requisition, whose draft-only CHECK remains unchanged. Owners can stage a versioned draft for review before publication (see the #15 lifecycle below); editing an existing publication is not supported. Create a new requisition for revised public content.
 
-`list_public_jobs` is a public summary query, keyset-paginated by requisition ID at 25 rows. `get_public_job` checks exact organization, brand and requisition. Both exclude closed publications and suspended organizations. Public responses contain approved job, organization/brand and notice fields, never candidates or attachments. `/?view=jobs` is the candidate entry point and survives authentication without requiring recruiter membership.
+`list_public_jobs` is a public summary query, keyset-paginated by requisition ID at 25 rows. `get_public_job` checks exact organization, brand and requisition. Both exclude closed publications and suspended organizations. Public responses contain approved job, organization/brand and notice fields, never candidates or attachments. `/jobs` is the candidate entry point and survives authentication without requiring recruiter membership.
 
 ## Worker ownership and evidence
 

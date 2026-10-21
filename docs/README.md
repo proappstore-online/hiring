@@ -5,6 +5,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | Document | Purpose |
 | --- | --- |
 | [Capability and governance gates](capability-governance-gates.md) | Issue #1 decisions, accountable owner, evidence and downstream unblock conditions. |
+| [Routing foundation](routing.md) | Public/recruiter routes, scope, detail API limits and SPA fallback. |
 | [Product boundary](product-boundary.md) | Actors, release scope, brand separation, exclusions. |
 | [Domain model](domain-model.md) | Canonical records, invariants, state transitions. |
 | [Internal workspace](internal-workspace.md) | Staff setup, scope, and current limits. |

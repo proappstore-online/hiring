@@ -27,8 +27,8 @@ test('the assignee picker remounts once members load so it defaults to the signe
 test('candidate and staff routes are separated; job and notice text render as escaped React content', () => {
   const app = readFileSync(resolve(dir, 'App.tsx'), 'utf8')
   const jobs = readFileSync(resolve(dir, 'Jobs.tsx'), 'utf8')
-  assert.match(app, /get\('view'\) === 'jobs'/)
-  assert.match(app, /<Jobs userId=\{user\?\.id\}/)
+  assert.match(app, /path="jobs\/:jobId"/)
+  assert.match(app, /<Jobs[^>]*userId=\{user\?\.id\}/)
   assert.match(jobs, /job\.organization_name/)
   assert.match(jobs, /job\.brand_name/)
   assert.match(jobs, /job\.notice_text/)

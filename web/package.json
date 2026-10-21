@@ -11,7 +11,8 @@
   "dependencies": {
     "@proappstore/sdk": "^1.16.78",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "react-router-dom": "6.30.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",

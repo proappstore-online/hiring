@@ -30,7 +30,7 @@ The regression suite configures sibling brands through registered actions, verif
 
 ## Issue #3 revision
 
-Owners can publish job snapshots using passkey verification and close publications with version checks. Browse jobs and independent candidate accounts at `/?view=jobs`. Existing internal sourcing is unchanged. Assigned staff can inspect attachment metadata; reviewer file downloads remain unavailable pending trusted scanning and scoped serving. Intake stays closed. See [intake implementation contract](candidate-intake.md).
+Owners can publish job snapshots using passkey verification and close publications with version checks. Browse jobs and independent candidate accounts at `/jobs`. Existing internal sourcing is unchanged. Assigned staff can inspect attachment metadata; reviewer file downloads remain unavailable pending trusted scanning and scoped serving. Intake stays closed. See [intake implementation contract](candidate-intake.md).
 
 ## Issue #14 administration revision
 

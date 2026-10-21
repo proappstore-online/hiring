@@ -306,7 +306,7 @@ test('candidate browser calls scoped candidate actions and renders an external v
   assert.match(source,/name="website" autoComplete="off" tabIndex=\{-1\}/)
   assert.match(source,/website: val\(f, 'website'\)/)
   assert.match(source,/'get_my_requisition_receipt'/)
-  assert.match(source,/view=jobs&organization_id=\$\{encodeURIComponent\(job.organization_id\)\}/)
+  assert.match(source,/new URLSearchParams\(\{ organization_id: row.organization_id, brand_id: row.brand_id \}\)/)
   assert.match(source,/provider="google"/)
   assert.doesNotMatch(source,/app\.db\.|app\.proxy\.|staff_token|D1_TOKEN|R2_SECRET|CLIENT_SECRET|dangerouslySetInnerHTML/)
   const action=tool('submit_job_application')
