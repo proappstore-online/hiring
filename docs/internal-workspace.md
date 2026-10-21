@@ -31,3 +31,7 @@ The regression suite configures sibling brands through registered actions, verif
 ## Issue #3 revision
 
 Owners can publish job snapshots using passkey verification and close publications with version checks. Browse jobs and independent candidate accounts at `/?view=jobs`. Existing internal sourcing is unchanged. Assigned staff can inspect attachment metadata; reviewer file downloads remain unavailable pending trusted scanning and scoped serving. Intake stays closed. See [intake implementation contract](candidate-intake.md).
+
+## Issue #14 administration revision
+
+Workspace setup now includes current organization identity (creator-owner), brand settings (brand owner), and scoped staff grant management. Owners can grant recruiter/reviewer/auditor authority and revoke legacy or explicit grants. These controls supersede the earlier statement that revocation requires later work. See the [administration contract](permissions.md#organization-and-brand-administration-14) for organization-wide restrictions and publication identity snapshots.

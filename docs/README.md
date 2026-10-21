@@ -27,3 +27,5 @@ Candidate intake implementation and its remaining release gate: [Requisitions an
 Server identity, scoped grants, assignment restrictions and revocation: [permissions contract](permissions.md).
 
 Append-only audit, durable job transitions and retry safety: [audit and outbox contract](audit-outbox.md).
+
+Owner identity editors, scoped member management, and immutable public identity snapshots: [organization and brand administration](permissions.md#organization-and-brand-administration-14).

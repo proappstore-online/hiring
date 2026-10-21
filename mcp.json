@@ -828,7 +828,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,b.name AS brand_name,o.name AS organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
     },
     {
       "name": "get_public_job",
@@ -846,7 +846,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,b.name AS brand_name,o.name AS organization_name,j.description,j.location,j.arrangement,j.compensation,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
     },
     {
       "name": "save_my_worker_profile",
@@ -1312,6 +1312,110 @@
         }
       },
       "sql": "SELECT id,recipient_email,subject,body,idempotency_key FROM hiring_outbox WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND claim_id=:claim_id AND claimed_by=:__user_id AND delivery_state='sending' AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) LIMIT 1"
+    },
+    {
+      "name": "update_organization_identity",
+      "description": "organization.identity_updated",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "optional": true
+        },
+        "verified_contact": {
+          "type": "string",
+          "optional": true
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_organizations SET name=coalesce(trim(:name),name),verified_contact=coalesce(trim(:verified_contact),verified_contact) WHERE id=:organization_id AND (EXISTS (SELECT 1 FROM hiring_organizations o WHERE o.id=:organization_id AND o.created_by=:__user_id AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND (:name IS NULL OR length(trim(:name)) BETWEEN 1 AND 300) AND (:verified_contact IS NULL OR length(trim(:verified_contact)) BETWEEN 0 AND 300) AND (:name IS NOT NULL OR :verified_contact IS NOT NULL)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'organization.identity_updated',:__user_id,:operation_id,:__now,'organizations',:organization_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "update_brand_settings",
+      "description": "brand.settings_updated",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "notice_version": {
+          "type": "string"
+        },
+        "reply_identity": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_brands SET name=trim(:name),slug=trim(:slug),notice_version=trim(:notice_version),reply_identity=trim(:reply_identity) WHERE id=:brand_id AND organization_id=:organization_id AND (EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:name)) BETWEEN 1 AND 300 AND length(trim(:slug)) BETWEEN 0 AND 300 AND length(trim(:notice_version)) BETWEEN 0 AND 128 AND length(trim(:reply_identity)) BETWEEN 0 AND 300 AND (:slug='' OR (:slug NOT GLOB '*[^a-z0-9-]*' AND NOT EXISTS (SELECT 1 FROM hiring_brands WHERE organization_id=:organization_id AND slug=:slug AND id<>:brand_id)))",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'brand.settings_updated',:__user_id,:operation_id,:__now,'brands',:brand_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "get_admin_settings",
+      "description": "Owner reads current organization and brand settings",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT o.name AS organization_name,o.verified_contact,b.name AS brand_name,b.slug,b.notice_version,b.reply_identity,(o.created_by=:__user_id) AS can_manage_organization FROM hiring_organizations o JOIN hiring_brands b ON b.organization_id=o.id WHERE o.id=:organization_id AND b.id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1"
+    },
+    {
+      "name": "list_organization_members",
+      "description": "Organization creator-owner lists active raw memberships and grants, preserving scope and revocation source",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT m.id,m.user_id,m.role,'brand' AS scope_type,m.brand_id AS scope_id,m.brand_id,NULL AS requisition_id,m.created_at AS granted_at,'membership' AS source FROM hiring_memberships m WHERE m.organization_id=:organization_id AND NOT EXISTS (SELECT 1 FROM hiring_membership_revocations r WHERE r.membership_id=m.id) AND EXISTS (SELECT 1 FROM hiring_organizations o WHERE o.id=:organization_id AND o.created_by=:__user_id AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION ALL SELECT g.id,g.user_id,g.role,CASE WHEN g.requisition_id IS NOT NULL THEN 'requisition' WHEN g.brand_id IS NOT NULL THEN 'brand' ELSE 'organization' END,coalesce(g.requisition_id,g.brand_id,g.organization_id),g.brand_id,g.requisition_id,g.created_at,'grant' FROM hiring_grants g WHERE g.organization_id=:organization_id AND g.status='active' AND EXISTS (SELECT 1 FROM hiring_organizations o WHERE o.id=:organization_id AND o.created_by=:__user_id AND o.status='active') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY granted_at,id LIMIT 500"
+    },
+    {
+      "name": "list_brand_admin_members",
+      "description": "Brand owner lists raw active grants for their brand",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT m.id,m.user_id,m.role,'brand' AS scope_type,m.brand_id AS scope_id,m.brand_id,NULL AS requisition_id,m.created_at AS granted_at,'membership' AS source FROM hiring_memberships m WHERE m.organization_id=:organization_id AND m.brand_id=:brand_id AND NOT EXISTS (SELECT 1 FROM hiring_membership_revocations r WHERE r.membership_id=m.id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION ALL SELECT g.id,g.user_id,g.role,CASE WHEN g.requisition_id IS NOT NULL THEN 'requisition' WHEN g.brand_id IS NOT NULL THEN 'brand' ELSE 'organization' END,coalesce(g.requisition_id,g.brand_id,g.organization_id),g.brand_id,g.requisition_id,g.created_at,'grant' FROM hiring_grants g WHERE g.organization_id=:organization_id AND g.status='active' AND g.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY granted_at,id LIMIT 500"
     }
   ]
 }

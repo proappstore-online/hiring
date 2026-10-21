@@ -8,7 +8,7 @@ export type Stage = typeof STAGES[number]
 export const TERMINAL_STAGES: readonly Stage[] = ['hired', 'rejected', 'withdrawn']
 export const NEXT_STAGES: readonly Stage[] = STAGES.filter(s => s !== 'submitted')
 export const stageLabel = (stage: string) => stage.replaceAll('_', ' ')
-export type Role = 'owner' | 'recruiter'
+export type Role = 'owner' | 'recruiter' | 'reviewer' | 'auditor'
 
 export type Scope = { organization_id: string; brand_id: string }
 export type Workspace = Scope & { organization_name: string; brand_name: string; role: Role; can_create_brand: number }
