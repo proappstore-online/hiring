@@ -55,3 +55,80 @@ Regression evidence: in-memory SQLite executes the deployed SQL with PAS-style
 binding and transactions; tests cover scope forgery, replay, exclusive claims,
 immutable payloads, audit rollback, redaction, timeouts and lost responses. These
 are local contract tests, not a live D1/provider delivery probe.
+
+## Logical email identity and history (#60 / #61)
+
+Additive migration `0018_email_identity_history` gives new outbox drafts a
+server-generated UUID (`logical_email_id`). Existing outbox and archive identities
+remain NULL until an old unsent draft is genuinely queued; that queue assigns an
+identity and records only its real queued event, never an invented draft event. It adds nullable identity columns, immutable explicit archive links,
+and append-only `email_status_events`. It does not edit any historical migration,
+rewrite archives, delete duplicate-looking records, or backfill fictional events.
+Gmail archives now reject updates/deletes just as worker archives do.
+
+Draft creation captures `draft` at server time and authenticated actor. Successful
+queue/claim/completion audit inserts capture `queued`, `sending`, and
+`accepted`/`failed`/`unknown` in the same transaction, including attempt number.
+`pending` maps to queued; outbox `sent` maps to provider accepted, **not delivered**.
+Rejected, replayed and no-op mutations append no events. Cancellation has an event
+schema value but no new cancellation operation is introduced; existing transition
+and no-double-send guards remain authoritative. Events have a monotonic sequence
+for stable ordering when timestamps tie. Current status follows recorded sequence;
+chronological history uses actual event time, then sequence.
+
+`get_claimed_communication` and `list_communication_drafts` now return the identity.
+The draft list also returns `current_status`, `latest_activity_at`, and
+`linked_archive_id`. Old delivery fields remain available. Both
+`record_candidate_email` and `record_worker_candidate_email` accept optional
+`logical_email_id`. Omit it for independent inbound/outbound archives, as before.
+For a new linked outbound archive, use the identity returned with the claimed
+payload, with the real provider message/thread/receipt/event IDs. Archive during
+sending or after sent/unknown completion, using the same authenticated claimant
+with current scoped access. Then complete using the original claim. Linking does
+not change the exclusive claim, release an unknown job, or authorize another send.
+
+Links require exact organization, brand and application, outbound direction,
+matching immutable subject/body, recipient and claimant identity. A logical email can link to only one
+provider archive across Gmail and Cloudflare. Conflicting links/payload replays
+abort; exact retries append nothing. Existing operation-ID replays can return zero
+changes before insertion, per the existing contract: zero changes is not evidence
+of a successful new archive. Use authorized provider-specific archive readback to
+verify the identity and actual IDs. Worker IDs are scoped to mailbox/connection;
+thread IDs never establish email identity. No actor parameter is accepted.
+
+`list_email_status_history` requires organization_id, brand_id, application_id,
+and logical_email_id. It uses the same owner/recruiter requisition access as the
+communication reads. Returns 50 events in chronological order. Supply the last
+returned `timestamp` as `cursor_at` and `id` as `cursor_id`; continue until an empty
+page (or a page shorter than 50). Do not treat the first page as complete history.
+The UI loads on expansion and offers further pages, with loading/error/retry states.
+No provider secrets, payloads or claim credentials are copied into event metadata.
+
+### Legacy reconciliation boundary
+
+The existing send/record/complete actions never persisted an explicit archive
+foreign key or provider account on the outbox. The historical nullable
+`provider_message_id` alone lacks a provider/mailbox/connection discriminator and
+cannot prove a Gmail-versus-worker association. Consequently this migration's safe
+reconciliation result is **no proven pairs**, no writes, NULL legacy identities,
+and unavailable history. It intentionally does not infer links from subject,
+body, addresses, time, threads, or a bare cross-provider message-ID collision.
+
+For an old pair to be reconciled in a future audited operation, retain an explicit
+stored outbox ID + provider + account/mailbox/connection + message/receipt reference
+from trusted send evidence, validate both scopes and immutable payloads, check
+one-to-one uniqueness, and append an attributed reconciliation link. Do not update
+an immutable archive or pretend reconciliation time was historical send time.
+This release exposes no manual content-matching/backfill bypass. Existing real
+invitation evidence is preserved, so unproven legacy duplicates stay visible.
+
+The Communications UI merges only shared non-null identities. Immutable outbox
+subject/body appear once; provider details enrich the same card. Separate identical
+sends stay separate. Standalone inbound and legacy archives remain visible and
+legacy cards say “Legacy / Unverified link.” Dates say Created, Provider event or
+Latest activity; a creation time is never described as send time. Existing bounded
+application list contracts still return up to 100 outbox rows and 100 archives;
+per-email history is independently paginated without truncating older events.
+
+Validation uses synthetic SQLite fixtures and React server rendering, not a live
+provider send, candidate mutation, or browser authentication ceremony.

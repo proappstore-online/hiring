@@ -57,7 +57,7 @@ test('provider-aware mail migration preserves populated historical Gmail archive
   db.prepare('INSERT INTO hiring_communication_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run('gmail-before','org-a','brand-a','app-a','inbound','gmail','person@example.com','admin@freeappstore.online','Original subject','Original full body','opaque-gmail-id','opaque-thread',1,'staff','agent','original-op',1)
   const before = db.prepare('SELECT * FROM hiring_communication_events').all()
   apply(db, migrations); apply(db, migrations)
-  assert.deepEqual(db.prepare('SELECT * FROM hiring_communication_events').all(), before)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_communication_events').all(), before.map(row => Object.assign(Object.create(null), row, { logical_email_id: null })))
   assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_worker_communication_events').get().n, 0)
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   assert.throws(() => db.prepare('INSERT INTO hiring_worker_communication_events(id,organization_id,brand_id,application_id,direction,mailbox_address,from_email,to_email,subject,body,provider_message_id,occurred_at,actor_user_id,agent_instance_id,operation_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run('bad','org-a','brand-a','app-b','inbound','admin@freeappstore.online','person@example.com','admin@freeappstore.online','Subject','Body','worker-id',1,'staff','agent','worker-op',1), /FOREIGN KEY/)
@@ -90,14 +90,14 @@ test('every legacy application child rejects mismatched scope on insert and upda
   db.exec("INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES ('brand-other','org-a','Other',0)")
   for (const table of ['hiring_stage_events','hiring_notes','hiring_outbox','hiring_assignment_events','hiring_communication_events','hiring_agent_activity','hiring_audit_events']) {
     const values = { id: table, organization_id: 'org-a', brand_id: 'brand-a', application_id: 'app-a', direction: 'inbound', channel: 'gmail', activity_type: 'email_thread_scanned' }
-    const columns = db.prepare(`PRAGMA table_info(${table})`).all().filter(c => c.dflt_value === null)
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().filter(c => c.dflt_value === null && c.name !== 'logical_email_id')
     const params = columns.map(c => values[c.name] ?? (c.type === 'INTEGER' ? 1 : 'value'))
     const sql = `INSERT INTO ${table} (${columns.map(c => c.name).join(',')}) VALUES (${columns.map(() => '?').join(',')})`
     db.prepare(sql).run(...params)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch|audit is append-only/, table)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch|audit is append-only/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only/, table)
     const bad = [...params]; bad[columns.findIndex(c => c.name === 'id')] += '-bad'; bad[columns.findIndex(c => c.name === 'application_id')] = 'app-b'
-    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch|audit is append-only/, table)
+    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch|audit is append-only|email archives are append-only/, table)
   }
   db.close()
 })
