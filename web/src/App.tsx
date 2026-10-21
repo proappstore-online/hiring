@@ -6,7 +6,9 @@ import { app, read, write, stageLabel, type AgentActivity, type Application, typ
 import { ApplicationDetail } from './ApplicationDetail'
 import { Admin, CreateApplication, Setup } from './forms'
 import { button, date, field, panel } from './ui'
-import { Jobs, PublishJob } from './Jobs'
+import { Jobs } from './Jobs'
+import { VacanciesIndexPage, VacancyDetailPage } from './Vacancies'
+import { VacancyManagement } from './VacancyManagement'
 
 const NAV: NavItem[] = [{ label: 'Workspace', href: '/dashboard', title: 'Hiring' }]
 type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
@@ -23,14 +25,14 @@ function RouteFocus() {
   return null
 }
 function PublicShell() {
-  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/jobs">Jobs</NavLink><NavLink to="/dashboard">Recruiter workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
+  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink><NavLink to="/jobs">Jobs</NavLink><NavLink to="/dashboard">Recruiter workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
 }
 function ProtectedShell() {
   const { user, loading } = useAuth(app)
   const location = useLocation()
   if (loading) return <LoadingState />
   if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
-  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to="/dashboard">Dashboard</NavLink><NavLink to="/applications">Applications</NavLink><Link to="/jobs">Public jobs</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
+  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to="/dashboard">Dashboard</NavLink><NavLink to="/applications">Applications</NavLink><NavLink to="/vacancies">Vacancies</NavLink><Link to="/jobs">Public jobs</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
 }
 function SignIn() {
   const { user, loading } = useAuth(app)
@@ -53,8 +55,8 @@ function StaffWorkspace() {
 }
 export function AppRoutes() {
   const location = useLocation()
-  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname + location.search}><Routes>
-    <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
+  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' ? location.pathname : location.pathname + location.search}><Routes>
+    <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}><Route path="dashboard" element={<StaffWorkspace />} /><Route path="applications" element={<StaffWorkspace />} /><Route path="applications/:applicationId" element={<StaffWorkspace />} /></Route>
   </Routes></RouteBoundary></>
 }
@@ -139,7 +141,7 @@ function WorkspaceView({ userId }: { userId: string }) {
       {workLoading ? <LoadingState>Loading applications…</LoadingState> : workError ? <ErrorState retry={() => void reloadWork()}>{workError}</ErrorState> : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
         <div className="space-y-6"><CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />
           <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <Link key={a.id} to={'/applications/' + encodeURIComponent(a.id) + '?' + new URLSearchParams(scope!)} aria-label={`Open ${a.candidate_name} application`} className={'block min-h-[44px] w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></Link>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
-          {space.role === 'owner' && <PublishJob key={selected} scope={scope!} requisitions={requisitions} />}
+          {(space.role === 'owner' || space.role === 'recruiter') && <VacancyManagement key={selected} scope={scope!} role={space.role} requisitions={requisitions} />}
           <Admin onChanged={async () => { await reloadSpaces(); await reloadWork(); await reloadDetail() }} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} />
         </div>
         <div>{active ? <ApplicationDetail detailLoading={detailLoading} detailError={detailError} retryDetail={() => void reloadDetail()} key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : activeId ? fallback ? <section className={panel}><h2>{fallback.candidate_name}</h2><p>{fallback.requisition_title} · {stageLabel(fallback.stage)}</p><p>This record provides a restricted summary. Full contact and history are unavailable through the current detail API.</p></section> : <NotFound /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>
