@@ -177,10 +177,10 @@ test('0012 retries after partial DDL and resolves existing memberships without r
 test('generic sources upgrade populated applications without relabelling history and retry after partial DDL', () => {
   const db = database()
   apply(db, historical); seed(db)
-  apply(db, migrations.slice(0, -1))
+  apply(db, migrations.slice(0, migrations.findIndex(m => m.name === '0016_generic_application_sources')))
   const before = db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
   db.exec('CREATE TABLE hiring_application_sources (application_id TEXT PRIMARY KEY REFERENCES hiring_applications(id), source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 100), profile_url TEXT CHECK(profile_url IS NULL OR (length(profile_url)<=2000 AND (profile_url LIKE \'https://%\' OR profile_url LIKE \'http://%\'))))')
-  apply(db, migrations); db.exec(migrations.at(-1).sql); apply(db, migrations)
+  apply(db, migrations); db.exec(migrations.find(m => m.name === '0016_generic_application_sources').sql); apply(db, migrations)
   assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), before)
   assert.equal(db.prepare('SELECT count(*) n FROM hiring_application_sources').get().n, 0)
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])

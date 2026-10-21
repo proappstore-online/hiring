@@ -147,10 +147,16 @@ test('submission abuse controls are enforced by SQL across brands and reject rap
   try {
     submit()
     assert.ok(call('submit_job_application','worker',application(B,'rapid')).every(n => n===0))
-    for (let n=1;n<10;n++) { advance(); assert.equal(call('submit_job_application','worker',application(n%2?B:A,`rate-${n}`)).at(-1),1) }
-    advance(); const before=counts(db)
-    assert.ok(call('submit_job_application','worker',application(A,'excess')).every(n => n===0)); assert.deepEqual(counts(db),before)
-    advance(86400001); assert.equal(call('submit_job_application','worker',application(A,'tomorrow')).at(-1),1)
+    const freshScope = n => {
+      const scope = { ...A, requisition_id: `rate-req-${n}` }
+      db.prepare('INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES (?,?,?,?,?,?)').run(scope.requisition_id,'org','a','Engineer','draft',0)
+      call('publish_job_requisition','owner', { ...publication(scope), operation_id:`rate-publish-${n}` })
+      return scope
+    }
+    for (let n=1;n<10;n++) { advance(); assert.equal(call('submit_job_application','worker',application(freshScope(n),`rate-${n}`)).at(-1),1) }
+    advance(); const excessScope=freshScope('excess'); const before=counts(db)
+    assert.ok(call('submit_job_application','worker',application(excessScope,'excess')).every(n => n===0)); assert.deepEqual(counts(db),before)
+    advance(86400001); assert.equal(call('submit_job_application','worker',application(freshScope('tomorrow'),'tomorrow')).at(-1),1)
   } finally { db.close() }
 })
 
@@ -261,4 +267,50 @@ test('lifecycle audit failure rolls back availability and version', () => {
   assert.throws(() => call('pause_job_requisition','owner',{ ...A, expected_version:1, operation_id:'pause-fail' }), /audit failure/)
   assert.equal(call('get_public_job',null,A)[0].version,1)
   db.close()
+})
+
+test('protected candidate intake rejects bot and malformed fields without partial writes', () => {
+  const { db, call, publish } = fixture()
+  try {
+    publish()
+    for (const patch of [{ website:'https://bot.example' }, { candidate_name:' '.repeat(201)+'x' }, {email:'a@@example.com'}, {email:'a@localhost'}, {email:'a b@example.com'}, {email:'a@example.com\n'}, {email:'a@example.'}, {candidate_name:'a\0b'}, {statement:'x\0y'}, {phone:'x'.repeat(101)}, {statement:'x'.repeat(10001)}, {notice_acknowledged:0}, {talent_pool_consent:2}, {communications_consent:-1}, {operation_id:''}]) {
+      const before=counts(db)
+      assert.ok(call('submit_job_application','worker',{...application(),...patch}).every(n=>n===0), JSON.stringify(patch).slice(0,100))
+      assert.deepEqual(counts(db),before)
+    }
+    assert.ok(call('submit_job_application','worker',{...application(),website:''}).some(n=>n===1))
+    assert.equal(call('list_my_workspaces','worker').length,0)
+  } finally { db.close() }
+})
+
+test('candidate and requisition deduplication survives new keys and preserves private receipt', () => {
+  const { db, call, publish, advance } = fixture()
+  try {
+    publish()
+    call('submit_job_application','worker',application())
+    advance()
+    const before=counts(db)
+    assert.ok(call('submit_job_application','worker',application(A,'new-key')).every(n=>n===0))
+    assert.deepEqual(counts(db),before)
+    const receipt=call('get_my_requisition_receipt','worker',A)[0]
+    assert.equal(receipt.application_id,'application-a')
+    for (const user of ['other-worker','staff-a','owner']) assert.deepEqual(call('get_my_requisition_receipt',user,A),[])
+    assert.deepEqual(call('get_my_requisition_receipt','worker',{...A,brand_id:'b'}),[])
+    assert.ok(call('submit_job_application','worker',application(B,'brand-b')).some(n=>n===1))
+    assert.equal(call('get_my_requisition_receipt','worker',B)[0].application_id,'application-brand-b')
+  } finally { db.close() }
+})
+
+test('candidate browser calls scoped candidate actions and renders an external vacancy link', () => {
+  const source=readFileSync(new URL('../web/src/Jobs.tsx',import.meta.url),'utf8')
+  assert.match(source,/name="website" autoComplete="off" tabIndex=\{-1\}/)
+  assert.match(source,/website: val\(f, 'website'\)/)
+  assert.match(source,/'get_my_requisition_receipt'/)
+  assert.match(source,/view=jobs&organization_id=\$\{encodeURIComponent\(job.organization_id\)\}/)
+  assert.match(source,/provider="google"/)
+  assert.doesNotMatch(source,/app\.db\.|app\.proxy\.|staff_token|D1_TOKEN|R2_SECRET|CLIENT_SECRET|dangerouslySetInnerHTML/)
+  const action=tool('submit_job_application')
+  assert.equal(action.requires_auth,true)
+  assert.equal('worker_user_id' in action.params,false)
+  assert.equal('staff_token' in action.params,false)
 })

@@ -63,6 +63,10 @@
     {
       "name": "0016_generic_application_sources",
       "sql": "CREATE TABLE IF NOT EXISTS hiring_application_sources (application_id TEXT PRIMARY KEY REFERENCES hiring_applications(id), source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 100), profile_url TEXT CHECK(profile_url IS NULL OR (length(profile_url)<=2000 AND (profile_url LIKE 'https://%' OR profile_url LIKE 'http://%')))); CREATE TRIGGER IF NOT EXISTS hiring_application_source_no_update BEFORE UPDATE ON hiring_application_sources BEGIN SELECT RAISE(ABORT,'application source is immutable'); END; CREATE TRIGGER IF NOT EXISTS hiring_application_source_no_delete BEFORE DELETE ON hiring_application_sources BEGIN SELECT RAISE(ABORT,'application source is immutable'); END"
+    },
+    {
+      "name": "0017_candidate_intake_scope_index",
+      "sql": "CREATE INDEX IF NOT EXISTS idx_intake_candidate_requisition ON hiring_intake_receipts(worker_user_id,organization_id,brand_id,requisition_id)"
     }
   ]
 }

@@ -1,39 +1,32 @@
 # Requisitions and authenticated candidate intake — issue #3
 
-## Issue #16 capability recheck — 22 October 2026
+## Issue #16 — candidate-facing protected intake
 
-The requested **unauthenticated submission** remains blocked by the platform,
-despite the earlier issue comment claiming that public write actions are supported.
-Rechecked at platform commit `c4157fe4f3902c3ba32bc59f48c89d055b75c845`:
+The owner clarified that “without recruiter app authentication” means a signed-in
+candidate without recruiter membership. The candidate UI uses Google sign-in; the installed platform SDK also supports
+email/password registration and email magic links. Anonymous writes are
+not required by this contract. No staff credential, D1/R2 secret, or OAuth secret
+is supplied to the candidate browser; the SDK uses the candidate's own session.
 
-- [Registration validator](https://github.com/proappstore-online/platform/blob/c4157fe4f3902c3ba32bc59f48c89d055b75c845/packages/backend/src/routes/tools.ts#L238)
-  rejects `requires_auth: false` unless `operation` is `query`.
-- [Execution validator](https://github.com/proappstore-online/platform/blob/c4157fe4f3902c3ba32bc59f48c89d055b75c845/packages/backend/src/routes/actions.ts#L386)
-  independently requires public actions to be queries. Adding an anonymous batch
-  to this app's manifest would fail deployment rather than provide an endpoint.
-- [Worker browser routing](https://github.com/proappstore-online/platform/blob/c4157fe4f3902c3ba32bc59f48c89d055b75c845/docs/app-workers.md#L310)
-  requires sign-in and CSRF checks. Workers have no independent public URL.
-  Public hooks require a verified provider signature or shared secret; putting
-  that credential in the candidate browser would violate issue #16's isolation
-  requirement.
+`submit_job_application` checks an optional `website` honeypot (absent/empty only)
+on the server, validates fields, and limits accepted submissions to ten per day
+and one per ten seconds per authenticated candidate across brands. This is a
+basic bot trap, not CAPTCHA or an IP request limiter; platform request throttling
+remains separate. Candidate identity and evidence timestamps are server-bound.
+Exactly one intake receipt per candidate and organization/brand/requisition is
+accepted even with new IDs or retry keys. `get_my_requisition_receipt` reconciles
+such retries within the caller's exact scope. Changed payloads report a conflict.
+The atomic batch records the published notice, actor, time and optional consent.
 
-Closing dependency issues does not remove these platform restrictions. Existing
-authenticated submission and its SQLite tests do not demonstrate anonymous HTTP
-submission. The runtime gate remains closed and no public write contract is added.
+External vacancy links use `/?view=jobs&organization_id=…&brand_id=…&requisition_id=…`.
+The same link loads the current published snapshot and survives sign-in. Paused,
+closed, stale and mixed-scope jobs refuse submission. No recruiter access is
+needed or granted by this path.
 
-To unblock #16, the platform must provide an anonymous server route with a
-server-only, app-scoped write capability, trusted client identification and
-request throttling. The intake handler must then verify bot controls before any
-write, validate exact active brand/open publication and notice versions, bind
-idempotency to scope and payload with a non-disclosing retry receipt, and commit
-application, consent evidence and audit atomically. HTTP tests must exercise
-anonymous success, malformed/bot/rate denials, concurrent retries and conflicts,
-cross-brand rejection, rollback and browser credential isolation. Do not close
-#16 or open intake on the strength of the authenticated SQL tests alone.
-
-Recheck validation: `node --test tests/candidate-intake.test.mjs
-tests/runtime-gate.test.mjs` passed all 17 existing tests. These verify the current
-authenticated controls and closed release boundary, not a new public endpoint.
+The independent issue #3 attachment/scanner release gate remains closed. These
+controls do not open production intake or claim scanner readiness. SQL tests
+exercise the endpoint's registered server batch; platform authentication and
+request throttling are provided by PAS, not simulated as HTTP tests here.
 
 Implementation revision, 21 October 2026. Issue #3 remains a release gate until the file capabilities below are verified. This document takes precedence over earlier statements that no job discovery or intake actions exist; it does not claim that intake is open.
 
