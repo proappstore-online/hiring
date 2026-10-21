@@ -1,8 +1,9 @@
 # Hiring agent operations runbook
 
 Live-state observations below were verified through a fresh PAGS MCP connection on **2026-10-21**.
-Implementation notes additionally reflect frozen PAGS source `fcee1d877cbf375691c3fb1f1ac07fb3222c77d1`;
-its deployment and live behavior have **not** yet been verified. Source/test completion is not a live mail roundtrip.
+Implementation notes reflect the final PAGS release candidate, pending full-suite validation
+and deployment verification. No full-suite green or live mail acceptance is claimed here;
+targeted source/tests are not a live mail roundtrip. An unstable candidate hash is intentionally not pinned.
 Tracking: [FAS email epic #58](https://github.com/proappstore-online/hiring/issues/58).
 The [Hiring MCP contract](hiring-mcp-contract.md) remains the application authorization contract.
 
@@ -46,7 +47,7 @@ Compare two supported paths; a bridge is not inherently required to receive forw
 | Path | Receive | Send as FAS | Isolation and cost controls |
 | --- | --- | --- | --- |
 | Gmail forwarding | Authorize the receiving mailbox `serge.the.dev@gmail.com`, then pin this instance | Requires an already verified Gmail send-as alias for `admin@freeappstore.online`; forwarding alone is insufficient | PAGS #1279 implements an account-bound recipient/sender policy, provider-side search, direct-ID checks, metadata pages and bounded body windows; live verification pending |
-| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 plus the frozen hardening implement exact mailbox scope, resumable paging, run budgets and explicit archive checkpoints; #1277 supplies secret-safe MCP management; deployment/live verification pending |
+| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 plus the final candidate hardening implement exact mailbox scope, resumable paging, atomic run-budget reservations and explicit archive checkpoints; #1277 supplies secret-safe MCP management; validation/deployment/live verification pending |
 
 Do not present code or unit tests as a live connection or delivery result. Gmail must not
 be enabled until the correct account is connected, the sender is verified and its scoped
@@ -106,8 +107,8 @@ The original thirteen PAS grants are:
    final hardened deployment before enrollment. Credentials go through the returned owner secure-input page, never
    private APIs, a shell proxy, tool arguments or chat.
 2. [PAGS #1278](https://github.com/ProAgentStore/platform/issues/1278) and the final hardening
-   are implemented in the frozen source: exact recipient checks for list/direct read/reply,
-   stable per-mailbox index cursors beyond 200 messages, bounded content and per-run counters.
+   are implemented in the release candidate: exact recipient checks for list/direct read/reply,
+   stable per-mailbox index cursors beyond 200 messages, bounded content and atomic per-run reservations.
    Cloudflare identity probes require a nonempty, valid `mailboxes` array; missing/empty legacy
    scope blocks access with a repair instruction, and malformed stored scope fails closed.
    Generic v1 worker behavior is unchanged. The earlier first-200/cursor/raw-read limitations
@@ -133,14 +134,25 @@ grants merely to repair an email connection.
 
 Instance rules require metadata first, at most ten summaries and three relevant body reads
 per run, at most 4,000 body characters each. These are the tighter operating limits, not
-the connector's maximums. The frozen CF connector defaults to ten summaries, caps each list
-at 25 and each list's bridge scan at eight pages, and enforces per-run ceilings of 60 summaries,
-six body reads and 60,000 delivered body characters. A body window defaults to 6,000 and caps
+the connector's maximums. The candidate CF connector defaults to ten summaries, caps each list
+at 25 and each list's bridge scan at eight pages, and reserves per-run capacity up to 60 summaries,
+six body reads and 60,000 body characters. A body window defaults to 6,000 and caps
 at 20,000 characters; the agent must explicitly request its lower 4,000-character limit.
+Admission is an atomic conditional reservation **before** the provider fetch, so overlapping
+calls cannot spend the same remaining capacity. Requested summary/window capacity remains
+consumed after an empty list, short body, refused/failed fetch or interrupted call; there is
+no refund. Results distinguish reserved capacity from actual returned summaries/characters,
+and a reservation refusal makes no provider call. Direct MCP calls without a run trace share
+this instance's hourly fallback budget; these limits are not an account-wide daily cost cap.
 The bridge bounds raw inbound ingestion at 262,144 bytes and retained body text at 50,000
 characters. Truncation/continuation is explicit; unavailable source content must not be described
 as fully archived. Follow returned `nextCursor`/`nextOffset` only within the operating budget;
-continuations consume the same run budget, not permission for an unbounded loop. A scan reports
+continuations consume the same run budget, not permission for an unbounded loop. Body continuation
+offsets must be safe integers strictly beyond the requested offset; malformed, negative,
+nonfinite or nonprogressing provider offsets are not emitted. If PAGS clips an oversized body
+window locally, continuation follows the returned slice (`offset + returned body length`), not
+the bridge's larger window. If truncation has no valid continuation, stop rather than inventing
+an offset or claiming a complete archive. A scan reports
 skipped handled mail, remaining mail and limit/budget stops. Stop with an actionable blocker
 if the deployed scope or limits cannot be verified.
 
