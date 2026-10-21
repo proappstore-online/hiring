@@ -1,0 +1,101 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
+
+const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+const migrations = JSON.parse(read('migrations.json')).migrations
+const historical = JSON.parse(read('tests/fixtures/migrations-0001-0007.json')).migrations
+function apply(db, entries) {
+  db.exec('CREATE TABLE IF NOT EXISTS applied_migrations(name TEXT PRIMARY KEY)')
+  for (const m of entries) {
+    if (db.prepare('SELECT 1 FROM applied_migrations WHERE name=?').get(m.name)) continue
+    db.exec('BEGIN')
+    try {
+      db.exec(m.sql)
+      db.prepare('INSERT INTO applied_migrations VALUES (?)').run(m.name)
+      db.exec('COMMIT')
+    } catch (error) { db.exec('ROLLBACK'); throw error }
+  }
+}
+function database() {
+  const db = new DatabaseSync(':memory:')
+  db.exec('PRAGMA foreign_keys=ON')
+  return db
+}
+function seed(db) {
+  for (const x of ['a', 'b']) {
+    db.exec(`INSERT INTO hiring_organizations VALUES ('org-${x}','Org','staff',0);
+      INSERT INTO hiring_brands VALUES ('brand-${x}','org-${x}','Brand',0);
+      INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,created_at) VALUES ('req-${x}','org-${x}','brand-${x}','Engineer',0);
+      INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES ('candidate-${x}','org-${x}','brand-${x}','Person','','staff',0);
+      INSERT INTO hiring_applications VALUES ('app-${x}','org-${x}','brand-${x}','req-${x}','candidate-${x}','linkedin','manual','basis','context','staff','submitted',1,'staff',0,0)`)
+  }
+}
+
+test('historical migrations are immutable; populated upgrade and tracked replay preserve data', () => {
+  assert.deepEqual(migrations.slice(0, historical.length), historical)
+  const db = database()
+  apply(db, historical)
+  db.exec("INSERT INTO items VALUES ('legacy','user','Title','active',0)")
+  seed(db)
+  apply(db, migrations)
+  const snapshot = db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
+  apply(db, migrations)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), snapshot)
+  assert.equal(db.prepare('SELECT title FROM items').get().title, 'Title')
+  assert.equal(db.prepare('SELECT retention_policy FROM hiring_organizations LIMIT 1').get().retention_policy, 'indefinite')
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
+  const fresh = database()
+  apply(fresh, migrations)
+  assert.deepEqual(fresh.prepare('PRAGMA foreign_key_check').all(), [])
+  db.close(); fresh.close()
+})
+
+test('new grants and governance reject cross-tenant references; workers remain independent', () => {
+  const db = database(); apply(db, historical); seed(db); apply(db, migrations)
+  db.exec("INSERT INTO hiring_worker_profiles(user_id,display_name,created_at,updated_at) VALUES ('worker','Worker',0,0)")
+  db.exec("UPDATE hiring_candidates SET worker_user_id='worker' WHERE id='candidate-a'")
+  assert.throws(() => db.exec("UPDATE hiring_candidates SET worker_user_id='missing'"), /FOREIGN KEY/)
+  const grant = db.prepare('INSERT INTO hiring_grants(id,organization_id,brand_id,requisition_id,user_id,role,granted_by,created_at) VALUES (?,?,?,?,?,?,?,?)')
+  grant.run('ok','org-a','brand-a','req-a','staff','reviewer','owner',0)
+  assert.throws(() => grant.run('bad','org-a','brand-b',null,'staff','reviewer','owner',0), /FOREIGN KEY/)
+  assert.throws(() => grant.run('bad','org-a','brand-a','req-b','staff','reviewer','owner',0), /FOREIGN KEY/)
+  const consent = db.prepare("INSERT INTO hiring_consent_records VALUES (?, 'org-a','brand-a',?,'recruitment','contract','v1','evidence','worker',0,NULL)")
+  consent.run('ok','app-a')
+  assert.throws(() => consent.run('bad','app-b'), /FOREIGN KEY/)
+  const rights = db.prepare("INSERT INTO hiring_rights_requests(id,organization_id,brand_id,candidate_id,request_type,actor_user_id,created_at,updated_at) VALUES (?,'org-a','brand-a',?,'deletion','worker',0,0)")
+  rights.run('ok','candidate-a')
+  assert.throws(() => rights.run('bad','candidate-b'), /FOREIGN KEY/)
+  assert.throws(() => db.exec("UPDATE hiring_applications SET brand_id='brand-b' WHERE id='app-a'"), /scope is immutable/)
+  db.close()
+})
+
+test('every legacy application child rejects mismatched scope on insert and update', () => {
+  const db = database(); apply(db, historical); seed(db)
+  // Generate minimal values from SQLite metadata to exercise every child constraint.
+  apply(db, migrations)
+  db.exec("INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES ('brand-other','org-a','Other',0)")
+  for (const table of ['hiring_stage_events','hiring_notes','hiring_outbox','hiring_assignment_events','hiring_communication_events','hiring_agent_activity','hiring_audit_events']) {
+    const values = { id: table, organization_id: 'org-a', brand_id: 'brand-a', application_id: 'app-a', direction: 'inbound', channel: 'gmail', activity_type: 'email_thread_scanned' }
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().filter(c => c.dflt_value === null)
+    const params = columns.map(c => values[c.name] ?? (c.type === 'INTEGER' ? 1 : 'value'))
+    const sql = `INSERT INTO ${table} (${columns.map(c => c.name).join(',')}) VALUES (${columns.map(() => '?').join(',')})`
+    db.prepare(sql).run(...params)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch/, table)
+    const bad = [...params]; bad[columns.findIndex(c => c.name === 'id')] += '-bad'; bad[columns.findIndex(c => c.name === 'application_id')] = 'app-b'
+    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch/, table)
+  }
+  db.close()
+})
+
+test('deploy stops on migration failure before worker, actions and frontend', () => {
+  const workflow = read('.github/workflows/deploy.yml')
+  const start = workflow.indexOf('- name: Apply D1 migrations')
+  const end = workflow.indexOf('\n      - name:', start + 1)
+  assert.ok(start > 0)
+  assert.match(workflow.slice(start, end), /exit 1/)
+  assert.doesNotMatch(workflow.slice(start, end), /continue-on-error/)
+  for (const step of ['Deploy app worker', 'Register app tools', 'Upload to R2']) assert.ok(workflow.indexOf('- name: ' + step) > start, step)
+})
