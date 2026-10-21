@@ -1,3 +1,6 @@
+import { useRecruiterData } from './recruiter-data'
+import { RecruiterDashboard } from './RecruiterDashboard'
+import { ApplicationPipeline } from './ApplicationPipeline'
 import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState, ErrorState, NotFound, RouteBoundary } from './route-ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -28,9 +31,12 @@ function PublicShell() {
 function ProtectedShell() {
   const { user, loading } = useAuth(app)
   const location = useLocation()
+  const scopeQuery = new URLSearchParams()
+  for (const name of ['organization_id', 'brand_id']) { const value = new URLSearchParams(location.search).get(name); if (value) scopeQuery.set(name, value) }
+  const suffix = scopeQuery.size ? '?' + scopeQuery.toString() : ''
   if (loading) return <LoadingState />
   if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
-  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to="/dashboard">Dashboard</NavLink><NavLink to="/applications">Applications</NavLink><Link to="/jobs">Public jobs</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
+  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to={'/dashboard' + suffix}>Dashboard</NavLink><NavLink to={'/applications' + suffix}>Applications</NavLink><Link to="/jobs">Public jobs</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
 }
 function SignIn() {
   const { user, loading } = useAuth(app)
@@ -49,17 +55,18 @@ function PublicJobs({ mode = 'list' }: { mode?: 'list' | 'detail' | 'apply' }) {
 function StaffWorkspace() {
   const { user } = useAuth(app)
   const location = useLocation()
-  return user ? <WorkspaceView key={user.id + location.pathname + location.search} userId={user.id} /> : null
+  return user ? <WorkspaceView key={user.id + location.pathname + new URLSearchParams(location.search).get('organization_id') + new URLSearchParams(location.search).get('brand_id')} userId={user.id} /> : null
 }
 export function AppRoutes() {
   const location = useLocation()
-  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname + location.search}><Routes>
+  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname}><Routes>
     <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}><Route path="dashboard" element={<StaffWorkspace />} /><Route path="applications" element={<StaffWorkspace />} /><Route path="applications/:applicationId" element={<StaffWorkspace />} /></Route>
   </Routes></RouteBoundary></>
 }
 
 function WorkspaceView({ userId }: { userId: string }) {
+  const location = useLocation()
   const [spaces, setSpaces] = useState<Workspace[] | null>(null)
   const [selected, setSelected] = useState<string>('')
   const [work, setWork] = useState<Work | null>(null)
@@ -75,6 +82,7 @@ function WorkspaceView({ userId }: { userId: string }) {
   const [detailFetch, setDetailFetch] = useState({ key: '', loading: false, error: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [revision, setRevision] = useState(0)
   const [loading, setLoading] = useState(true)
   const workSeq = useRef(0)
   const detailSeq = useRef(0)
@@ -90,7 +98,7 @@ function WorkspaceView({ userId }: { userId: string }) {
   const reloadSpaces = useCallback(async () => { const rows = await read<Workspace>('list_my_workspaces'); setSpaces(rows); setSelected(old => rows.some(s => s.brand_id === old) ? old : requestedBrand ?? rows[0]?.brand_id ?? '') }, [requestedBrand])
   const reloadWork = useCallback(async () => {
     const seq = ++workSeq.current
-    if (!scope) return
+    if (!scope || !activeId) return
     setWorkLoading(true); setWorkError(''); setFallback(null)
     try {
     const [r, m, a] = await Promise.all([read<Requisition>('list_requisitions', scope), read<Member>('list_workspace_members', scope), read<Application>('list_applications', scope)])
@@ -125,7 +133,7 @@ function WorkspaceView({ userId }: { userId: string }) {
   useEffect(() => { reloadDetail().catch(e => setError(String(e))) }, [reloadDetail])
   const run: Run = async (name, params) => {
     setBusy(true); setError('')
-    try { await write(name, params); await reloadSpaces(); await reloadWork(); await reloadDetail() }
+    try { await write(name, params); setRevision(n => n + 1); await reloadSpaces(); await reloadWork(); await reloadDetail() }
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setBusy(false) }
   }
@@ -136,7 +144,7 @@ function WorkspaceView({ userId }: { userId: string }) {
     {error && <p role="alert" className="mt-5 rounded-lg border border-[var(--danger)] p-3 text-sm text-[var(--danger)]">{error}</p>}
     {loading ? <p role="status" className="mt-6">Loading workspace…</p> : !spaces ? <button type="button" className={button + ' mt-6'} onClick={loadSpaces}>Retry loading workspaces</button> : !space && (requestedBrand || activeId) ? <NotFound /> : !space ? <Setup busy={busy} run={run} /> : <>
       <div className="my-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={selected} onChange={e => { navigate('/applications?' + new URLSearchParams({ brand_id: e.target.value, organization_id: spaces.find(s => s.brand_id === e.target.value)!.organization_id })) }}>{spaces.map(s => <option value={s.brand_id} key={s.brand_id}>{s.organization_name} / {s.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>
-      {workLoading ? <LoadingState>Loading applications…</LoadingState> : workError ? <ErrorState retry={() => void reloadWork()}>{workError}</ErrorState> : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
+      {!activeId ? <><Link className="mb-4 inline-block underline" to={'/dashboard?' + new URLSearchParams(scope!)}>Dashboard</Link><Link className="mb-4 ml-4 inline-block underline" to={'/applications?' + new URLSearchParams(scope!)}>Applications</Link>{location.pathname === '/dashboard' ? <RecruiterDashboard key={revision} space={space} /> : <ApplicationPipeline key={revision} space={space} />}{(space.role === 'owner' || space.role === 'recruiter') && <details className="mt-6"><summary>Workspace tools</summary><WorkspaceTools key={revision} space={space} userId={userId} busy={busy} run={run} /></details>}</> : workLoading ? <LoadingState>Loading applications…</LoadingState> : workError ? <ErrorState retry={() => void reloadWork()}>{workError}</ErrorState> : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
         <div className="space-y-6"><CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />
           <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <Link key={a.id} to={'/applications/' + encodeURIComponent(a.id) + '?' + new URLSearchParams(scope!)} aria-label={`Open ${a.candidate_name} application`} className={'block min-h-[44px] w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></Link>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
           {space.role === 'owner' && <PublishJob key={selected} scope={scope!} requisitions={requisitions} />}
@@ -146,4 +154,12 @@ function WorkspaceView({ userId }: { userId: string }) {
       </div>}
     </>}
   </div>
+}
+
+function WorkspaceTools({ space, userId, busy, run }: { space: Workspace; userId: string; busy: boolean; run: Run }) {
+  const { requisitions, members, loading, error, reload } = useRecruiterData(space)
+  if (loading) return <LoadingState>Loading workspace tools…</LoadingState>
+  if (error) return <ErrorState retry={() => void reload()}>{error}</ErrorState>
+  if (space.role !== 'owner' && space.role !== 'recruiter') return null
+  return <div className="mt-4 space-y-4"><CreateApplication key={members.map(m => m.user_id).join()} scope={space} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} /><Admin onChanged={async () => { window.location.reload() }} scope={space} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} /></div>
 }
