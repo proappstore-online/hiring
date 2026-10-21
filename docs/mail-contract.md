@@ -67,3 +67,11 @@ Verified against `proappstore-online/platform@4ad0753` (`packages/sdk/src/email.
 The newer [FAS mail epic #58](https://github.com/proappstore-online/hiring/issues/58) selects a dedicated Cloudflare/PAGS bridge for the approved FAS identity. Its tools exist, but the recorded live check found no configured bridge and no successful mail roundtrip. Secure connection management (PAGS #1277), recipient isolation and bounded incremental reads (#1278), sender approval and a controlled roundtrip remain prerequisites. See [operations runbook](hiring-agent-operations.md). Do not substitute PAS email or unrelated Gmail credentials for that route. Existing communication-event recording proves storage/audit, not delivery.
 
 The approved multi-tenant model requires every message to map to its organization, brand and application; worker self-registration grants no cross-tenant mailbox access. #25/#26/#27/#47 retain their broader adapter, callback, template and receipt work. Indefinite Hiring retention and explicit deletion follow [#9](https://github.com/proappstore-online/hiring/issues/9); provider retention/deletion limitations need owner confirmation, not lawyer sign-off.
+
+## Issue #13 implementation
+
+[Audit and transactional outbox](audit-outbox.md) defines the implemented lifecycle
+and safe single-attempt adapter helper. This supersedes the earlier draft-only
+outbox description. Sending/provider enablement remains separate. No automatic
+retry, including failed jobs, is enabled; unknown or interrupted attempts require
+reconciliation. `sent` in storage means provider acceptance only.

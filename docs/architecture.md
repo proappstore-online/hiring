@@ -79,3 +79,10 @@ Public job discovery and passkey-protected owner publication now have registered
 ## Issue #12 authorization revision
 
 The registered SQL boundary now resolves active organization, brand and requisition grants through `hiring_effective_access`, including revocation and assignment checks for reviewers. This supersedes the earlier brand-wide-only authorization and #12 gap descriptions above. Atomic owner administration is implemented as registered batches; no worker enablement is required. [Server permissions](permissions.md) documents the role matrix, actions, and remaining read/denial audit and throttling gaps.
+
+## Issue #13 audit/outbox revision
+
+The [audit and outbox contract](audit-outbox.md) supersedes draft-only outbox
+limitations above: scoped queue, exclusive claim and completion actions now exist,
+with atomic attributed audit and a provider-neutral dispatch helper. No scheduled
+sender/provider integration is deployed; uncertain outcomes remain non-retryable.

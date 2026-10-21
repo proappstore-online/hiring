@@ -406,7 +406,7 @@
       "name": "list_communication_drafts",
       "description": "list communication drafts",
       "operation": "query",
-      "sql": "SELECT id,recipient_email,subject,body,status,actor_user_id,created_at FROM hiring_outbox WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) ORDER BY created_at DESC LIMIT 100",
+      "sql": "SELECT id,recipient_email,subject,body,status,delivery_state,attempt_count,actor_user_id,created_at FROM hiring_outbox WHERE organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) ORDER BY created_at DESC LIMIT 100",
       "params": {
         "organization_id": {
           "type": "string"
@@ -1201,6 +1201,117 @@
         "INSERT OR IGNORE INTO hiring_grants(id,organization_id,brand_id,requisition_id,user_id,role,granted_by,created_at) SELECT :grant_id,:organization_id,NULL,NULL,:member_user_id,:role,:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :role IN ('recruiter','reviewer','auditor') AND :member_user_id<>:__user_id AND length(trim(:member_user_id))>0 AND length(trim(:grant_id))>0 AND EXISTS (SELECT 1 FROM hiring_organizations WHERE id=:organization_id AND created_by=:__user_id AND status='active') AND NOT EXISTS (SELECT 1 FROM hiring_memberships WHERE id=:grant_id)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'grant.created',:__user_id,:operation_id,:__now,'grant',:grant_id WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
       ]
+    },
+    {
+      "name": "queue_communication",
+      "description": "outbox.queued; atomic scoped outbox transition, no provider call",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_outbox SET delivery_state='pending',idempotency_key=operation_id WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='draft' AND operation_id IS NOT NULL",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.queued',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.queued' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
+      ]
+    },
+    {
+      "name": "claim_communication",
+      "description": "outbox.claimed; atomic scoped outbox transition, no provider call",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_outbox SET delivery_state='sending',claim_id=:operation_id,claimed_by=:__user_id,attempt_count=attempt_count+1,last_attempt_at=:__now WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='pending'",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.claimed',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.claimed' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
+      ]
+    },
+    {
+      "name": "complete_communication",
+      "description": "outbox.completed; atomic scoped outbox transition, no provider call",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_outbox SET delivery_state=:outcome WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='sending' AND claim_id=:claim_id AND claimed_by=:__user_id AND :outcome IN ('sent','failed','unknown')",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.completed',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.completed' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
+      ]
+    },
+    {
+      "name": "get_claimed_communication",
+      "description": "Read private payload only for the current exclusive claim; never log this response",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT id,recipient_email,subject,body,idempotency_key FROM hiring_outbox WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND claim_id=:claim_id AND claimed_by=:__user_id AND delivery_state='sending' AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) LIMIT 1"
     }
   ]
 }

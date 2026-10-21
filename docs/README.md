@@ -25,3 +25,5 @@ The repository workflows use GitHub-hosted runners; the deploy workflow uses Git
 Candidate intake implementation and its remaining release gate: [Requisitions and authenticated candidate intake](candidate-intake.md).
 
 Server identity, scoped grants, assignment restrictions and revocation: [permissions contract](permissions.md).
+
+Append-only audit, durable job transitions and retry safety: [audit and outbox contract](audit-outbox.md).
