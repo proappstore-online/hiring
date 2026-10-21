@@ -127,9 +127,9 @@ test('existing identities cannot cross tenant/application boundaries and audit f
 })
 test('legacy upgrade preserves unproven archives and outbox rows without invented events',()=>{
  const db=new DatabaseSync(':memory:')
- for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ for(const m of migrations.migrations.slice(0, migrations.migrations.findIndex(m => m.name === '0018_email_identity_history')))db.exec(m.sql)
  db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1); INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1); INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,created_at) VALUES('req','org','brand','Role',1); INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES('c','org','brand','Synthetic','','owner',1); INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at) VALUES('app','org','brand','req','c','linkedin','fixture','basis','fixture','owner','submitted',1,'owner',1,1); INSERT INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at) VALUES('old','org','brand','app','candidate@example.test','Same','Same','draft','owner',1)")
- db.exec(migrations.migrations.at(-1).sql)
+ for (const m of migrations.migrations.slice(migrations.migrations.findIndex(m => m.name === '0018_email_identity_history'))) db.exec(m.sql)
  assert.equal(db.prepare("SELECT logical_email_id FROM hiring_outbox WHERE id='old'").get().logical_email_id,null)
  assert.equal(db.prepare('SELECT count(*) n FROM email_status_events').get().n,0)
  assert.equal(db.prepare('SELECT count(*) n FROM hiring_email_archive_links').get().n,0)
@@ -142,5 +142,61 @@ test('queueing a legacy unsent draft starts a new identity with only the real qu
  const logical=f.db.prepare("SELECT logical_email_id FROM hiring_outbox WHERE id='legacy'").get().logical_email_id
  assert.match(logical,/^[0-9a-f-]{36}$/)
  assert.deepEqual(history(f.call,logical).map(e=>e.status),['queued'])
+ f.db.close()
+})
+
+for (const outcome of ['unknown', 'failed', 'sent']) test(`archive acceptance survives ${outcome} completion without duplicate acceptance`, () => {
+ for (const provider of ['gmail', 'worker']) {
+  const f = seeded(); const logical = claimed(f)
+  const payload = archive(logical, provider === 'worker' ? { mailbox_address: 'sender@example.test', provider_connection_id: 'bridge', provider_receipt_id: 'receipt', provider_event_id: 'event' } : {})
+  f.call(provider === 'gmail' ? 'record_candidate_email' : 'record_worker_candidate_email', 'owner', payload)
+  const before = history(f.call, logical)
+  const completion = { ...input, claim_id: 'claim', outcome, operation_id: 'complete' }
+  if (outcome === 'sent') {
+   f.call('complete_communication', 'owner', completion)
+   assert.equal(row(f.db).delivery_state, 'sent')
+   assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE action='outbox.completed'").get().n, 1)
+   assert.ok(f.call('complete_communication', 'owner', completion).every(n => n === 0))
+  } else {
+   assert.throws(() => f.call('complete_communication', 'owner', completion), /completion contradicts recorded provider acceptance/)
+   assert.equal(row(f.db).delivery_state, 'sending')
+   assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE action='outbox.completed'").get().n, 0)
+  }
+  assert.equal(f.call('list_communication_drafts', 'owner', scope)[0].current_status, 'accepted')
+  assert.deepEqual(history(f.call, logical), before)
+  f.db.close()
+ }
+})
+
+test('worker linked replay rejects altered receipt, event, mailbox and connection without new evidence', () => {
+ const f = seeded(); const logical = claimed(f)
+ const payload = archive(logical, { mailbox_address: 'sender@example.test', provider_connection_id: 'bridge', provider_receipt_id: 'receipt', provider_event_id: 'event' })
+ f.call('record_worker_candidate_email', 'owner', payload)
+ const before = history(f.call, logical)
+ assert.ok(f.call('record_worker_candidate_email', 'owner', payload).every(n => n === 0))
+ for (const patch of [{ provider_receipt_id: 'other' }, { provider_event_id: 'other' }, { mailbox_address: 'other@example.test', from_email: 'other@example.test' }, { provider_connection_id: 'other' }]) {
+  assert.throws(() => f.call('record_worker_candidate_email', 'owner', { ...payload, ...patch, operation_id: 'conflicting-replay' }), /conflicting email replay/)
+  assert.deepEqual(history(f.call, logical), before)
+  assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_worker_communication_events').get().n, 1)
+  assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_email_archive_links').get().n, 1)
+ }
+ f.db.close()
+})
+
+test('rejected and no-op queue and claim calls append no status events', () => {
+ const f = seeded(); const logical = row(f.db).logical_email_id
+ for (const name of ['queue_communication', 'claim_communication']) {
+  const before = history(f.call, logical)
+  assert.ok(f.call(name, 'outsider', { ...input, operation_id: 'denied' }).every(n => n === 0))
+  assert.ok(f.call(name, 'owner', { ...input, brand_id: 'forged', operation_id: 'forged' }).every(n => n === 0))
+  assert.deepEqual(history(f.call, logical), before)
+  const operation = { ...input, operation_id: name }
+  f.call(name, 'owner', operation)
+  const after = history(f.call, logical)
+  assert.equal(after.length, before.length + 1)
+  assert.ok(f.call(name, 'owner', operation).every(n => n === 0))
+  assert.ok(f.call(name, 'owner', { ...input, operation_id: name + '-noop' }).every(n => n === 0))
+  assert.deepEqual(history(f.call, logical), after)
+ }
  f.db.close()
 })

@@ -70,7 +70,7 @@ Draft creation captures `draft` at server time and authenticated actor. Successf
 queue/claim/completion audit inserts capture `queued`, `sending`, and
 `accepted`/`failed`/`unknown` in the same transaction, including attempt number.
 `pending` maps to queued; outbox `sent` maps to provider accepted, **not delivered**.
-Rejected, replayed and no-op mutations append no events. Cancellation has an event
+Rejected, replayed and no-op mutations append no events. Migration `0019_preserve_email_acceptance` rejects failed/unknown completion once linked provider acceptance is recorded, with `completion contradicts recorded provider acceptance`. A sent completion still finalizes the outbox and records its audit, but adds no duplicate accepted status event; current status remains accepted. Cancellation has an event
 schema value but no new cancellation operation is introduced; existing transition
 and no-double-send guards remain authoritative. Events have a monotonic sequence
 for stable ordering when timestamps tie. Current status follows recorded sequence;
