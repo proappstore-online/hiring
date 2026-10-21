@@ -64,14 +64,18 @@ Never silently fall back to another Gmail account.
 ## Verified live state
 
 - PAS Hiring MCP is connected. Workspace and application reads succeeded for FreeAppStore.
-- Seventeen remote tools are granted: the original thirteen below plus
+- Nineteen remote tools are granted: the original thirteen below plus
   `record_candidate_email`, `record_agent_activity`, `list_application_communications`
-  and `list_application_agent_activity`. The four additions are deployed and discoverable.
+  and `list_application_agent_activity`, and now `record_worker_candidate_email` and
+  `get_worker_candidate_email`. All six additions are deployed and discoverable.
 - Template capabilities now include `email_worker_list_messages`,
   `email_worker_read_message`, `email_worker_send`, `email_worker_reply`,
   `email_worker_identities` and `email_worker_list_events`; all are invocable.
 - Live identity and inbox checks (`limit: 1`) both returned
   **No worker-backed email connection is configured.** No email roundtrip has passed.
+- The new MCP management tool `get_instance_email_worker` is deployed. Its live readback
+  confirms `state: absent`, `no_connection`, `readyToRead: false`, `readyToSend: false`
+  and write consent `off`; deployed tools do not imply a configured bridge.
 - Gmail write consent is `off`. The instance's `gmail_search`, `gmail_read_message`,
   `gmail_reply` and `gmail_send` tools are disabled. The stale
   `serge.pro.job@gmail.com` account pin is unrelated to Hiring.
@@ -89,10 +93,12 @@ The original thirteen PAS grants are:
 
 ## Remaining work
 
-1. [PAGS #1277](https://github.com/ProAgentStore/platform/issues/1277): secret-safe MCP
-   inspection, secure connection enrollment, testing, pinning and sender/reply-identity
-   configuration. Fresh discovery exposed no worker-email management commands. Do not
-   bypass the missing MCP surface with private APIs or a generic HTTP/shell proxy.
+1. [PAGS #1277](https://github.com/ProAgentStore/platform/issues/1277) has deployed secret-safe
+   MCP inspection, enrollment, connection testing, pinning and sender/reply-identity tools.
+   [PAGS #1280](https://github.com/ProAgentStore/platform/issues/1280) hardens malformed bridge
+   identities, credential echoes and fail-closed sender-policy loading; verify its deployment
+   before enrollment. Credentials go through the returned owner secure-input page, never
+   private APIs, a shell proxy, tool arguments or chat.
 2. [PAGS #1278](https://github.com/ProAgentStore/platform/issues/1278): enforced recipient
    isolation and bounded incremental reads. The bridge inspected after #1270 shares
    storage across routes, ignores list cursors, considers only the first 200 keys and
