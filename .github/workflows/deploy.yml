@@ -110,7 +110,9 @@ jobs:
           if echo "$RESP" | node scripts/deploy-json.mjs true ok >/dev/null; then
             echo "Applied migration(s): $(echo "$RESP" | node scripts/deploy-json.mjs json applied '[]'); already: $(echo "$RESP" | node scripts/deploy-json.mjs json already '[]')"
           else
-            echo "::error::migration failed: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"; exit 1
+            echo "::error::migration failed: $(echo "$RESP" | node scripts/deploy-json.mjs json error)"
+            echo "$RESP" | node scripts/deploy-json.mjs json detail
+            exit 1
           fi
 
       - name: Deploy app worker (worker/ -> platform, keyless)
