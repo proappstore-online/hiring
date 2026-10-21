@@ -1,6 +1,8 @@
 # Hiring agent operations runbook
 
-Verified through a fresh PAGS MCP connection on **2026-10-21**.
+Live-state observations below were verified through a fresh PAGS MCP connection on **2026-10-21**.
+Implementation notes additionally reflect frozen PAGS source `fcee1d877cbf375691c3fb1f1ac07fb3222c77d1`;
+its deployment and live behavior have **not** yet been verified. Source/test completion is not a live mail roundtrip.
 Tracking: [FAS email epic #58](https://github.com/proappstore-online/hiring/issues/58).
 The [Hiring MCP contract](hiring-mcp-contract.md) remains the application authorization contract.
 
@@ -43,8 +45,8 @@ Compare two supported paths; a bridge is not inherently required to receive forw
 
 | Path | Receive | Send as FAS | Isolation and cost controls |
 | --- | --- | --- | --- |
-| Gmail forwarding | Authorize the receiving mailbox `serge.the.dev@gmail.com`, then pin this instance | Requires an already verified Gmail send-as alias for `admin@freeappstore.online`; forwarding alone is insufficient | PAGS #1279 adds an account-bound recipient/sender policy, provider-side search, direct-ID checks, metadata pages and bounded body windows |
-| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 must enforce recipient isolation, paging and bounded reads; #1277 supplies secret-safe MCP connection management |
+| Gmail forwarding | Authorize the receiving mailbox `serge.the.dev@gmail.com`, then pin this instance | Requires an already verified Gmail send-as alias for `admin@freeappstore.online`; forwarding alone is insufficient | PAGS #1279 implements an account-bound recipient/sender policy, provider-side search, direct-ID checks, metadata pages and bounded body windows; live verification pending |
+| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 plus the frozen hardening implement exact mailbox scope, resumable paging, run budgets and explicit archive checkpoints; #1277 supplies secret-safe MCP management; deployment/live verification pending |
 
 Do not present code or unit tests as a live connection or delivery result. Gmail must not
 be enabled until the correct account is connected, the sender is verified and its scoped
@@ -67,10 +69,13 @@ Never silently fall back to another Gmail account.
 - Nineteen remote tools are granted: the original thirteen below plus
   `record_candidate_email`, `record_agent_activity`, `list_application_communications`
   and `list_application_agent_activity`, and now `record_worker_candidate_email` and
-  `get_worker_candidate_email`. All six additions are deployed and discoverable.
+  `get_worker_candidate_email`. All six additions are deployed and discoverable;
+  the worker archive actions shipped in PAS Hiring commit `157cc67`.
 - Template capabilities now include `email_worker_list_messages`,
   `email_worker_read_message`, `email_worker_send`, `email_worker_reply`,
   `email_worker_identities` and `email_worker_list_events`; all are invocable.
+  The newly implemented `email_worker_mark_handled` is **not** included in this verified
+  live capability list; discover and grant it after the hardened PAGS deployment is verified.
 - Live identity and inbox checks (`limit: 1`) both returned
   **No worker-backed email connection is configured.** No email roundtrip has passed.
 - The new MCP management tool `get_instance_email_worker` is deployed. Its live readback
@@ -82,7 +87,8 @@ Never silently fall back to another Gmail account.
 - Eight imported applications returned by the check have no candidate email addresses.
   Do not infer contact addresses from LinkedIn applicant alerts.
 - Special Instructions and memory key `fas_hiring_mail_setup` record the setup,
-  account identifiers, scope, limits and current blockers.
+  account identifiers, scope, limits and current blockers. Their final hardening update
+  remains pending deployment verification; this document is not evidence that the live instructions changed.
 
 The original thirteen PAS grants are:
 
@@ -96,16 +102,19 @@ The original thirteen PAS grants are:
 1. [PAGS #1277](https://github.com/ProAgentStore/platform/issues/1277) has deployed secret-safe
    MCP inspection, enrollment, connection testing, pinning and sender/reply-identity tools.
    [PAGS #1280](https://github.com/ProAgentStore/platform/issues/1280) hardens malformed bridge
-   identities, credential echoes and fail-closed sender-policy loading; verify its deployment
-   before enrollment. Credentials go through the returned owner secure-input page, never
+   identities, credential echoes and fail-closed sender-policy loading in source; verify the
+   final hardened deployment before enrollment. Credentials go through the returned owner secure-input page, never
    private APIs, a shell proxy, tool arguments or chat.
-2. [PAGS #1278](https://github.com/ProAgentStore/platform/issues/1278): enforced recipient
-   isolation and bounded incremental reads. The bridge inspected after #1270 shares
-   storage across routes, ignores list cursors, considers only the first 200 keys and
-   returns `nextCursor: null`; reads can return up to 200,000 raw MIME characters.
-   Prompt instructions do not fix those implementation gaps.
-3. [PAGS #1279](https://github.com/ProAgentStore/platform/issues/1279): finish deploying
-   and verifying Gmail exact-account OAuth handoff, recipient/sender enforcement and
+2. [PAGS #1278](https://github.com/ProAgentStore/platform/issues/1278) and the final hardening
+   are implemented in the frozen source: exact recipient checks for list/direct read/reply,
+   stable per-mailbox index cursors beyond 200 messages, bounded content and per-run counters.
+   Cloudflare identity probes require a nonempty, valid `mailboxes` array; missing/empty legacy
+   scope blocks access with a repair instruction, and malformed stored scope fails closed.
+   Generic v1 worker behavior is unchanged. The earlier first-200/cursor/raw-read limitations
+   describe the old bridge, not the current source. Verify the deployed bridge and connector
+   together, including foreign-recipient controls, paging and archive-after-success checkpoints.
+3. [PAGS #1279](https://github.com/ProAgentStore/platform/issues/1279): verify deployment
+   and live Gmail exact-account OAuth handoff, recipient/sender enforcement and
    bounded reads. Use `start_gmail_connection` for `serge.the.dev@gmail.com`; the owner
    independently signs into the same PAGS account and approves Google. Inspect identities,
    pin that mailbox and set/read back recipient and sender `admin@freeappstore.online`.
@@ -123,10 +132,17 @@ grants merely to repair an email connection.
 ## Read budget and application audit
 
 Instance rules require metadata first, at most ten summaries and three relevant body reads
-per run, at most 4,000 body characters each. Continuation pages count toward the same run
-budget, not as permission for an unbounded loop. Persist provider IDs/checkpoints only after
-successful Hiring recording. Scope, pagination and output limits must be enforced and
-tested by the connector; stop with an actionable blocker if unavailable.
+per run, at most 4,000 body characters each. These are the tighter operating limits, not
+the connector's maximums. The frozen CF connector defaults to ten summaries, caps each list
+at 25 and each list's bridge scan at eight pages, and enforces per-run ceilings of 60 summaries,
+six body reads and 60,000 delivered body characters. A body window defaults to 6,000 and caps
+at 20,000 characters; the agent must explicitly request its lower 4,000-character limit.
+The bridge bounds raw inbound ingestion at 262,144 bytes and retained body text at 50,000
+characters. Truncation/continuation is explicit; unavailable source content must not be described
+as fully archived. Follow returned `nextCursor`/`nextOffset` only within the operating budget;
+continuations consume the same run budget, not permission for an unbounded loop. A scan reports
+skipped handled mail, remaining mail and limit/budget stops. Stop with an actionable blocker
+if the deployed scope or limits cannot be verified.
 
 After an actual candidate email read/send, immediately record it in the
 matching organization, brand and application with the actual subject/body, direction,
@@ -146,6 +162,30 @@ record: use `get_worker_candidate_email` with that exact operation/application a
 its provider, mailbox, IDs and content. A different existing payload is a conflict; stop.
 These are archival records reported by the caller, not a provider delivery verification.
 
+For CF mail, the processing order is strictly **archive → exact readback → explicit checkpoint**:
+
+1. Successfully read the in-scope provider message in this instance; archive the actual
+   correspondence using `record_worker_candidate_email` with stable `operation_id`.
+2. Call `get_worker_candidate_email` for that exact operation, organization, brand and
+   application. Compare direction, subject/body, addresses, mailbox, provider/connection,
+   message/thread IDs and supplied acceptance/event IDs against the intended archive.
+   An empty result, incomplete content, mismatched existing record or failed readback is not success.
+3. Only after that exact match, invoke PAGS `email_worker_mark_handled` with
+   `message_id` and `archive_reference` equal to the verified nonsecret archive `operation_id`.
+   The reference accepts 1–128 letters, digits, `.`, `_`, `:` or `-`, starting with a letter
+   or digit; never use a credential, URL, body or subject. Inspect its `handled: true`
+   result and matching reference before assuming the checkpoint advanced.
+
+Reading or replying alone no longer marks mail handled. Failed PAS archive/readback leaves it
+visible for the next scan. The checkpoint requires prior successful scoped read evidence for
+this instance and pinned connection, is idempotent for the same reference and refuses a
+different reference without overwriting the first. It records the caller's confirmed archive,
+not independent PAS/provider verification. It mutates only PAGS state (`scope: read`,
+`mutates: true`, `reach: platform`), requires its own capability but no outbound-send consent,
+and never contacts/modifies the mailbox. Legacy automatic read/reply marks remain as history
+but do not hide mail until explicitly upgraded with an archive reference. This behavior is
+implemented, **not yet live-verified**; never emulate it with an early local checkpoint.
+
 After a real profile/search crawl or thread scan, `record_agent_activity` with the supported
 activity type, HTTPS source URL and factual summary/time. Read history when relevant.
 Never change stage, assignment, reject or offer without explicit human direction.
@@ -159,10 +199,15 @@ MCP connection and read back on application `8729c34d-cab9-4f5d-bafc-6c96e749dc0
 It explicitly labels itself an integration check, says no email was read/sent and makes
 no candidate decision. This verifies app recording, not mail delivery.
 
-For each path, after connection, send a labeled test to an owner-controlled address; independently
+Before any outbound test, obtain the owner's confirmation of the exact owner-controlled
+recipient and labeled subject (and intended test message). Broad setup-test authorization on
+2026-10-21 is recorded, but that exact recipient/subject confirmation is still pending;
+it is not an approval for an arbitrarily chosen send or candidate outreach.
+
+For each path, after connection and that exact approval, send the labeled test; independently
 verify receipt, agent read, reply From/thread identity and retries/deduplication. Record
-actual correspondence on a verified test contact/application and read it back. The owner
-authorized setup test mail on 2026-10-21. Do not use candidates as test recipients or claim
+actual correspondence on a verified test contact/application and read it back before advancing
+the CF checkpoint. Do not use candidates as test recipients or claim
 delivery from an accepted-send receipt alone.
 
 Also send an unrelated-mail negative control to the same receiving Gmail mailbox without
