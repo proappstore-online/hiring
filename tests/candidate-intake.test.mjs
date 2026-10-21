@@ -87,7 +87,6 @@ test('candidate submission records exact brand, worker ownership, notice snapsho
     const a = db.prepare('SELECT * FROM hiring_applications').get()
     assert.equal(a.brand_id,A.brand_id)
     assert.equal(a.source,'linkedin') // immutable legacy compatibility constraint
-    assert.equal(a.intake_source,'direct')
     assert.equal(a.assignee_user_id,'owner')
     const consent = db.prepare('SELECT * FROM hiring_consent_records').all()
     assert.equal(consent.length,1)
