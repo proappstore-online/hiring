@@ -36,6 +36,45 @@ const scope = { organization_id: 'org-a', brand_id: 'brand-a' }
 const bootstrap = { ...scope, requisition_id: 'req-a', organization_name: 'Org A', brand_name: 'Brand A', requisition_title: 'Engineer', operation_id: 'bootstrap-a' }
 const candidate = { ...scope, requisition_id: 'req-a', candidate_id: 'cand-a', application_id: 'app-a', operation_id: 'create-a', candidate_name: 'A Person', email: 'a@example.com', phone: '', linkedin_url: 'https://www.linkedin.com/in/a-person', source_detail: 'LinkedIn search on 2026-10-20', basis_reference: 'recruitment legitimate interests assessment v1', contact_context: 'Public profile; email supplied directly', assignee_user_id: 'staff-a' }
 
+test('generic application creation preserves any source, optional profile, assignment and atomic audit', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  for (const source of ['linkedin', 'email', 'referral', 'job_board', 'recruiter_import', 'manual', 'community meetup']) {
+    const input = { ...candidate, source, profile_url: 'https://example.org/profile', candidate_id: `candidate-${source}`, application_id: `application-${source}`, operation_id: `operation-${source}` }
+    assert.deepEqual(call('create_application', 'outsider', input), [0,0,0,0,0])
+    assert.deepEqual(call('create_application', 'staff-a', input), [1,1,1,1,1])
+    const record = call('list_applications', 'staff-a', scope).find(r => r.id === input.application_id)
+    assert.equal(record.source, source)
+    assert.equal(record.profile_url, input.profile_url)
+    assert.equal(record.assignee_user_id, 'staff-a')
+    assert.equal(record.stage, 'submitted')
+    assert.equal(call('gateway_get_application', 'staff-a', { ...scope, application_id: input.application_id })[0].source, source)
+    assert.equal(call('list_application_audit', 'staff-a', { ...scope, application_id: input.application_id }).length, 1)
+    assert.deepEqual(call('create_application', 'staff-a', input), [0,0,0,0,0])
+    assert.deepEqual(call('create_application', 'staff-a', { ...input, operation_id: `retry-${source}` }), [0,0,0,0,0])
+  }
+  const optional = { ...candidate, source: 'email', candidate_id: 'no-profile', application_id: 'no-profile', operation_id: 'no-profile' }
+  assert.deepEqual(call('create_application', 'staff-a', optional), [1,1,1,1,1])
+  assert.equal(call('list_applications', 'staff-a', scope).find(r => r.id === 'no-profile').profile_url, null)
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
+  assert.throws(() => db.exec("UPDATE hiring_application_sources SET source='changed'"), /immutable/)
+  db.close()
+})
+
+test('generic create rejects invalid sources, unsafe profiles and forged scope without partial records', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  const input = { ...candidate, source: 'referral', profile_url: '' }
+  for (const patch of [{ source: '' }, { source: ' ' }, { source: 'x'.repeat(101) }, { profile_url: 'javascript:alert(1)' }, { profile_url: 'https://' + 'x'.repeat(2000) }, { brand_id: 'wrong' }, { requisition_id: 'wrong' }, { assignee_user_id: 'outsider' }]) {
+    assert.deepEqual(call('create_application', 'staff-a', { ...input, ...patch }), [0,0,0,0,0])
+    assert.equal(db.prepare('SELECT count(*) n FROM hiring_candidates').get().n, 0)
+  }
+  db.exec("CREATE TRIGGER fail_generic_audit BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.created' BEGIN SELECT RAISE(ABORT,'audit failure'); END")
+  assert.throws(() => call('create_application', 'staff-a', input), /audit failure/)
+  for (const table of ['hiring_candidates','hiring_applications','hiring_stage_events','hiring_application_sources']) assert.equal(db.prepare(`SELECT count(*) n FROM ${table}`).get().n, 0)
+  db.close()
+})
+
 test('internal LinkedIn workflow is scoped, audited, and never sends', () => {
   const { db, call } = fixture()
   assert.equal(call('create_workspace', 'staff-a', bootstrap).at(-1), 1)

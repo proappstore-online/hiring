@@ -59,6 +59,10 @@
     {
       "name": "0015_requisition_lifecycle",
       "sql": "CREATE TABLE hiring_requisition_reviews (requisition_id TEXT PRIMARY KEY REFERENCES hiring_requisitions(id), state TEXT NOT NULL CHECK(state IN ('draft','pending_review')), payload TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, actor_user_id TEXT NOT NULL); CREATE TABLE hiring_publication_controls (requisition_id TEXT PRIMARY KEY REFERENCES hiring_job_publications(requisition_id), paused INTEGER NOT NULL DEFAULT 0 CHECK(paused IN (0,1))); ALTER TABLE hiring_job_publications ADD COLUMN compensation_type TEXT NOT NULL DEFAULT 'unspecified' CHECK(compensation_type IN ('unspecified','paid','unpaid','internship','volunteer')); CREATE TRIGGER hiring_compensation_immutable BEFORE UPDATE OF compensation_type ON hiring_job_publications BEGIN SELECT RAISE(ABORT,'publication classification is immutable'); END; CREATE TRIGGER hiring_publication_control_capture AFTER INSERT ON hiring_job_publications BEGIN INSERT INTO hiring_publication_controls(requisition_id) VALUES(NEW.requisition_id); END; INSERT INTO hiring_publication_controls(requisition_id) SELECT requisition_id FROM hiring_job_publications;"
+    },
+    {
+      "name": "0016_generic_application_sources",
+      "sql": "CREATE TABLE IF NOT EXISTS hiring_application_sources (application_id TEXT PRIMARY KEY REFERENCES hiring_applications(id), source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 100), profile_url TEXT CHECK(profile_url IS NULL OR (length(profile_url)<=2000 AND (profile_url LIKE 'https://%' OR profile_url LIKE 'http://%')))); CREATE TRIGGER IF NOT EXISTS hiring_application_source_no_update BEFORE UPDATE ON hiring_application_sources BEGIN SELECT RAISE(ABORT,'application source is immutable'); END; CREATE TRIGGER IF NOT EXISTS hiring_application_source_no_delete BEFORE DELETE ON hiring_application_sources BEGIN SELECT RAISE(ABORT,'application source is immutable'); END"
     }
   ]
 }

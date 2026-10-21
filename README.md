@@ -5,6 +5,17 @@ Hiring is an early multi-brand applicant tracking system. The first private recr
 - `web/`: Vite/React shell with PAS-native Google and GitHub staff sign-in; candidate intake remains closed.
 - `marketing/`: Astro starter copy and draft legal pages, not approved Hiring claims.
 - `migrations.json`, `mcp.json`: a default-closed public intake gate plus the authenticated internal recruiter workspace schema and actions; the legacy `items` table remains unused.
+
+Recruiters and agents add candidates with `create_application`, recording any source (email,
+referral, LinkedIn, job board, manual import or a custom source) and an optional profile URL.
+The workspace form is **Add candidate**. The older `create_linkedin_application` action remains
+available for existing callers. Source and contact evidence, assignment, tenant access and the
+creation audit are recorded together. Creating an application does not send email.
+
+For a trusted Hiring agent in ProAgentStore, grant **Read & write access to this server** for
+`https://mcp.proappstore.online/mcp/apps/hiring` once. This also covers newly added Hiring
+actions; individual tool selection remains available under Advanced permissions. The Hiring
+server continues to enforce the connected user's organization and brand access.
 - `.github/workflows/`: CI, compliance and main-branch deploy.
 
 See [internal workspace setup](docs/internal-workspace.md). Run `pnpm install && pnpm dev`, `pnpm test`, and `pnpm build`. Main is the delivery branch; no PRs. A push to main triggers deployment. Follow [CLAUDE.md](CLAUDE.md) and the [platform guide](https://proappstore.online/skills.md). Do not treat the starter's placeholder owner, copy, schema or tools as product decisions.
