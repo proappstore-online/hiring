@@ -58,7 +58,7 @@ test('gateway tools are schema-coherent and accept no identity or role parameter
     for (const s of t.statements ?? [t.sql]) {
       assert.ok(!s.includes(';'), `${t.name}: semicolon`)
       assert.match(s, /LIMIT (1|25)$/, `${t.name}: bounded`)
-      assert.match(s, /hiring_memberships m WHERE m\.organization_id = :organization_id AND m\.brand_id = :brand_id AND m\.user_id = :__user_id/)
+      assert.match(s, /hiring_effective_access p WHERE p\.organization_id=:organization_id AND p\.brand_id=:brand_id AND p\.user_id=:__user_id/)
       const used = new Set([...s.matchAll(/:([a-z_][a-z0-9_]*)/gi)].map(m => m[1]).filter(n => !n.startsWith('__')))
       assert.deepEqual([...used].sort(), Object.keys(t.params).sort(), `${t.name}: declared params match SQL`)
     }

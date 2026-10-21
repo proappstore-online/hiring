@@ -75,3 +75,7 @@ Use request IDs across UI, worker, D1, MAIL and MCP. Monitor queue age, failures
 ## Issue #3 implementation revision
 
 Public job discovery and passkey-protected owner publication now have registered actions and UI. Candidate-owned submission is implemented behind the still-closed runtime gate. Private attachment reservations are quarantined; no scanner or brand-scoped reviewer byte-serving route is claimed available. Public discovery does not open intake. See [candidate intake contract](candidate-intake.md) for additive schema compatibility, SQL abuse limits and required release evidence.
+
+## Issue #12 authorization revision
+
+The registered SQL boundary now resolves active organization, brand and requisition grants through `hiring_effective_access`, including revocation and assignment checks for reviewers. This supersedes the earlier brand-wide-only authorization and #12 gap descriptions above. Atomic owner administration is implemented as registered batches; no worker enablement is required. [Server permissions](permissions.md) documents the role matrix, actions, and remaining read/denial audit and throttling gaps.
