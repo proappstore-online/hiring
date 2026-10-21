@@ -31,6 +31,7 @@ The table above describes the canonical design. The shipped migrations currently
 - **0005:** operation provenance on notes, outbox messages and requisitions.
 - **0006:** nullable `linkedin_profile_url` on candidates alongside the legacy required `linkedin_url`; a separate LinkedIn profile URL is optional.
 - **0007:** Gmail communication events and agent activity records, scoped to organization, brand and application, with provider/operation identifiers.
+- **0009:** Additive Cloudflare email-worker archives with an exact mailbox, optional bridge namespace, separate opaque message/thread/acceptance/event IDs and append-only storage; legacy Gmail rows remain in their original table. Combined application history reports the actual provider.
 
 - **0008:** independent platform-user-keyed worker profiles with nullable candidate links; organization policy/contact metadata; organization/brand/requisition-scoped grants; requisition metadata and submitted application snapshots; scoped idempotency indexes; consent evidence and explicit rights requests; redacted audit metadata and outbox delivery bookkeeping. Retention defaults to indefinite, with no expiry or legal-review gate. Composite foreign keys constrain new grant/governance references. Insert/update triggers enforce organization/brand/application agreement on existing history, notes, outbox, communications, agent activity and audit tables; application scope is immutable. Existing historical rows are preserved, not retroactively repaired.
 

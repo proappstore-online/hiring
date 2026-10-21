@@ -249,3 +249,106 @@ test('agent emails and crawl activity are append-only, visible to the granted wo
   assert.equal(call('list_application_agent_activity', 'outsider', { ...scope, application_id: 'app-a' }).length, 0)
   assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='agent.candidate_profile_crawled'").get().n, 1)
 })
+
+const workerMail = {
+  ...scope, application_id: 'app-a', communication_id: 'worker-out-1', direction: 'outbound',
+  mailbox_address: 'admin@freeappstore.online', provider_connection_id: 'fas-hiring-bridge',
+  from_email: 'admin@freeappstore.online', to_email: 'a@example.com', subject: 'Interview availability',
+  body: 'Could you share your availability?', provider_message_id: 'out_opaque:bridge-message',
+  provider_thread_id: '<opaque-thread@bridge>', provider_receipt_id: 'cloudflare-accepted-id',
+  occurred_at: 400, agent_instance_id: 'pags-hiring-comms', operation_id: 'worker-record-op',
+}
+function workerFixture() {
+  const fixtureData = fixture()
+  fixtureData.call('create_workspace', 'staff-a', bootstrap)
+  fixtureData.call('create_linkedin_application', 'staff-a', candidate)
+  return fixtureData
+}
+
+test('Cloudflare mail retains separate opaque IDs, exact mailbox, content and authenticated actor', () => {
+  const { db, call } = workerFixture()
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
+  const [row] = call('get_worker_candidate_email', 'staff-a', workerMail)
+  assert.equal(row.channel, 'email-worker')
+  assert.equal(row.provider, 'cloudflare')
+  for (const key of ['mailbox_address','provider_connection_id','provider_message_id','provider_thread_id','provider_receipt_id','body','operation_id']) assert.equal(row[key], workerMail[key], key)
+  assert.equal(row.provider_event_id, null)
+  assert.equal(row.actor_user_id, 'staff-a')
+  const received = { ...workerMail, communication_id: 'worker-in-1', direction: 'inbound', from_email: 'a@example.com', to_email: 'admin@freeappstore.online', provider_message_id: '<original-message@example.com>', provider_event_id: 'in:<original-message@example.com>', provider_receipt_id: null, operation_id: 'worker-in-op' }
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', received), [1, 1])
+  assert.equal(call('get_worker_candidate_email', 'staff-a', received)[0].provider_event_id, received.provider_event_id)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='communication.email_sent'").get().n, 1)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_communication_events").get().n, 0)
+  assert.throws(() => db.exec("UPDATE hiring_worker_communication_events SET body='rewritten'"), /append-only/)
+  assert.throws(() => db.exec('DELETE FROM hiring_worker_communication_events'), /append-only/)
+  db.close()
+})
+
+test('Cloudflare archives preserve owner, brand, application, candidate and mailbox gates', () => {
+  const { db, call } = workerFixture()
+  call('create_workspace', 'staff-b', { ...bootstrap, organization_id: 'org-b', brand_id: 'brand-b', requisition_id: 'req-b', operation_id: 'bootstrap-b' })
+  call('create_linkedin_application', 'staff-b', { ...candidate, organization_id: 'org-b', brand_id: 'brand-b', requisition_id: 'req-b', candidate_id: 'cand-b', application_id: 'app-b', assignee_user_id: 'staff-b', operation_id: 'create-b' })
+  for (const [user, patch] of [
+    ['outsider', {}],
+    ['staff-a', { brand_id: 'brand-b' }],
+    ['staff-a', { organization_id: 'org-b', brand_id: 'brand-b', application_id: 'app-b' }],
+    ['staff-a', { application_id: 'app-b' }],
+    ['staff-a', { to_email: 'another-candidate@example.com' }],
+    ['staff-a', { from_email: 'wrong-mailbox@example.com' }],
+    ['staff-a', { direction: 'inbound', from_email: 'a@example.com', to_email: 'wrong-mailbox@example.com' }],
+  ]) assert.deepEqual(call('record_worker_candidate_email', user, { ...workerMail, ...patch }), [0, 0])
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_worker_communication_events').get().n, 0)
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
+  assert.equal(call('get_worker_candidate_email', 'outsider', workerMail).length, 0)
+  assert.equal(call('get_worker_candidate_email', 'staff-b', workerMail).length, 0)
+  assert.equal(call('list_application_communications', 'staff-b', workerMail).length, 0)
+  // An orphaned archive cannot be used to recreate an audit after the actor loses membership.
+  db.prepare('DELETE FROM hiring_audit_events WHERE operation_id=?').run(workerMail.operation_id)
+  db.exec("DELETE FROM hiring_memberships WHERE user_id='staff-a'")
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [0, 0])
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_audit_events WHERE operation_id=?').get(workerMail.operation_id).n, 0)
+  db.close()
+})
+
+test('Cloudflare replay and conflicting IDs never claim a newly archived record', () => {
+  const { db, call } = workerFixture()
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [0, 0])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, body: 'Conflicting body' }), [0, 0])
+  assert.equal(call('get_worker_candidate_email', 'staff-a', workerMail)[0].body, workerMail.body)
+  const retry = { ...workerMail, communication_id: 'worker-new-id', operation_id: 'worker-new-op' }
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', retry), [0, 0])
+  assert.deepEqual(call('get_worker_candidate_email', 'staff-a', retry), [])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...retry, provider_message_id: 'different-bridge-id-same-receipt' }), [0, 0])
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_worker_communication_events').get().n, 1)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='communication.email_sent'").get().n, 1)
+  db.close()
+})
+
+test('Gmail and worker history coexist without rewriting or relabeling old messages', () => {
+  const { db, call } = workerFixture()
+  const gmail = { ...workerMail, communication_id: 'gmail-one', provider_message_id: workerMail.provider_message_id, operation_id: 'gmail-op', occurred_at: 100 }
+  assert.deepEqual(call('record_candidate_email', 'staff-a', gmail), [1, 1])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, operation_id: gmail.operation_id }), [0, 0])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
+  const rows = call('list_application_communications', 'staff-a', workerMail)
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].channel, 'email-worker')
+  assert.equal(rows[0].provider, 'cloudflare')
+  assert.equal(rows[0].provider_receipt_id, workerMail.provider_receipt_id)
+  assert.equal(rows[1].channel, 'gmail')
+  assert.equal(rows[1].provider, 'gmail')
+  assert.equal(rows[1].provider_receipt_id, null)
+  assert.equal(rows[1].body, gmail.body)
+  assert.equal(call('list_application_communications', 'outsider', workerMail).length, 0)
+  db.close()
+})
+
+test('worker provider dedupe respects separate mailbox and bridge namespaces', () => {
+  const { db, call } = workerFixture()
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, communication_id: 'another-bridge', provider_connection_id: 'second-bridge', operation_id: 'another-bridge-op' }), [1, 1])
+  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, communication_id: 'another-mailbox', mailbox_address: 'hiring@freeappstore.online', from_email: 'hiring@freeappstore.online', operation_id: 'another-mailbox-op' }), [1, 1])
+  assert.equal(call('list_application_communications', 'staff-a', workerMail).length, 3)
+  db.close()
+})

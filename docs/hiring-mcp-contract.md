@@ -4,6 +4,17 @@ The public `get_hiring_runtime_gate` action remains a bounded non-sensitive read
 
 ## Common envelope
 
+Candidate mail archives support two existing transports without rewriting history:
+`record_candidate_email` retains its Gmail-only contract; `record_worker_candidate_email`
+records Cloudflare bridge mail as `channel=email-worker`, `provider=cloudflare`. The worker
+action checks exact application/organization/brand membership, candidate address and the
+configured mailbox side (inbound To or outbound From), and deduplicates operation IDs and
+provider identifiers within the mailbox/bridge namespace. It stores message, thread,
+acceptance receipt and event IDs separately. `get_worker_candidate_email` reads one exact
+operation for verification; `list_application_communications` combines both providers.
+Neither records nor reads mail directly from a provider or sends it. A zero-change write
+requires readback and exact comparison; it is not evidence of a successful new archive.
+
 Platform-authenticated caller, explicit organization/brand selection, validated arguments and request ID. Mutations require idempotency key and expected record version. Server derives grants; tool input cannot assert `user_id` or roles. Return only permitted fields, record version and structured errors (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `VALIDATION`, `RATE_LIMITED`). Mask unauthorized existence as `NOT_FOUND`. Bound and paginate results; minimize PII.
 
 | Tool | Scope and guard |

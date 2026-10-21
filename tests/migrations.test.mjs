@@ -52,6 +52,18 @@ test('historical migrations are immutable; populated upgrade and tracked replay 
   db.close(); fresh.close()
 })
 
+test('provider-aware mail migration preserves populated historical Gmail archives byte-for-byte', () => {
+  const db = database(); apply(db, historical); seed(db)
+  db.prepare('INSERT INTO hiring_communication_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run('gmail-before','org-a','brand-a','app-a','inbound','gmail','person@example.com','admin@freeappstore.online','Original subject','Original full body','opaque-gmail-id','opaque-thread',1,'staff','agent','original-op',1)
+  const before = db.prepare('SELECT * FROM hiring_communication_events').all()
+  apply(db, migrations); apply(db, migrations)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_communication_events').all(), before)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_worker_communication_events').get().n, 0)
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
+  assert.throws(() => db.prepare('INSERT INTO hiring_worker_communication_events(id,organization_id,brand_id,application_id,direction,mailbox_address,from_email,to_email,subject,body,provider_message_id,occurred_at,actor_user_id,agent_instance_id,operation_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run('bad','org-a','brand-a','app-b','inbound','admin@freeappstore.online','person@example.com','admin@freeappstore.online','Subject','Body','worker-id',1,'staff','agent','worker-op',1), /FOREIGN KEY/)
+  db.close()
+})
+
 test('new grants and governance reject cross-tenant references; workers remain independent', () => {
   const db = database(); apply(db, historical); seed(db); apply(db, migrations)
   db.exec("INSERT INTO hiring_worker_profiles(user_id,display_name,created_at,updated_at) VALUES ('worker','Worker',0,0)")

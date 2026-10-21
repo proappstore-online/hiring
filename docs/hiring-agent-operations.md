@@ -122,11 +122,23 @@ budget, not as permission for an unbounded loop. Persist provider IDs/checkpoint
 successful Hiring recording. Scope, pagination and output limits must be enforced and
 tested by the connector; stop with an actionable blocker if unavailable.
 
-After an actual candidate email read/send, immediately `record_candidate_email` in the
+After an actual candidate email read/send, immediately record it in the
 matching organization, brand and application with the actual subject/body, direction,
 addresses, provider message/thread IDs, occurrence time and instance ID. Verify provider
 compatibility; never fabricate Gmail IDs for Cloudflare mail. A preview is not a full
 archived message. Unmatched correspondence goes to human triage.
+
+Use `record_candidate_email` for Gmail. For the Cloudflare bridge, use
+`record_worker_candidate_email`: `mailbox_address` must equal inbound `to_email` or
+outbound `from_email`, while the other address must match the stored candidate. Preserve
+the bridge's opaque `provider_message_id` and `provider_thread_id`; record an actual
+Cloudflare acceptance receipt as `provider_receipt_id` and an actual inbound event ID as
+`provider_event_id` when supplied. Use the stable non-secret bridge/connection identifier
+as `provider_connection_id` when known; never include a credential or capability URL.
+Reuse the original `operation_id` on a retry. Zero inserted rows does not prove a new
+record: use `get_worker_candidate_email` with that exact operation/application and compare
+its provider, mailbox, IDs and content. A different existing payload is a conflict; stop.
+These are archival records reported by the caller, not a provider delivery verification.
 
 After a real profile/search crawl or thread scan, `record_agent_activity` with the supported
 activity type, HTTPS source URL and factual summary/time. Read history when relevant.
