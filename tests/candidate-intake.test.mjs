@@ -316,9 +316,13 @@ test('candidate browser calls scoped candidate actions and renders an external v
 })
 
 test('candidate detail lookup is owned, safe and independent of public availability', () => {
-  const { db, call, submit } = fixture()
+  const { db, call, submit, advance } = fixture()
   try {
     submit()
+    advance()
+    call('submit_job_application','worker',application(B,'detail-b'))
+    assert.equal(call('get_my_application','worker',{ application_id:'application-detail-b' })[0].brand_id,'b')
+    assert.deepEqual(call('get_my_application','other-worker',{ application_id:'application-detail-b' }),[])
     const row = call('get_my_application', 'worker', { application_id: 'application-a' })[0]
     assert.equal(row.stage, 'submitted')
     assert.equal(row.created_at, 1_000_000_000)
