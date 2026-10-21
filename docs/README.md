@@ -11,6 +11,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | [Privacy and governance](privacy-governance.md) | Consent, retention, rights and unpaid-arrangement controls. |
 | [MAIL contract](mail-contract.md) | Provider-neutral messaging boundary and failure handling. |
 | [Hiring MCP contract](hiring-mcp-contract.md) | Safe agent tools, identity, authorization and mutation rules. |
+| [Hiring agent operations](hiring-agent-operations.md) | Live PAGS communications-agent configuration, Gmail mailbox requirement, checks and recovery. |
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
 | [Google sign-in](google-sign-in.md) | Live PAS-native auth path and operator configuration. |
 

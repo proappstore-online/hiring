@@ -23,6 +23,10 @@
     {
       "name": "0006_optional_linkedin_profile",
       "sql": "ALTER TABLE hiring_candidates ADD COLUMN linkedin_profile_url TEXT"
+    },
+    {
+      "name": "0007_communication_and_agent_activity",
+      "sql": "CREATE TABLE IF NOT EXISTS hiring_communication_events (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, brand_id TEXT NOT NULL, application_id TEXT NOT NULL REFERENCES hiring_applications(id), direction TEXT NOT NULL CHECK(direction IN ('inbound','outbound')), channel TEXT NOT NULL CHECK(channel='gmail'), from_email TEXT NOT NULL, to_email TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, provider_message_id TEXT NOT NULL, provider_thread_id TEXT, occurred_at INTEGER NOT NULL, actor_user_id TEXT NOT NULL, agent_instance_id TEXT NOT NULL, operation_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL, UNIQUE(organization_id, brand_id, provider_message_id)); CREATE INDEX IF NOT EXISTS idx_hiring_communication_events_application ON hiring_communication_events(application_id, occurred_at DESC); CREATE TABLE IF NOT EXISTS hiring_agent_activity (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, brand_id TEXT NOT NULL, application_id TEXT NOT NULL REFERENCES hiring_applications(id), activity_type TEXT NOT NULL CHECK(activity_type IN ('candidate_profile_crawled','candidate_search_crawled','email_thread_scanned')), source_url TEXT NOT NULL, summary TEXT NOT NULL, occurred_at INTEGER NOT NULL, actor_user_id TEXT NOT NULL, agent_instance_id TEXT NOT NULL, operation_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_hiring_agent_activity_application ON hiring_agent_activity(application_id, occurred_at DESC)"
     }
   ]
 }

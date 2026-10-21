@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ProShell, PageHeader, SignInButton, useAuth, type NavItem } from '@proappstore/sdk'
-import { app, read, write, stageLabel, type Application, type Audit, type AssignmentEvent, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
+import { app, read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
 import { ApplicationDetail } from './ApplicationDetail'
 import { Admin, CreateApplication, Setup } from './forms'
 import { button, date, field, panel } from './ui'
 
 const NAV: NavItem[] = [{ label: 'Workspace', href: '/', title: 'Hiring' }]
 type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
-type Detail = { application_id: string; notes: Note[]; drafts: Draft[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
+type Detail = { application_id: string; notes: Note[]; drafts: Draft[]; communications: Communication[]; activities: AgentActivity[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
 const emptyWork: Omit<Work, 'brand_id'> = { requisitions: [], members: [], applications: [] }
-const emptyDetail: Omit<Detail, 'application_id'> = { notes: [], drafts: [], events: [], assignments: [], audit: [] }
+const emptyDetail: Omit<Detail, 'application_id'> = { notes: [], drafts: [], communications: [], activities: [], events: [], assignments: [], audit: [] }
 
 export default function App() {
   const { user, loading } = useAuth(app)
@@ -33,7 +33,7 @@ function WorkspaceView({ userId }: { userId: string }) {
   const scope = space ? { organization_id: space.organization_id, brand_id: space.brand_id } : null
   // Data loaded for a previous workspace or application is never shown for the current one.
   const { requisitions, members, applications } = work?.brand_id === selected ? work : emptyWork
-  const { notes, drafts, events, assignments, audit } = detail?.application_id === activeId ? detail : emptyDetail
+  const { notes, drafts, communications, activities, events, assignments, audit } = detail?.application_id === activeId ? detail : emptyDetail
   const active = applications.find(a => a.id === activeId)
   const reloadSpaces = useCallback(async () => { const rows = await read<Workspace>('list_my_workspaces'); setSpaces(rows); setSelected(old => rows.some(s => s.brand_id === old) ? old : rows[0]?.brand_id ?? '') }, [])
   const reloadWork = useCallback(async () => {
@@ -46,8 +46,8 @@ function WorkspaceView({ userId }: { userId: string }) {
     const seq = ++detailSeq.current
     if (!scope || !activeId) return
     const p = { ...scope, application_id: activeId }
-    const [n, d, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
-    if (seq === detailSeq.current) setDetail({ application_id: activeId, notes: n, drafts: d, events: e, assignments: h, audit: a })
+    const [n, d, c, x, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<Communication>('list_application_communications', p), read<AgentActivity>('list_application_agent_activity', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
+    if (seq === detailSeq.current) setDetail({ application_id: activeId, notes: n, drafts: d, communications: c, activities: x, events: e, assignments: h, audit: a })
   }, [space?.organization_id, space?.brand_id, activeId])
   const loadSpaces = useCallback(() => { setLoading(true); setError(''); reloadSpaces().catch(e => setError(String(e))).finally(() => setLoading(false)) }, [reloadSpaces])
   useEffect(loadSpaces, [loadSpaces])
@@ -70,7 +70,7 @@ function WorkspaceView({ userId }: { userId: string }) {
           <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <button key={a.id} type="button" onClick={() => setActiveId(a.id)} aria-label={`Open ${a.candidate_name} application`} className={'w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></button>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
           <Admin scope={scope!} role={space.role} busy={busy} run={run} />
         </div>
-        <div>{active ? <ApplicationDetail key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, notes and drafts.</p></section>}</div>
+        <div>{active ? <ApplicationDetail key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>
       </div>
     </>}
   </div>

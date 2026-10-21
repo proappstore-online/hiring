@@ -208,3 +208,44 @@ test('blank workspace, requisition and member values are rejected server-side', 
 test('versioned actions declare expected_version as an integer', () => {
   for (const name of ['change_application_stage', 'reassign_application']) assert.equal(action(name).params.expected_version.type, 'integer', name)
 })
+
+test('agent emails and crawl activity are append-only, visible to the granted workspace, and auditable', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  call('create_linkedin_application', 'staff-a', candidate)
+  const sent = {
+    ...scope,
+    application_id: 'app-a',
+    communication_id: 'email-out-1',
+    direction: 'outbound',
+    from_email: 'admin@freeappstore.online',
+    to_email: 'a@example.com',
+    subject: 'Interview availability',
+    body: 'Could you share your availability next week?',
+    provider_message_id: 'gmail-message-out-1',
+    provider_thread_id: 'gmail-thread-1',
+    occurred_at: 100,
+    agent_instance_id: 'pags-hiring-comms',
+    operation_id: 'record-email-out-1',
+  }
+  assert.deepEqual(call('record_candidate_email', 'outsider', sent), [0, 0])
+  assert.deepEqual(call('record_candidate_email', 'staff-a', { ...sent, to_email: 'wrong@example.com', communication_id: 'wrong-email', provider_message_id: 'wrong-provider', operation_id: 'wrong-email-op' }), [0, 0])
+  assert.deepEqual(call('record_candidate_email', 'staff-a', sent), [1, 1])
+  assert.deepEqual(call('record_candidate_email', 'staff-a', { ...sent, communication_id: 'email-out-retry', operation_id: 'record-email-out-retry' }), [0, 0])
+  const received = { ...sent, communication_id: 'email-in-1', direction: 'inbound', from_email: 'a@example.com', to_email: 'admin@freeappstore.online', subject: 'Re: Interview availability', body: 'Tuesday afternoon works for me.', provider_message_id: 'gmail-message-in-1', operation_id: 'record-email-in-1', occurred_at: 200 }
+  assert.deepEqual(call('record_candidate_email', 'staff-a', received), [1, 1])
+  const communications = call('list_application_communications', 'staff-a', { ...scope, application_id: 'app-a' })
+  assert.equal(communications.length, 2)
+  assert.equal(communications[0].direction, 'inbound')
+  assert.equal(communications[0].body, received.body)
+  assert.equal(call('list_application_communications', 'outsider', { ...scope, application_id: 'app-a' }).length, 0)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action IN ('communication.email_sent','communication.email_received')").get().n, 2)
+
+  const crawl = { ...scope, application_id: 'app-a', activity_id: 'crawl-1', activity_type: 'candidate_profile_crawled', source_url: 'https://www.linkedin.com/in/a-person', summary: 'Reviewed public profile for role-relevant experience.', occurred_at: 300, agent_instance_id: 'pags-hiring-comms', operation_id: 'record-crawl-1' }
+  assert.deepEqual(call('record_agent_activity', 'staff-a', { ...crawl, source_url: 'http://invalid.example', activity_id: 'invalid-crawl', operation_id: 'invalid-crawl-op' }), [0, 0])
+  assert.deepEqual(call('record_agent_activity', 'staff-a', crawl), [1, 1])
+  assert.deepEqual(call('record_agent_activity', 'staff-a', crawl), [0, 0])
+  assert.equal(call('list_application_agent_activity', 'staff-a', { ...scope, application_id: 'app-a' }).length, 1)
+  assert.equal(call('list_application_agent_activity', 'outsider', { ...scope, application_id: 'app-a' }).length, 0)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='agent.candidate_profile_crawled'").get().n, 1)
+})
