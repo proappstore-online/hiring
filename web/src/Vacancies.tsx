@@ -3,6 +3,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { readPublic, type PublicJob } from './api'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { parsePD, PositionDescription } from './position-description'
+import { DiscoveryFilters } from './DiscoveryFilters'
 import { button, field, panel } from './ui'
 
 type Vacancy = PublicJob & { pd_json: string | null; pd_version: number | null; status: 'published' }
@@ -18,6 +19,8 @@ export function VacanciesIndexPage() {
   const brand_id = query.get('brand_id') ?? ''
   const search = query.get('q') ?? ''
   const arrangement = query.get('arrangement') ?? ''
+  const brand = query.get('filter_brand') ?? ''
+  const brands = [...new Map(rows.map(r => [r.brand_id, { id: r.brand_id, name: r.brand_name }])).values()]
   async function load(after_id = '') {
     const request = ++seq.current
     setLoading(true); setError(false)
@@ -31,11 +34,12 @@ export function VacanciesIndexPage() {
   const arrangements = [...new Set(rows.map(r => String(parsePD(r.pd_json).workingArrangement || r.arrangement || '')).filter(Boolean))]
   const filtered = rows.filter(r => {
     const pd = parsePD(r.pd_json)
-    return (!arrangement || (pd.workingArrangement || r.arrangement) === arrangement) && `${r.title} ${pd.overview || r.description || ''}`.toLowerCase().includes(search.toLowerCase())
+    return (!brand || r.brand_id === brand) && (!arrangement || (pd.workingArrangement || r.arrangement) === arrangement) && `${r.title} ${pd.overview || r.description || ''}`.toLowerCase().includes(search.toLowerCase())
   })
   function filter(key: string, value: string) { setQuery(old => { const next = new URLSearchParams(old); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true }) }
   return <div className="mx-auto max-w-5xl space-y-5 py-6"><h1 className="text-2xl font-semibold">Vacancies</h1><p>Explore open roles and their position descriptions.</p>
-    <div className="grid gap-4 sm:grid-cols-2"><label>Search vacancies<input className={field} type="search" value={search} onChange={e => filter('q', e.target.value)} /></label><label>Working arrangement<select className={field} value={arrangement} onChange={e => filter('arrangement', e.target.value)}><option value="">All arrangements</option>{arrangements.map(a => <option key={a}>{a}</option>)}</select></label></div>
+    <DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={value => filter('q', value)} onBrand={value => filter('filter_brand', value)} />
+    <label className="block">Working arrangement<select className={field} value={arrangement} onChange={e => filter('arrangement', e.target.value)}><option value="">All arrangements</option>{arrangements.map(a => <option key={a}>{a}</option>)}</select></label>
     <p className="text-sm">Showing published, open vacancies only. Search and filters apply to loaded results.</p>
     {loading && <LoadingState>Loading vacancies…</LoadingState>}{error && <ErrorState retry={() => void load()}>Vacancies could not be loaded.</ErrorState>}
     {!loading && !error && !filtered.length && <EmptyState>{rows.length ? 'No vacancies match these filters.' : 'No vacancies currently open'}</EmptyState>}

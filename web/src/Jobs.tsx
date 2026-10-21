@@ -1,10 +1,11 @@
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState, EmptyState, ErrorState, NotFound } from './route-ui'
 import { useEffect, useRef, useState } from 'react'
 import { SignInButton } from '@proappstore/sdk'
-import { app, id, read, readPublic, write, type CandidateApplication, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
-import { Attachments } from './attachments'
+import { app, id, read, readPublic, write, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
+import { CandidateApplications, applicationLink } from './CandidateAccount'
 import { Form, MultilineField, TextField, button, field, panel, val } from './ui'
+import { DiscoveryFilters } from './DiscoveryFilters'
 import { registerPublicationPasskey, verifyPublicationPasskey } from './passkey'
 
 export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; requisitions: Requisition[]; onChanged?: () => Promise<void> }) {
@@ -25,6 +26,7 @@ export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; r
 
 export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list' | 'detail' | 'apply' }) {
   const { jobId } = useParams()
+  const location = useLocation()
   const [query] = useSearchParams()
   const organization_id = query.get('organization_id') ?? ''
   const brand_id = query.get('brand_id') ?? ''
@@ -34,9 +36,10 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
   const [loading, setLoading] = useState(true)
   const [more, setMore] = useState(false)
   const [available, setAvailable] = useState(false)
-  const [applications, setApplications] = useState<CandidateApplication[]>([])
-  const [mineLoading, setMineLoading] = useState(Boolean(userId))
-  const [mineError, setMineError] = useState(false)
+  const [search, setSearch] = useState('')
+  const [brand, setBrand] = useState('')
+  const brands = [...new Map(jobs.map(j => [j.brand_id, { id: j.brand_id, name: j.brand_name }])).values()]
+  const filtered = jobs.filter(j => (!brand || j.brand_id === brand) && (j.title + ' ' + j.brand_name + ' ' + j.location).toLowerCase().includes(search.toLowerCase()))
   const selection = useRef(0)
   const link = (row: Pick<PublicJob, 'organization_id' | 'brand_id' | 'requisition_id'>, prefix = '/jobs/') => prefix + encodeURIComponent(row.requisition_id) + '?' + new URLSearchParams({ organization_id: row.organization_id, brand_id: row.brand_id })
   async function load(after = '') {
@@ -68,21 +71,15 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
     } catch { if (seq === selection.current) setError('Jobs could not be loaded. Please retry.') }
     finally { if (seq === selection.current) setLoading(false) }
   }
-  async function mine() {
-    if (!userId) return
-    setMineLoading(true); setMineError(false)
-    try { setApplications(await read<CandidateApplication>('list_my_job_applications')) }
-    catch { setMineError(true) }
-    finally { setMineLoading(false) }
-  }
-  useEffect(() => { void load(); void mine(); return () => { ++selection.current } }, [])
+  const [refreshMine, setRefreshMine] = useState(0)
+  useEffect(() => { void load(); return () => { ++selection.current } }, [])
   if (loading && !jobs.length) return <LoadingState>Loading jobs…</LoadingState>
   if (error) return <ErrorState retry={() => void load()}>{error}</ErrorState>
   if (mode !== 'list' && !job) return <NotFound>This job is no longer available. Open a vacancy link from the jobs list to include its organization and brand.</NotFound>
   return <div className="mx-auto max-w-4xl space-y-5 px-4 py-8">
-    {mode === 'list' && <><h1 className="text-2xl font-semibold">Jobs</h1><button className={button} disabled={loading} onClick={() => void load()}>Refresh jobs</button><ul className="space-y-2">{jobs.map(j => <li key={j.requisition_id}><Link className={panel + ' block min-h-[44px] text-left'} to={link(j)}>{j.title} · {j.brand_name} · {j.location}</Link></li>)}</ul>{!jobs.length && <EmptyState>No published jobs are available.</EmptyState>}{loading && <LoadingState />}{more && <button className={button} disabled={loading} onClick={() => void load(jobs.at(-1)!.requisition_id)}>More jobs</button>}</>}
-    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={link(job, '/apply/')}>Apply for this job</Link> : !userId ? <div className="mt-4"><p>Sign in to apply with your own candidate account.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={mine} />}</section>}
-    {userId && <section className={panel}><h2 className="font-semibold">My applications</h2>{mineLoading ? <LoadingState>Loading your applications…</LoadingState> : mineError ? <ErrorState retry={() => void mine()}>Your applications could not be loaded.</ErrorState> : !applications.length ? <EmptyState>No applications recorded yet.</EmptyState> : applications.map(a => <article className="mt-5" key={a.application_id}><h3>{a.title} · {a.brand_name}</h3><p>{a.stage.replaceAll('_', ' ')}</p><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></article>)}</section>}
+    {mode === 'list' && <><h1 className="text-2xl font-semibold">Jobs</h1><button className={button} disabled={loading} onClick={() => void load()}>Refresh jobs</button><DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={setSearch} onBrand={setBrand} /><p>Search and filters apply to loaded results.</p><ul className="space-y-2">{filtered.map(j => <li key={j.requisition_id}><Link className={panel + ' block min-h-[44px] text-left'} to={link(j)}>{j.title} · {j.brand_name} · {j.location}</Link></li>)}</ul>{!filtered.length && <EmptyState>{jobs.length ? 'No jobs match these filters.' : 'No published jobs are available.'}</EmptyState>}{loading && <LoadingState />}{more && <button className={button} disabled={loading} onClick={() => void load(jobs.at(-1)!.requisition_id)}>More jobs</button>}</>}
+    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={link(job, '/apply/')}>Apply for this job</Link> : !userId ? <div className="mt-4"><p>Sign in to apply with your own candidate account.</p><Link className="inline-flex min-h-[44px] items-center underline" to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)}>Sign in to continue</Link><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={async () => setRefreshMine(n => n + 1)} />}</section>}
+    {userId && <section className={panel}><h2 className="font-semibold"><Link to="/my-applications" className="underline">My applications</Link></h2><CandidateApplications key={refreshMine} userId={userId} /></section>}
   </div>
 }
 
@@ -108,8 +105,8 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
       if (!saved) throw failure ?? new Error('Application was not saved. Check that applications are open, then retry. Submissions are limited to ten per day and one per ten seconds.')
       if (JSON.stringify(JSON.parse(saved.payload_json)) !== JSON.stringify(payload)) throw new Error('Submission conflict. The saved application differs from this form.')
       setReceipt(saved); await onSaved()
-    } catch (e) { setError(e instanceof Error ? e.message : 'Application could not be saved.') } finally { setBusy(false) }
+    } catch (e) { setError((e instanceof Error ? e.message : 'Application could not be confirmed.') + ' If the result is uncertain, retry with the same form values; your receipt will be checked before success is shown.') } finally { setBusy(false) }
   }
-  if (receipt) return <p role="status" className="mt-4">Application saved for {job.brand_name}. Reference: {receipt.application_id}. You can manage attachments under My applications.</p>
-  return <div className="mt-5"><h3 className="font-semibold">Apply to {job.brand_name}</h3>{error && <p role="alert">{error}</p>}<Form busy={busy} onSubmit={submit}><label className="hidden" aria-hidden="true">Leave empty<input name="website" autoComplete="off" tabIndex={-1} /></label><TextField name="candidate_name" label="Your name" /><TextField name="email" label="Email" type="email" /><TextField name="phone" label="Phone (optional)" required={false} /><label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} /></label><label className="block text-sm"><input name="notice_acknowledged" type="checkbox" required /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label><label className="block text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label><label className="block text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label></Form></div>
+  if (receipt) return <div className="mt-4"><p role="status">Application saved for {job.brand_name}. Reference: {receipt.application_id}.</p><Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(receipt.application_id)}>View application status</Link></div>
+  return <div className="mt-5"><h3 className="font-semibold">Apply to {job.brand_name}</h3>{error && <p role="alert">{error}</p>}<p role="status">{busy ? 'Submitting application and checking your receipt…' : 'Complete your details and acknowledge the notice to submit. If confirmation is interrupted, retry with the same values to check your receipt.'}</p><Form busy={busy} submitLabel="Submit application" busyLabel="Submitting…" onSubmit={submit}><fieldset disabled={busy} className="space-y-3"><label className="hidden" aria-hidden="true">Leave empty<input name="website" autoComplete="off" tabIndex={-1} /></label><TextField name="candidate_name" label="Your name" /><TextField name="email" label="Email" type="email" /><TextField name="phone" label="Phone (optional)" required={false} /><label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} /></label><label className="block text-sm"><input name="notice_acknowledged" type="checkbox" required /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label><label className="block text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label><label className="block text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label></fieldset></Form></div>
 }

@@ -79,3 +79,30 @@ Owners use **Load saved review** to restore saved content and its current versio
 **Acceptance revision:** #15's original unpaid legal-review criterion is superseded by Serge's explicit approval in [#52](https://github.com/proappstore-online/hiring/issues/52#issuecomment-6309937556) and #10's won't-do resolution. Unpaid, internship, and volunteer roles require classification and the same owner content/notice approval as paid roles, with no legal-review record or expiry gate. This implements that recorded owner decision rather than reinstating the rejected dependency.
 
 Verification adds regression coverage for staged payload binding, forged brand IDs, non-owner denial, stale review versions, unpaid publication under the approved policy, immutable classification, pause discovery/submission denial, resume, terminal closure, and rollback on audit failure. Platform passkey enforcement and production deployment remain platform checks, not simulated by SQLite.
+
+## Candidate account routes (#65)
+
+Signed-in candidates can open `/my-applications` and
+`/my-applications/:applicationId` independently of recruiter membership.
+The list shows at most the latest 100 owned applications; the new authenticated
+`get_my_application` action resolves a single owned ID without that list limit.
+It returns only scope, job/brand/organization identity, stage and submission time.
+Missing and unauthorized IDs both return no rows. Closing a public job does not
+remove the candidate's receipt/status access. Older servers can fall back to the
+owned list; that compatibility lookup retains the 100-record limit.
+
+Job and vacancy discovery both provide keyword and brand filtering over loaded
+pages, with an explicit loaded-results disclaimer. Detail/application links bind
+organization and brand. Candidate sign-in accepts only local supported return
+routes and preserves application/account destinations.
+
+The application form displays submission progress and links the verified receipt
+to its status route. Uncertain responses retain the same mounted-form identifiers
+and require receipt payload reconciliation. Reloading does not persist PII or
+form state; server requisition deduplication remains authoritative.
+
+Candidate withdrawal is explicitly unavailable: no candidate-owned withdrawal
+mutation is registered. Private attachment metadata and quarantine remain visible;
+neither the status page nor discovery introduces download capability or opens
+intake/scanning gates. Browser tests use mocked auth/actions; they do not verify
+a live OAuth ceremony, scanner, or file-serving integration.

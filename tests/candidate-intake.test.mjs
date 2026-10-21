@@ -314,3 +314,24 @@ test('candidate browser calls scoped candidate actions and renders an external v
   assert.equal('worker_user_id' in action.params,false)
   assert.equal('staff_token' in action.params,false)
 })
+
+test('candidate detail lookup is owned, safe and independent of public availability', () => {
+  const { db, call, submit, advance } = fixture()
+  try {
+    submit()
+    advance()
+    call('submit_job_application','worker',application(B,'detail-b'))
+    assert.equal(call('get_my_application','worker',{ application_id:'application-detail-b' })[0].brand_id,'b')
+    assert.deepEqual(call('get_my_application','other-worker',{ application_id:'application-detail-b' }),[])
+    const row = call('get_my_application', 'worker', { application_id: 'application-a' })[0]
+    assert.equal(row.stage, 'submitted')
+    assert.equal(row.created_at, 1_000_000_000)
+    assert.equal(row.brand_id, 'a')
+    assert.equal(row.organization_name, 'Org')
+    for (const key of ['email','phone','payload_json','assignee_user_id','reason','notes']) assert.equal(key in row, false)
+    for (const user of ['other-worker','owner','staff-a',null]) assert.deepEqual(call('get_my_application', user, { application_id:'application-a' }), [])
+    assert.deepEqual(call('get_my_application','worker',{ application_id:'missing' }),[])
+    call('close_job_requisition','owner',{ ...A,expected_version:1,operation_id:'close-detail' })
+    assert.equal(call('get_my_application','worker',{ application_id:'application-a' }).length,1)
+  } finally { db.close() }
+})

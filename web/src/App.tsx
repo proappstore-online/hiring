@@ -6,6 +6,7 @@ import { app, read, write, stageLabel, type AgentActivity, type Application, typ
 import { ApplicationDetail } from './ApplicationDetail'
 import { Admin, CreateApplication, Setup } from './forms'
 import { button, date, field, panel } from './ui'
+import { CandidateAccountPage } from './CandidateAccount'
 import { Jobs } from './Jobs'
 import { VacanciesIndexPage, VacancyDetailPage } from './Vacancies'
 import { VacancyManagement } from './VacancyManagement'
@@ -25,28 +26,36 @@ function RouteFocus() {
   return null
 }
 function PublicShell() {
-  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink><NavLink to="/jobs">Jobs</NavLink><NavLink to="/dashboard">Recruiter workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
+  const { user } = useAuth(app)
+  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink><NavLink to="/jobs">Jobs</NavLink>{user && <NavLink to="/my-applications">My Applications</NavLink>}<NavLink to="/dashboard">Recruiter workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
 }
 function ProtectedShell() {
   const { user, loading } = useAuth(app)
   const location = useLocation()
   if (loading) return <LoadingState />
   if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
-  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to="/dashboard">Dashboard</NavLink><NavLink to="/applications">Applications</NavLink><NavLink to="/vacancies">Vacancies</NavLink><Link to="/jobs">Public jobs</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
+  return <ProShell app={app} appName="hiring" nav={NAV} branding="app"><nav aria-label="Recruiter navigation" className="flex gap-5 p-4"><NavLink to="/dashboard">Dashboard</NavLink><NavLink to="/applications">Applications</NavLink><NavLink to="/vacancies">Vacancies</NavLink><Link to="/jobs">Public jobs</Link><Link to="/my-applications">My Applications</Link></nav><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
 }
 function SignIn() {
   const { user, loading } = useAuth(app)
   const [query] = useSearchParams()
   const target = query.get('returnTo') ?? '/dashboard'
-  const safeTarget = /^\/(dashboard|applications)(\/|\?|$)/.test(target) ? target : '/dashboard'
+  const safeTarget = /^\/(dashboard|applications|my-applications|apply)(\/|\?|$)/.test(target) ? target : '/dashboard'
   if (loading) return <LoadingState />
   if (user) return <Navigate replace to={safeTarget} />
-  return <section className={panel}><h1 className="text-2xl font-semibold">Sign in to Hiring</h1><p className="my-4">Continue to your private recruiting workspace.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></section>
+  return <section className={panel}><h1 className="text-2xl font-semibold">Sign in to Hiring</h1><p className="my-4">Continue to your application or workspace.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></section>
 }
 function PublicJobs({ mode = 'list' }: { mode?: 'list' | 'detail' | 'apply' }) {
   const { user } = useAuth(app)
   const location = useLocation()
   return <Jobs key={location.pathname + location.search + (user?.id ?? '')} userId={user?.id} mode={mode} />
+}
+function CandidateAccount() {
+  const { user, loading } = useAuth(app)
+  const location = useLocation()
+  if (loading) return <LoadingState />
+  if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
+  return <CandidateAccountPage key={user.id} userId={user.id} />
 }
 function StaffWorkspace() {
   const { user } = useAuth(app)
@@ -56,7 +65,7 @@ function StaffWorkspace() {
 export function AppRoutes() {
   const location = useLocation()
   return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' ? location.pathname : location.pathname + location.search}><Routes>
-    <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
+    <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="my-applications" element={<CandidateAccount />} /><Route path="my-applications/:applicationId" element={<CandidateAccount />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}><Route path="dashboard" element={<StaffWorkspace />} /><Route path="applications" element={<StaffWorkspace />} /><Route path="applications/:applicationId" element={<StaffWorkspace />} /></Route>
   </Routes></RouteBoundary></>
 }

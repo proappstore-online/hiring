@@ -1815,6 +1815,18 @@
         }
       },
       "sql": "SELECT r.id,r.title,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY updated_at DESC,r.id LIMIT 100"
+    },
+    {
+      "name": "get_my_application",
+      "description": "Read one authenticated candidate-owned application by ID, including current stage and submission time. Missing and unauthorized IDs both return no rows; no staff notes or contact data.",
+      "operation": "query",
+      "params": {
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.created_at,a.stage,q.title,b.name AS brand_name,o.name AS organization_name FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id JOIN hiring_requisitions q ON q.id=r.requisition_id JOIN hiring_brands b ON b.id=r.brand_id JOIN hiring_organizations o ON o.id=r.organization_id WHERE r.worker_user_id=:__user_id AND r.application_id=:application_id LIMIT 1"
     }
   ]
 }
