@@ -1500,7 +1500,7 @@
       },
       "statements": [
         "UPDATE hiring_job_publications SET version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND status='published' AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_publication_controls WHERE requisition_id=:requisition_id AND paused=0)",
-        "UPDATE hiring_publication_controls SET paused=1 WHERE requisition_id=:requisition_id AND changes()=1",
+        "UPDATE hiring_publication_controls SET paused=1 WHERE requisition_id=:requisition_id AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.paused',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
       ]
     },
@@ -1529,7 +1529,7 @@
       },
       "statements": [
         "UPDATE hiring_job_publications SET version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND status='published' AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_publication_controls WHERE requisition_id=:requisition_id AND paused=1)",
-        "UPDATE hiring_publication_controls SET paused=0 WHERE requisition_id=:requisition_id AND changes()=1",
+        "UPDATE hiring_publication_controls SET paused=0 WHERE requisition_id=:requisition_id AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.resumed',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
       ]
     },
