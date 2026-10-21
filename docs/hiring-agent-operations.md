@@ -1,9 +1,9 @@
 # Hiring agent operations runbook
 
 Live-state observations below were verified through a fresh PAGS MCP connection on **2026-10-21**.
-Implementation notes reflect the final PAGS release candidate, pending full-suite validation
-and deployment verification. No full-suite green or live mail acceptance is claimed here;
-targeted source/tests are not a live mail roundtrip. An unstable candidate hash is intentionally not pinned.
+The PAGS mail changes passed the immutable local full suite documented below, but publication
+is blocked by concurrent unrelated `main` advances. Deployment and live mail acceptance remain
+unverified; local green tests are not a live mail roundtrip. No unstable rebased candidate hash is pinned.
 Tracking: [FAS email epic #58](https://github.com/proappstore-online/hiring/issues/58).
 The [Hiring MCP contract](hiring-mcp-contract.md) remains the application authorization contract.
 
@@ -47,7 +47,7 @@ Compare two supported paths; a bridge is not inherently required to receive forw
 | Path | Receive | Send as FAS | Isolation and cost controls |
 | --- | --- | --- | --- |
 | Gmail forwarding | Authorize the receiving mailbox `serge.the.dev@gmail.com`, then pin this instance | Requires an already verified Gmail send-as alias for `admin@freeappstore.online`; forwarding alone is insufficient | PAGS #1279 implements an account-bound recipient/sender policy, provider-side search, direct-ID checks, metadata pages and bounded body windows; live verification pending |
-| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 plus the final candidate hardening implement exact mailbox scope, resumable paging, atomic run-budget reservations and explicit archive checkpoints; #1277 supplies secret-safe MCP management; validation/deployment/live verification pending |
+| Cloudflare bridge | A dedicated PAGS `email-worker/v1` bridge receives routed mail | Requires domain sending onboarding, bridge identity and owner approval | PAGS #1278 plus the locally verified hardening implement exact mailbox scope, resumable paging, atomic run-budget reservations and explicit archive checkpoints; #1277 supplies secret-safe MCP management; final publication/deployment/live verification pending |
 
 Do not present code or unit tests as a live connection or delivery result. Gmail must not
 be enabled until the correct account is connected, the sender is verified and its scoped
@@ -79,6 +79,9 @@ Never silently fall back to another Gmail account.
   live capability list; discover and grant it after the hardened PAGS deployment is verified.
 - Live identity and inbox checks (`limit: 1`) both returned
   **No worker-backed email connection is configured.** No email roundtrip has passed.
+- The latest private Hiring preflight, trace `c109fcfe-493c-4a29-bbec-001ba11b5fb4`,
+  made exactly one `email_worker_identities` call, refused for `no_connection`.
+  That trace made no Gmail, message-list/read, send/reply or Hiring application-write calls.
 - The new MCP management tool `get_instance_email_worker` is deployed. Its live readback
   confirms `state: absent`, `no_connection`, `readyToRead: false`, `readyToSend: false`
   and write consent `off`; deployed tools do not imply a configured bridge.
@@ -97,6 +100,29 @@ The original thirteen PAS grants are:
 | --- | --- |
 | Read | `list_my_workspaces`, `list_applications`, `list_requisitions`, `list_application_notes`, `list_application_audit`, `list_stage_events`, `list_assignment_events`, `list_communication_drafts`, `list_workspace_members` |
 | Write | `add_application_note`, `change_application_stage`, `create_communication_draft`, `reassign_application` |
+
+## Local validation and publication blocker
+
+The immutable PAGS snapshot `247a017d0e70c03e20ee16e964e7c149ecc380a5` completed the
+authoritative full suite green: **1,182 files; 19,447 tests passed, four skipped, zero failed;
+632.68 seconds**. This identifies the tested local snapshot, not a published revision or
+proof that a later rebased tree has had the same full run. Normal pre-push validation also
+passed twice, each covering 418 files and 8,312 tests. Both normal pushes were rejected
+because unrelated work advanced `main`; the mail changes remain **unpublished**.
+
+The last verified deployed revisions are API/Host `ba10536e` and MCP `1398c35a`
+(MCP version `0.1.170`). These do not include the final local Gmail, hardening,
+explicit-acknowledgement and atomic-budget fixes. Do not infer deployment from a local
+suite, completed push checks or the presence of older connector tools.
+
+A ten-minute hold on the other coder's pushes was requested from the owner to allow normal
+publication, but approval has **not** been received. Do not contact, interrupt or stop that
+coder, bypass hooks or force-push. Coordinate through the owner, preserve unrelated work,
+then verify the actual published/deployed revision before connection and mail acceptance tests.
+
+For the cost objective, the private preflight's prompt estimate rose from 14,451 to 14,618
+tokens, dominated by tool schemas rather than email content. These are diagnostic prompt
+estimates, not measured mailbox volume or billing; this trace did not browse candidate mail.
 
 ## Remaining work
 
