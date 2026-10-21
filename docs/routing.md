@@ -43,3 +43,11 @@ and current-page navigation indicators.
 This delivery uses a branch and PR under the owner's explicit instruction;
 older direct-to-main documentation does not apply to this delivery. No merge,
 deployment or opening of intake is authorized by UI-1.
+
+## Vacancies foundation (#68)
+
+Public `/vacancies` and `/vacancies/:vacancyId` add discovery and structured PDs;
+canonical shared links retain organization/brand scope. Existing job/application
+routes remain intact. Signed-in navigation includes Vacancies; owner/recruiter
+workspaces include Vacancy Management with lifecycle states and PD editing.
+See [PD contracts and non-executing mapping plan](vacancies-mapping-plan.md).

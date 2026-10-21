@@ -1672,6 +1672,149 @@
         }
       },
       "sql": "SELECT e.* FROM email_status_events e JOIN hiring_outbox o ON o.logical_email_id=e.logical_email_id WHERE e.logical_email_id=:logical_email_id AND o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND (:cursor_at IS NULL OR e.timestamp>:cursor_at OR (e.timestamp=:cursor_at AND e.sequence>COALESCE((SELECT sequence FROM email_status_events WHERE id=:cursor_id AND logical_email_id=:logical_email_id),0))) ORDER BY e.timestamp,e.sequence LIMIT 50"
+    },
+    {
+      "name": "savePDDraft",
+      "description": "Append a scoped structured PD version before publication. Editing resets pending publication review to draft; owner must review again. Expected version and operation ID prevent lost updates and duplicate writes.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "overview": {
+          "type": "string"
+        },
+        "rolePurpose": {
+          "type": "string"
+        },
+        "responsibilities": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "string"
+        },
+        "workingArrangement": {
+          "type": "string"
+        },
+        "compensation": {
+          "type": "string"
+        },
+        "benefits": {
+          "type": "string"
+        },
+        "applicationProcess": {
+          "type": "string"
+        },
+        "privacyContact": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "number"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_pd_versions(requisition_id,version,payload,actor_user_id,updated_at,operation_id) SELECT r.id,:expected_version+1,json_object('overview',:overview,'rolePurpose',:rolePurpose,'responsibilities',json(:responsibilities),'requirements',json(:requirements),'workingArrangement',:workingArrangement,'compensation',:compensation,'benefits',:benefits,'applicationProcess',:applicationProcess,'privacyContact',:privacyContact),:__user_id,:__now,:operation_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id),0) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_pd_versions WHERE operation_id=:operation_id) AND length(:overview)<=20000 AND length(:rolePurpose)<=20000 AND CASE WHEN json_valid(:responsibilities) THEN json_type(:responsibilities)='array' AND json_array_length(:responsibilities)<=100 AND NOT EXISTS (SELECT 1 FROM json_each(:responsibilities) WHERE type<>'text' OR length(value)>2000) ELSE 0 END AND CASE WHEN json_valid(:requirements) THEN json_type(:requirements)='array' AND json_array_length(:requirements)<=100 AND NOT EXISTS (SELECT 1 FROM json_each(:requirements) WHERE type<>'text' OR length(value)>2000) ELSE 0 END AND length(:workingArrangement)<=20000 AND length(:compensation)<=20000 AND length(:benefits)<=20000 AND length(:applicationProcess)<=20000 AND length(:privacyContact)<=20000",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.pd_saved',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "getPDDraft",
+      "description": "Read latest scoped PD as plain text and string arrays; render escaped content only. No HTML, applicant data or internal notes.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT d.payload,d.version,d.updated_at FROM hiring_pd_versions d JOIN hiring_requisitions r ON r.id=d.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY d.version DESC LIMIT 1"
+    },
+    {
+      "name": "previewPD",
+      "description": "Read latest scoped PD as plain text and string arrays; render escaped content only. No HTML, applicant data or internal notes.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT d.payload,d.version,d.updated_at FROM hiring_pd_versions d JOIN hiring_requisitions r ON r.id=d.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY d.version DESC LIMIT 1"
+    },
+    {
+      "name": "listVacancies",
+      "description": "Public approved vacancy and immutable structured PD snapshot only. Missing or unavailable detail returns no rows (NOT_FOUND).",
+      "operation": "query",
+      "params": {
+        "after_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string",
+          "optional": true
+        },
+        "brand_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": false,
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at,j.arrangement,j.description,j.compensation,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:organization_id IS NULL OR :organization_id='' OR j.organization_id=:organization_id) AND (:brand_id IS NULL OR :brand_id='' OR j.brand_id=:brand_id) AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+    },
+    {
+      "name": "getVacancyDetail",
+      "description": "Public approved vacancy and immutable structured PD snapshot only. Missing or unavailable detail returns no rows (NOT_FOUND).",
+      "operation": "query",
+      "params": {
+        "requisition_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": false,
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+    },
+    {
+      "name": "listVacancyManagement",
+      "description": "Recent 100 scoped requisitions with derived review/publication lifecycle and latest activity time; no candidates.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.id,r.title,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY updated_at DESC,r.id LIMIT 100"
     }
   ]
 }
