@@ -12,7 +12,7 @@ const { default: tailwind } = await import(require.resolve('@tailwindcss/vite'))
 const ts = require('typescript')
 const transpile = source => ts.transpile(source, {jsx:ts.JsxEmit.React, module:ts.ModuleKind.ESNext})
 const web = new URL('../web/', import.meta.url).pathname
-const sdk = `import React from 'react'; export const initPro=()=>({auth:{user:null}}); export const useAuth=()=>window.auth; export const ProShell=({children})=><div data-testid="staff-shell">{children}</div>; export const PageHeader=({title})=><h1>{title}</h1>; export const SignInButton=({label})=><button>{label}</button>;`
+const sdk = `import React from 'react'; export const initPro=()=>({auth:{user:null}}); export const useAuth=()=>window.auth; export const ProShell=({children,nav,renderNav})=><div data-testid="staff-shell"><header>{nav?.length ? renderNav?.({items:nav,currentPath:location.pathname,onNavigate:()=>{}}) : null}</header>{children}</div>; export const PageHeader=({title})=><h1>{title}</h1>; export const SignInButton=({label})=><button>{label}</button>;`
 const fixture = `import React from 'react';import {createRoot} from 'react-dom/client';import App from '/src/App.tsx';import {RouteBoundary} from '/src/route-ui.tsx';import '/src/index.css';
 window.role='recruiter';window.auth={user:null,loading:false};window.calls=[];window.fail=false;window.gate='closed';window.pending=[];
 const job={requisition_id:'job',organization_id:'org',brand_id:'brand',title:'Engineer',brand_name:'Brand',organization_name:'Org',location:'Remote',notice_text:'Notice',notice_version:'v1',description:'Job description'};
@@ -44,10 +44,24 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    const calls=await page.evaluate(()=>window.calls);assert.ok(calls.some(c=>c.name==='get_public_job'&&c.p.organization_id==='org'&&c.p.brand_id==='brand'))
   })
   await t.test('public discovery survives auth hydration; protected pages wait',async()=>{
-   await go('/missing');await page.evaluate(()=>{window.auth={user:null,loading:true}});await page.getByRole('link',{name:'Browse jobs'}).click();await expect(page.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();await page.getByRole('link',{name:'Recruiter workspace'}).click();await expect(page.getByRole('status')).toHaveText('Loading…');await expect(page.getByTestId('staff-shell')).toHaveCount(0)
+   await go('/missing');await page.evaluate(()=>{window.auth={user:null,loading:true}});await page.getByRole('link',{name:'Browse jobs'}).click();await expect(page.getByRole('heading',{name:'Jobs',exact:true})).toBeVisible();await page.getByRole('link',{name:'Switch to Recruiter Workspace'}).click();await expect(page.getByRole('status')).toHaveText('Loading…');await expect(page.getByTestId('staff-shell')).toHaveCount(0)
   })
   await t.test('protected routes redirect with destination and no private reads',async()=>{
    for(const route of ['/admin','/admin/communications','/admin/operations','/admin/compliance','/admin/settings','/dashboard','/applications','/applications/old?organization_id=org&brand_id=brand']){await go(route);await expect(page).toHaveURL(/\/sign-in\?returnTo=/);await expect(page.getByRole('heading',{name:'Sign in to Hiring'})).toBeVisible();assert.equal(await page.evaluate(()=>window.calls.length),0);await expect(page.getByTestId('staff-shell')).toHaveCount(0)}
+  })
+  await t.test('primary navigation follows role, scope, active route and mobile menu',async()=>{
+   await page.setViewportSize({width:1280,height:800})
+   for(const [role,names] of Object.entries({owner:['Overview','Vacancies','Applications','Communications','Playbook','Operations','Settings'],recruiter:['Overview','Vacancies','Applications','Communications','Playbook','Operations'],reviewer:['Overview','Applications'],auditor:['Overview']})){
+    await go('/dashboard?organization_id=org&brand_id=brand');await page.evaluate(role=>{window.role=role;window.auth={user:{id:'staff'},loading:false};window.render()},role)
+    const nav=page.getByRole('navigation',{name:'Primary navigation'});await expect(nav).toBeVisible()
+    await expect(nav.locator('.md\\:flex a')).toHaveText([...names,'Switch to Public Jobs'])
+    await expect(nav.locator('.md\\:flex a[aria-current="page"]')).toHaveText('Overview')
+    for(const link of await nav.locator('.md\\:flex a').all()){const href=await link.getAttribute('href');if(href?.startsWith('/jobs'))continue;assert.match(href,/organization_id=org&brand_id=brand/)}
+   }
+   await page.getByRole('navigation',{name:'Primary navigation'}).locator('.md\\:flex').getByRole('link',{name:'Switch to Public Jobs'}).click();await expect(page).toHaveURL(/\/jobs$/)
+   await page.setViewportSize({width:375,height:812});await go('/dashboard?organization_id=org&brand_id=brand');await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'staff'},loading:false};window.render()})
+   const nav=page.getByRole('navigation',{name:'Primary navigation'});const toggle=nav.getByRole('button',{name:'Toggle primary navigation'});await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','true')
+   await nav.locator('#primary-navigation-menu').getByRole('link',{name:'Vacancies'}).click();await expect(page).toHaveURL(/\/recruiter\/vacancies\?organization_id=org&brand_id=brand/);await expect(nav.getByRole('link',{name:'Vacancies',exact:true,includeHidden:true}).first()).toHaveAttribute('aria-current','page');await expect(toggle).toHaveAttribute('aria-expanded','false')
   })
   await t.test('unknown route, asynchronous loading, retry and empty states',async()=>{
    await go('/missing');await expect(page.getByRole('heading',{name:'404 — Not found'})).toBeVisible();await page.evaluate(()=>{window.hold=true});await page.getByRole('link',{name:'Browse jobs'}).click();await expect(page.getByRole('status')).toHaveText('Loading jobs…');await expect(page.getByText('No published jobs are available.')).toHaveCount(0);await page.evaluate(()=>window.pending.shift().resolve([]));await expect(page.getByText('No published jobs are available.')).toBeVisible();await page.evaluate(()=>{window.hold=false;window.fail=true});await page.getByRole('button',{name:'Refresh jobs'}).click();await expect(page.getByRole('alert')).toContainText('Jobs could not be loaded');await page.evaluate(()=>window.fail=false);await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.getByRole('link',{name:'Engineer · Brand · Remote'})).toBeVisible()

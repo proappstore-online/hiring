@@ -10,7 +10,7 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8')
 test('the starter uses independently branded shell controls', () => {
   const app = read('web/src/App.tsx')
 
-  assert.match(app, /<ProShell app=\{app\} appName="hiring" nav=\{NAV\} branding="app">/)
+  assert.match(app, /<ProShell app=\{app\} appName="hiring" branding="app"/)
   assert.doesNotMatch(app, /Built for ProAppStore|href="https:\/\/proappstore\.online"/)
 })
 

@@ -4,7 +4,7 @@ import type { Role, Scope } from './api'
 export const adminSections = [
   { path: '/playbook', label: 'Playbook', roles: ['owner', 'recruiter'] },
   { path: '/admin', label: 'Dashboard', roles: ['owner', 'recruiter', 'reviewer', 'auditor'] },
-  { path: '/applications', label: 'Applications', roles: ['owner', 'recruiter', 'reviewer', 'auditor'] },
+  { path: '/applications', label: 'Applications', roles: ['owner', 'recruiter', 'reviewer'] },
   { path: '/admin/communications', label: 'Communications', roles: ['owner', 'recruiter'] },
   { path: '/admin/operations', label: 'Operations', roles: ['owner', 'recruiter', 'auditor'] },
   { path: '/admin/compliance', label: 'Compliance', roles: ['owner', 'auditor'] },

@@ -37,7 +37,7 @@ test('Administration UI permissions, confirmations, operational states and mobil
  page.setDefaultTimeout(10000);page.setDefaultNavigationTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(e.message))
  await page.goto(live.resolvedUrls.local[0]+'admin-test');await expect(page.getByRole('navigation',{name:'Administration'})).toBeVisible({timeout:30000})
  await t.test('role navigation and explicit denial',async()=>{
- for(const [role,names]of Object.entries({owner:['Playbook','Dashboard','Applications','Communications','Operations','Compliance','Settings'],recruiter:['Playbook','Dashboard','Applications','Communications','Operations'],reviewer:['Dashboard','Applications'],auditor:['Dashboard','Applications','Operations','Compliance']})){
+ for(const [role,names]of Object.entries({owner:['Playbook','Dashboard','Applications','Communications','Operations','Compliance','Settings'],recruiter:['Playbook','Dashboard','Applications','Communications','Operations'],reviewer:['Dashboard','Applications'],auditor:['Dashboard','Operations','Compliance']})){
  await page.evaluate(role=>window.show('nav',role),role)
  await expect(page.getByRole('navigation',{name:'Administration'}).getByRole('link')).toHaveText(names)
  await expect(page.getByText('Access denied',{exact:true})).toHaveCount(role==='owner'?0:1)
