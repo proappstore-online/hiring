@@ -8,7 +8,7 @@ Migration `0012_scoped_permissions` adds a membership revocation ledger and the 
 | --- | --- |
 | Owner | Brand-wide staff operations, grant administration, passkey-protected publication. Creating sibling brands and organization-wide delegation also require organization creator identity. Owner delegation/revocation is unavailable through these tools. |
 | Recruiter | Full application reads and operational writes within granted requisitions. Creating requisitions and listing staff/publications require brand-wide authority. |
-| Reviewer | Restricted `gateway_get_application` / `gateway_list_applications` reads within scope, and only for applications currently assigned to that identity. No full candidate/contact/history reads or mutations. |
+| Reviewer | Restricted `gateway_get_application` / `gateway_list_applications` reads for currently assigned applications. Interview packets require the current interview assignment. Reads and edits only own current assigned scorecard. No full candidate/contact reads, other reviewer content, application mutations or hiring decisions. |
 | Auditor | `list_application_audit` within granted requisitions. No candidate detail reads or business mutations. |
 
 An application assignee must have active owner, recruiter or reviewer authority for that exact requisition. Assignment alone grants no access. Reassignment immediately removes the previous reviewer's access; revocation also removes access even if their user ID remains on an application. Reviewers cannot reassign themselves. Application mutations still require optimistic versions where supported, and audit/operation checks remain atomic.
@@ -63,3 +63,15 @@ notes, Gmail/worker communication history, drafts and attachment metadata. Priva
 storage credentials/paths and attachment bytes are never included. No packet read
 bypasses attachment quarantine. Unauthorized and missing reads both return no rows;
 denied/stale/replayed mutations return zero changes, matching existing actions.
+
+## Scorecards (#23)
+
+`read_own_scorecard` and `save_own_scorecard` require the authenticated identity
+on the exact active interview assignment plus current requisition authority.
+This is the scorecard's sole ownership contract; application assignment, role
+alone, and owner/recruiter access to interview packets do not authorize reading
+another reviewer's scorecard. Reassignment, assignment revocation, grant
+revocation and tenant suspension deny subsequent scorecard requests. Returning
+reviewers receive a new assignment and cannot reopen the old assignment's review.
+See [structured scorecards](domain-model.md#structured-scorecards-23) for revision,
+submission, validation and pagination contracts.

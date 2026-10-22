@@ -117,3 +117,17 @@ The older Working Interview Invitation component remains a separate playbook
 workflow; interview metadata does not confer send, publication or final-decision
 authority. Tests execute the deployed SQL against SQLite with PAS-style binding;
 they do not claim a live D1 or provider probe.
+
+### Structured scorecards (#23)
+
+- `save_own_scorecard`: exact tenant/brand/application/interview/assignment IDs,
+  `expected_version` (0 for new), `status` (`draft` or `submitted`),
+  `criteria_json`, `operation_id`. Appends one immutable version and redacted
+  audit event atomically; only the current assigned principal can write.
+- `read_own_scorecard`: same IDs, optional exclusive `before_version`. Returns
+  at most 50 own revisions descending by version. Current ownership/grants are
+  rechecked for every page. Staff have no override. Submitted scorecards are final
+  per assignment. Score capture supplies no hiring decision or send authority.
+
+The interview list includes its active `assignment_id` for explicit scorecard
+ownership. Full validation and lifecycle: [domain model](domain-model.md#structured-scorecards-23).

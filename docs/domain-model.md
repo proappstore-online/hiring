@@ -103,3 +103,46 @@ increment it once. Business state, history and attributed immutable audit commit
 in one transaction; audit failure rolls everything back. Reassignment emits two
 audit events when replacing an active assignment, one otherwise. No outbox or
 external send is created by interview metadata operations.
+
+## Structured scorecards (#23)
+
+Migration `0025_structured_scorecards` adds `hiring_scorecard_versions`, an
+append-only revision ledger tied to an exact `interview_assignments.id`, scoped
+interview/application/requisition, and authenticated reviewer. Version starts at 1;
+`expected_version=0` creates the first draft or submission. Each successful save
+appends a full snapshot with server `created_at`, unique operation ID and actor.
+Submission records `submitted_at` equal to server creation time and is final for
+that assignment: neither another draft nor a replacement submission is accepted.
+Earlier drafts and submitted content/timestamps reject UPDATE and DELETE.
+
+Criteria are a JSON array of 1–30 objects with exactly `criterion` (nonblank,
+maximum 200 characters, unique ignoring case/outer whitespace), integer `rating`
+(1–5), and `evidence` (maximum 2000 characters). Draft evidence may be empty;
+submission requires nonblank evidence for every criterion. Total JSON size is
+limited to 60000 characters. Criteria are explicit reviewer inputs, not inferred
+scores or an organization-approved rubric. No aggregate score, ranking, final
+hiring decision, stage transition or external communication is generated.
+
+`save_own_scorecard` takes tenant, brand, application, interview, assignment,
+expected version, draft/submitted status, criteria JSON and operation ID.
+`read_own_scorecard` takes the same scope/assignment IDs, returning only assignment
+ID, version, status, criteria JSON and save/submission timestamps. It returns up
+to 50 versions newest first; pass the last version as exclusive `before_version`
+for earlier pages. It never projects contact details, packets or other reviews.
+Both require that the platform identity owns the exact current, unrevoked
+assignment, the interview is scheduled, and an active owner/recruiter/reviewer
+grant covers its requisition. Owner/recruiter roles have no scorecard override.
+
+Reassignment/revocation removes read and write access immediately on the next
+server request. A new assignment starts an independent scorecard even when the
+same reviewer returns later. Prior evidence stays stored but is not shared with
+the new reviewer. Revoked grants and suspended organizations also deny access.
+The Interviews UI shows the current user's assigned scorecard, refreshes on
+window focus, clears prior content while loading, and displays immutable version
+history with pagination. Already viewed content cannot be remotely recalled.
+
+Each save/submission and a redacted `scorecard.draft_saved` / `scorecard.submitted`
+audit event commit in one registered transaction. An audit failure rolls back the
+revision. Stale versions and duplicate operation IDs append nothing, including
+retries from another principal/scope. Zero changes is not confirmation of a save.
+Audit summaries exclude criteria/evidence; no outbox work is created.

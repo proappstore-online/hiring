@@ -70,7 +70,7 @@ export async function saveOrgRecruitingPlaybook(organization_id: string, payload
   if (!result.results?.at(-1)?.rows?.some(row => row.version === expected_version + 1)) throw Error('Save could not be confirmed. Reload and check access or version conflicts.')
 }
 
-export type Interview = { id: string; version: number; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string; reviewer_id: string | null }
+export type Interview = { assignment_id: string | null; id: string; version: number; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string; reviewer_id: string | null }
 export type InterviewPacket = { candidate_name: string; requisition_title: string; stage: string; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string }
 export const interviewScope = (scope: Scope, application_id: string) => ({ tenant_id: scope.organization_id, brand_id: scope.brand_id, application_id })
 export const listApplicationInterviews = (scope: Scope, applicationId: string) => read<Interview>('list_application_interviews', interviewScope(scope, applicationId))
@@ -79,3 +79,6 @@ export async function readInterviewPacket(scope: Scope, applicationId: string, i
   return rows[0] ? JSON.parse(rows[0].packet_json) as InterviewPacket : null
 }
 export const interviewActions = { create: 'create_interview', schedule: 'update_interview_schedule', assign: 'assign_interviewer', revoke: 'revoke_interviewer' } as const
+
+export type ScorecardCriterion = { criterion: string; rating: number; evidence: string }
+export type ScorecardVersion = { assignment_id: string; version: number; status: 'draft' | 'submitted'; criteria_json: string; created_at: number; submitted_at: number | null }

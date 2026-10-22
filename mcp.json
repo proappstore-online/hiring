@@ -2208,7 +2208,74 @@
         }
       },
       "requires_auth": true,
-      "sql": "SELECT i.id,i.version,i.scheduled_at,i.duration_minutes,i.location,i.format,i.status,(SELECT reviewer_id FROM interview_assignments WHERE interview_id=i.id AND revoked_at IS NULL) AS reviewer_id FROM interviews i JOIN hiring_applications a ON a.id=i.application_id AND a.organization_id=i.tenant_id AND a.brand_id=i.brand_id AND a.requisition_id=i.requisition_id WHERE i.tenant_id=:tenant_id AND i.brand_id=:brand_id AND i.application_id=:application_id AND (EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) OR (EXISTS(SELECT 1 FROM hiring_effective_access p JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.reviewer_id=p.user_id AND ia.revoked_at IS NULL WHERE p.organization_id=i.tenant_id AND p.brand_id=i.brand_id AND p.user_id=:__user_id AND p.role='reviewer' AND (p.requisition_id IS NULL OR p.requisition_id=i.requisition_id)) AND i.status='scheduled')) ORDER BY i.created_at DESC,i.id LIMIT 100"
+      "sql": "SELECT (SELECT id FROM interview_assignments WHERE interview_id=i.id AND revoked_at IS NULL) AS assignment_id,i.id,i.version,i.scheduled_at,i.duration_minutes,i.location,i.format,i.status,(SELECT reviewer_id FROM interview_assignments WHERE interview_id=i.id AND revoked_at IS NULL) AS reviewer_id FROM interviews i JOIN hiring_applications a ON a.id=i.application_id AND a.organization_id=i.tenant_id AND a.brand_id=i.brand_id AND a.requisition_id=i.requisition_id WHERE i.tenant_id=:tenant_id AND i.brand_id=:brand_id AND i.application_id=:application_id AND (EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) OR (EXISTS(SELECT 1 FROM hiring_effective_access p JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.reviewer_id=p.user_id AND ia.revoked_at IS NULL WHERE p.organization_id=i.tenant_id AND p.brand_id=i.brand_id AND p.user_id=:__user_id AND p.role='reviewer' AND (p.requisition_id IS NULL OR p.requisition_id=i.requisition_id)) AND i.status='scheduled')) ORDER BY i.created_at DESC,i.id LIMIT 100"
+    },
+    {
+      "name": "read_own_scorecard",
+      "description": "Read only your current assigned scorecard revisions, newest first, 50 per page. No staff override.",
+      "operation": "query",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "assignment_id": {
+          "type": "string"
+        },
+        "before_version": {
+          "type": "number",
+          "optional": true
+        }
+      },
+      "sql": "SELECT s.assignment_id,s.version,s.status,s.criteria_json,s.created_at,s.submitted_at FROM hiring_scorecard_versions s JOIN interview_assignments a ON a.id=s.assignment_id JOIN interviews i ON i.id=a.interview_id WHERE a.id=:assignment_id AND a.interview_id=:interview_id AND a.application_id=:application_id AND a.tenant_id=:tenant_id AND a.brand_id=:brand_id AND a.reviewer_id=:__user_id AND a.revoked_at IS NULL AND i.status='scheduled' AND EXISTS(SELECT 1 FROM hiring_applications app WHERE app.id=a.application_id AND app.organization_id=a.tenant_id AND app.brand_id=a.brand_id AND app.requisition_id=a.requisition_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.tenant_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter','reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND s.reviewer_id=:__user_id AND s.tenant_id=:tenant_id AND s.brand_id=:brand_id AND s.application_id=:application_id AND s.interview_id=:interview_id AND s.version<COALESCE(:before_version,2147483647) ORDER BY s.version DESC LIMIT 50",
+      "requires_auth": true
+    },
+    {
+      "name": "save_own_scorecard",
+      "description": "Append own assigned scorecard revision. expected_version=0 creates; draft or final submitted; submission locks assignment scorecard. No decision or communication authority.",
+      "operation": "batch",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "assignment_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "criteria_json": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_scorecard_versions(id,assignment_id,interview_id,application_id,tenant_id,brand_id,requisition_id,reviewer_id,version,status,criteria_json,created_at,submitted_at,operation_id) SELECT :__uuid,a.id,a.interview_id,a.application_id,a.tenant_id,a.brand_id,a.requisition_id,:__user_id,:expected_version+1,:status,:criteria_json,:__now,CASE WHEN :status='submitted' THEN :__now END,:operation_id FROM interview_assignments a JOIN interviews i ON i.id=a.interview_id WHERE a.id=:assignment_id AND a.interview_id=:interview_id AND a.application_id=:application_id AND a.tenant_id=:tenant_id AND a.brand_id=:brand_id AND a.reviewer_id=:__user_id AND a.revoked_at IS NULL AND i.status='scheduled' AND EXISTS(SELECT 1 FROM hiring_applications app WHERE app.id=a.application_id AND app.organization_id=a.tenant_id AND app.brand_id=a.brand_id AND app.requisition_id=a.requisition_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.tenant_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter','reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :expected_version=COALESCE((SELECT MAX(version) FROM hiring_scorecard_versions WHERE assignment_id=a.id),0) AND NOT EXISTS(SELECT 1 FROM hiring_scorecard_versions WHERE assignment_id=a.id AND status='submitted') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_scorecard_versions WHERE operation_id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,:application_id,CASE WHEN :status='submitted' THEN 'scorecard.submitted' ELSE 'scorecard.draft_saved' END,:__user_id,:operation_id,:__now,'scorecard',:assignment_id,'Scorecard version recorded' WHERE changes()=1"
+      ],
+      "requires_auth": true
     }
   ]
 }

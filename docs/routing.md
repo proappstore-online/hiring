@@ -60,3 +60,12 @@ of the 100-record queue. It returns full details only for current owner/recruite
 access to the exact organization, brand and requisition. Missing and unauthorized
 IDs both return no rows. Assigned reviewers retain the restricted
 `gateway_get_application` fallback, with no contact or history authority.
+
+### Assigned scorecards (#23)
+
+The existing application detail Interviews section embeds “Your scorecard” only
+for the signed-in user on the active interview assignment. It saves persistent
+criterion/rating/evidence drafts and final submissions through registered actions,
+and offers immutable version history with earlier-page loading. There is no new
+route or staff review override. Assignment IDs come from the authorized interview
+list; direct action calls still require exact current ownership and scoped grants.
