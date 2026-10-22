@@ -16,7 +16,7 @@ export function VacancyManagement({ scope, role, requisitions }: { scope: Scope;
   async function load() {
     const request = ++seq.current
     setLoading(true); setError(false)
-    try { const result = await read<ManagedVacancy>('listVacancyManagement', scope); if (request === seq.current) setRows(result) }
+    try { const result = await read<ManagedVacancy>('list_vacancy_management', scope); if (request === seq.current) setRows(result) }
     catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
   }
@@ -45,7 +45,7 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
     const request = ++seq.current
     setLoading(true); setLoadError(false)
     try {
-      const result = await read<PDRecord>('getPDDraft', params)
+      const result = await read<PDRecord>('get_pd_draft', params)
       if (request !== seq.current) return
       setRecord(result[0] ?? null)
       const pd = parsePD(result[0]?.payload)
@@ -60,12 +60,12 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
     try {
       let current = record
       if (!locked) {
-        await write('savePDDraft', { ...params, ...payload(), expected_version: record?.version ?? 0, operation_id: id() })
-        const saved = await read<PDRecord>('getPDDraft', params)
+        await write('save_pd_draft', { ...params, ...payload(), expected_version: record?.version ?? 0, operation_id: id() })
+        const saved = await read<PDRecord>('get_pd_draft', params)
         current = saved[0] ?? null; setRecord(current)
         await onSaved()
       }
-      if (showPreview) { const rows = await read<PDRecord>('previewPD', params); setPreview(rows[0] ?? null); setMessage(rows.length ? 'Preview loaded.' : 'No structured PD is saved.') }
+      if (showPreview) { const rows = await read<PDRecord>('preview_pd', params); setPreview(rows[0] ?? null); setMessage(rows.length ? 'Preview loaded.' : 'No structured PD is saved.') }
       else setMessage(`PD draft saved, version ${current?.version}. Publication content must be reviewed again before publishing.`)
     } catch (e) { setFailed(true); setMessage(mutationError(e)); }
     finally { setBusy(false) }

@@ -18,22 +18,22 @@ text/list fields, never arbitrary imported keys or HTML. Optional sections are o
 when empty. Responsibilities/requirements are JSON arrays of at most 100 strings,
 each at most 2,000 characters; other sections are strings up to 20,000 characters.
 
-- `savePDDraft`: owner/recruiter with exact workspace/requisition access; requires
+- `save_pd_draft`: owner/recruiter with exact workspace/requisition access; requires
   all nine fields (empty strings/arrays allowed), `expected_version` (zero initially)
   and a unique `operation_id`. No writes after publication. Saves a new version and
   audit atomically. Edits reset existing pending review to draft and increment its
   review version. This prevents publication of a changed PD under an old review.
-- `getPDDraft`, `previewPD`: same scoped access, latest payload/version/update time;
+- `get_pd_draft`, `preview_pd`: same scoped access, latest payload/version/update time;
   preview is plain data, rendered as escaped React text. Empty rows mask missing or
   unauthorized records. Preview in the editor saves before requesting the preview.
-- `listVacancies`: public, 25 rows ordered by requisition ID, `after_id` cursor;
+- `list_vacancies`: public, 25 rows ordered by requisition ID, `after_id` cursor;
   optional organization/brand filters. Search/arrangement filters apply to loaded
   pages; the UI clearly states this and offers load more. Only published, unpaused
   vacancies in active organizations are returned.
-- `getVacancyDetail`: public exact organization/brand/requisition lookup with the
+- `get_vacancy_detail`: public exact organization/brand/requisition lookup with the
   same visibility boundary; empty rows map to the UI's 404. Both public actions
   explicitly select approved publication fields plus the captured PD/version.
-- `listVacancyManagement`: granted owner/recruiter view of 100 recent requisitions,
+- `list_vacancy_management`: granted owner/recruiter view of 100 recent requisitions,
   lifecycle and latest recorded activity time. Review/publication controls remain
   owner-only. Create a new requisition for revisions after publication.
 

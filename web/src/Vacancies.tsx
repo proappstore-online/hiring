@@ -25,7 +25,7 @@ export function VacanciesIndexPage() {
     const request = ++seq.current
     setLoading(true); setError(false)
     try {
-      const page = await readPublic<Vacancy>('listVacancies', { after_id, organization_id, brand_id })
+      const page = await readPublic<Vacancy>('list_vacancies', { after_id, organization_id, brand_id })
       if (request === seq.current) { setRows(old => after_id ? [...old, ...page] : page); setMore(page.length === 25) }
     } catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
@@ -65,7 +65,7 @@ export function VacancyDetailPage() {
       if (!organization_id && !brand_id) {
         let after_id = ''
         while (request === seq.current) {
-          const page = await readPublic<Vacancy>('listVacancies', { after_id })
+          const page = await readPublic<Vacancy>('list_vacancies', { after_id })
           const match = page.find(v => v.requisition_id === vacancyId)
           if (match) { organization_id = match.organization_id; brand_id = match.brand_id; break }
           const next = page.at(-1)?.requisition_id ?? ''
@@ -74,7 +74,7 @@ export function VacancyDetailPage() {
         }
       }
       if (request !== seq.current) return
-      const details = organization_id && brand_id ? await readPublic<Vacancy>('getVacancyDetail', { organization_id, brand_id, requisition_id: vacancyId }) : []
+      const details = organization_id && brand_id ? await readPublic<Vacancy>('get_vacancy_detail', { organization_id, brand_id, requisition_id: vacancyId }) : []
       const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate')
       if (request === seq.current) { setRow(details[0] ?? null); setAvailable(gates[0]?.intake_status === 'open') }
     } catch { if (request === seq.current) setError(true) }

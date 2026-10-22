@@ -1739,7 +1739,7 @@
       "sql": "SELECT e.* FROM email_status_events e JOIN hiring_outbox o ON o.logical_email_id=e.logical_email_id WHERE e.logical_email_id=:logical_email_id AND o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND (:cursor_at IS NULL OR e.timestamp>:cursor_at OR (e.timestamp=:cursor_at AND e.sequence>COALESCE((SELECT sequence FROM email_status_events WHERE id=:cursor_id AND logical_email_id=:logical_email_id),0))) ORDER BY e.timestamp,e.sequence LIMIT 50"
     },
     {
-      "name": "savePDDraft",
+      "name": "save_pd_draft",
       "description": "Append a scoped structured PD version before publication. Editing resets pending publication review to draft; owner must review again. Expected version and operation ID prevent lost updates and duplicate writes.",
       "operation": "batch",
       "requires_auth": true,
@@ -1793,7 +1793,7 @@
       ]
     },
     {
-      "name": "getPDDraft",
+      "name": "get_pd_draft",
       "description": "Read latest scoped PD as plain text and string arrays; render escaped content only. No HTML, applicant data or internal notes.",
       "operation": "query",
       "requires_auth": true,
@@ -1811,7 +1811,7 @@
       "sql": "SELECT d.payload,d.version,d.updated_at FROM hiring_pd_versions d JOIN hiring_requisitions r ON r.id=d.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY d.version DESC LIMIT 1"
     },
     {
-      "name": "previewPD",
+      "name": "preview_pd",
       "description": "Read latest scoped PD as plain text and string arrays; render escaped content only. No HTML, applicant data or internal notes.",
       "operation": "query",
       "requires_auth": true,
@@ -1829,7 +1829,7 @@
       "sql": "SELECT d.payload,d.version,d.updated_at FROM hiring_pd_versions d JOIN hiring_requisitions r ON r.id=d.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY d.version DESC LIMIT 1"
     },
     {
-      "name": "listVacancies",
+      "name": "list_vacancies",
       "description": "Public approved vacancy and immutable structured PD snapshot only. Missing or unavailable detail returns no rows (NOT_FOUND).",
       "operation": "query",
       "params": {
@@ -1849,7 +1849,7 @@
       "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at,j.arrangement,j.description,j.compensation,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:organization_id IS NULL OR :organization_id='' OR j.organization_id=:organization_id) AND (:brand_id IS NULL OR :brand_id='' OR j.brand_id=:brand_id) AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
     },
     {
-      "name": "getVacancyDetail",
+      "name": "get_vacancy_detail",
       "description": "Public approved vacancy and immutable structured PD snapshot only. Missing or unavailable detail returns no rows (NOT_FOUND).",
       "operation": "query",
       "params": {
@@ -1867,7 +1867,7 @@
       "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
     },
     {
-      "name": "listVacancyManagement",
+      "name": "list_vacancy_management",
       "description": "Recent 100 scoped requisitions with derived review/publication lifecycle and latest activity time; no candidates.",
       "operation": "query",
       "requires_auth": true,

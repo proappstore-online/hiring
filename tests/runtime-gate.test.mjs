@@ -13,8 +13,8 @@ test('runtime gate is default-closed and only approved public queries are expose
   const manifest = read('mcp.json')
   assert.equal(migrations[0].name, '0001_init')
   assert.equal(migrations[1].name, '0002_hiring_runtime_gate')
-  assert.deepEqual(manifest.tools.filter(({ requires_auth }) => !requires_auth).map(({ name }) => name), ['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job', 'listVacancies', 'getVacancyDetail'])
-  assert.ok(manifest.tools.filter(t => !['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job', 'listVacancies', 'getVacancyDetail'].includes(t.name)).every(({ requires_auth }) => requires_auth))
+  assert.deepEqual(manifest.tools.filter(({ requires_auth }) => !requires_auth).map(({ name }) => name), ['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job', 'list_vacancies', 'get_vacancy_detail'])
+  assert.ok(manifest.tools.filter(t => !['get_hiring_runtime_gate', 'list_public_jobs', 'get_public_job', 'list_vacancies', 'get_vacancy_detail'].includes(t.name)).every(({ requires_auth }) => requires_auth))
   assert.equal(manifest.tools[0].requires_auth, false)
   assert.match(manifest.tools[0].sql, /LIMIT 1$/)
 
@@ -54,7 +54,7 @@ test('only the guarded owner action can change intake and no anonymous candidate
             assert.match(sql, /p\.role='owner'/)
           }
         } else assert.doesNotMatch(sql, /(?:UPDATE|INTO|DELETE FROM)\s+hiring_runtime_gate\b/i, tool.name)
-        if (['list_public_jobs', 'get_public_job', 'listVacancies', 'getVacancyDetail'].includes(tool.name)) {
+        if (['list_public_jobs', 'get_public_job', 'list_vacancies', 'get_vacancy_detail'].includes(tool.name)) {
           assert.equal(tool.requires_auth, false)
           assert.match(sql, /^SELECT /)
           assert.doesNotMatch(sql, /hiring_candidates|hiring_applications|hiring_attachments/)

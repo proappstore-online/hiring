@@ -45,20 +45,20 @@ const pd = (scope = A, version = 0, operation_id = crypto.randomUUID()) => ({ ..
 test('PD drafts enforce tenant/role, version, validation, replay and review reset', () => {
   const { db, call } = fixture()
   try {
-    for (const user of ['worker','outsider','staff-b']) assert.deepEqual(call('savePDDraft', user, pd()), [0,0])
-    assert.deepEqual(call('savePDDraft','owner',pd({ ...A, requisition_id:B.requisition_id })),[0,0])
-    assert.deepEqual(call('savePDDraft','staff-a',pd(A,0,'pd-first')),[1,1])
-    assert.equal(call('getPDDraft','staff-a',A)[0].version,1)
-    assert.deepEqual(call('getPDDraft','staff-b',A),[])
-    assert.deepEqual(call('getPDDraft','owner',{ ...A,brand_id:'b' }),[])
-    assert.deepEqual(call('savePDDraft','owner',pd(A,0)),[0,0])
-    assert.deepEqual(call('savePDDraft','owner',pd(A,1,'pd-first')),[0,0])
-    for (const responsibilities of ['not json','{}','[1]','["'+ 'x'.repeat(2001)+'"]']) assert.deepEqual(call('savePDDraft','owner',{ ...pd(A,1),responsibilities }),[0,0])
+    for (const user of ['worker','outsider','staff-b']) assert.deepEqual(call('save_pd_draft', user, pd()), [0,0])
+    assert.deepEqual(call('save_pd_draft','owner',pd({ ...A, requisition_id:B.requisition_id })),[0,0])
+    assert.deepEqual(call('save_pd_draft','staff-a',pd(A,0,'pd-first')),[1,1])
+    assert.equal(call('get_pd_draft','staff-a',A)[0].version,1)
+    assert.deepEqual(call('get_pd_draft','staff-b',A),[])
+    assert.deepEqual(call('get_pd_draft','owner',{ ...A,brand_id:'b' }),[])
+    assert.deepEqual(call('save_pd_draft','owner',pd(A,0)),[0,0])
+    assert.deepEqual(call('save_pd_draft','owner',pd(A,1,'pd-first')),[0,0])
+    for (const responsibilities of ['not json','{}','[1]','["'+ 'x'.repeat(2001)+'"]']) assert.deepEqual(call('save_pd_draft','owner',{ ...pd(A,1),responsibilities }),[0,0])
     call('save_requisition_review','owner',{ ...publication(),compensation_type:'paid',state:'pending_review',expected_version:0,operation_id:'review' })
-    assert.deepEqual(call('savePDDraft','staff-a',pd(A,1)),[1,1])
+    assert.deepEqual(call('save_pd_draft','staff-a',pd(A,1)),[1,1])
     assert.equal(db.prepare('SELECT state FROM hiring_requisition_reviews').get().state,'draft')
     assert.equal(db.prepare('SELECT version FROM hiring_requisition_reviews').get().version,2)
-    assert.deepEqual(call('previewPD','owner',A),call('getPDDraft','owner',A))
+    assert.deepEqual(call('preview_pd','owner',A),call('get_pd_draft','owner',A))
     assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='requisition.pd_saved'").get().n,2)
     assert.throws(()=>db.exec("UPDATE hiring_pd_versions SET payload='{}'"),/immutable/)
   } finally { db.close() }
@@ -67,32 +67,32 @@ test('PD drafts enforce tenant/role, version, validation, replay and review rese
 test('public vacancies contain only immutable published PD snapshots and preserve legacy jobs', () => {
   const { db, call, publish } = fixture()
   try {
-    call('savePDDraft','owner',pd())
-    assert.deepEqual(call('listVacancies',null,{ after_id:'' }),[])
-    assert.deepEqual(call('getVacancyDetail',null,A),[])
+    call('save_pd_draft','owner',pd())
+    assert.deepEqual(call('list_vacancies',null,{ after_id:'' }),[])
+    assert.deepEqual(call('get_vacancy_detail',null,A),[])
     publish()
-    const list = call('listVacancies',null,{ after_id:'',organization_id:'org',brand_id:'a' })
+    const list = call('list_vacancies',null,{ after_id:'',organization_id:'org',brand_id:'a' })
     assert.equal(list.length,1)
-    const detail = call('getVacancyDetail',null,A)[0]
+    const detail = call('get_vacancy_detail',null,A)[0]
     assert.equal(JSON.parse(detail.pd_json).overview,'Engineer overview')
     assert.equal(detail.pd_version,1)
     for (const key of ['actor_user_id','operation_id','candidate_name','email','internal_notes','payload']) assert.equal(key in detail,false,key)
-    assert.deepEqual(call('getVacancyDetail',null,{ ...A,brand_id:'b' }),[])
-    assert.deepEqual(call('getVacancyDetail',null,{ ...A,requisition_id:'missing' }),[])
-    assert.deepEqual(call('listVacancies',null,{ after_id:'',organization_id:'wrong' }),[])
-    assert.equal(call('listVacancies',null,{ after_id:A.requisition_id }).length,1)
-    assert.equal(call('getVacancyDetail',null,B)[0].pd_json,null)
+    assert.deepEqual(call('get_vacancy_detail',null,{ ...A,brand_id:'b' }),[])
+    assert.deepEqual(call('get_vacancy_detail',null,{ ...A,requisition_id:'missing' }),[])
+    assert.deepEqual(call('list_vacancies',null,{ after_id:'',organization_id:'wrong' }),[])
+    assert.equal(call('list_vacancies',null,{ after_id:A.requisition_id }).length,1)
+    assert.equal(call('get_vacancy_detail',null,B)[0].pd_json,null)
     assert.equal(call('get_public_job',null,A)[0].description,publication().description)
-    assert.deepEqual(call('savePDDraft','owner',pd(A,1)),[0,0])
+    assert.deepEqual(call('save_pd_draft','owner',pd(A,1)),[0,0])
     assert.throws(()=>db.exec("UPDATE hiring_pd_publications SET payload='{}'"),/immutable/)
     call('pause_job_requisition','owner',{ ...A,expected_version:1,operation_id:'pause' })
-    assert.deepEqual(call('getVacancyDetail',null,A),[])
-    assert.equal(call('listVacancies',null,{ after_id:'' }).length,1)
+    assert.deepEqual(call('get_vacancy_detail',null,A),[])
+    assert.equal(call('list_vacancies',null,{ after_id:'' }).length,1)
     call('close_job_requisition','owner',{ ...B,expected_version:1,operation_id:'close' })
-    assert.deepEqual(call('listVacancies',null,{ after_id:'' }),[])
+    assert.deepEqual(call('list_vacancies',null,{ after_id:'' }),[])
     call('resume_job_requisition','owner',{ ...A,expected_version:2,operation_id:'resume' })
     db.exec("UPDATE hiring_organizations SET status='suspended'")
-    assert.deepEqual(call('getVacancyDetail',null,A),[])
+    assert.deepEqual(call('get_vacancy_detail',null,A),[])
   } finally { db.close() }
 })
 
@@ -100,17 +100,17 @@ test('PD audit failure rolls back the version and review reset atomically',()=>{
   const { db,call }=fixture()
   try {
     db.exec("CREATE TRIGGER fail_pd BEFORE INSERT ON hiring_audit_events WHEN NEW.action='requisition.pd_saved' BEGIN SELECT RAISE(ABORT,'audit failure'); END")
-    assert.throws(()=>call('savePDDraft','owner',pd()),/audit failure/)
-    assert.deepEqual(call('getPDDraft','owner',A),[])
+    assert.throws(()=>call('save_pd_draft','owner',pd()),/audit failure/)
+    assert.deepEqual(call('get_pd_draft','owner',A),[])
   } finally { db.close() }
 })
 
 test('vacancy management derives complete lifecycle and masks ungranted scopes',()=>{
   const { db,call }=fixture()
   try {
-    const state=()=>call('listVacancyManagement','owner',A)[0].state
+    const state=()=>call('list_vacancy_management','owner',A)[0].state
     assert.equal(state(),'draft')
-    assert.deepEqual(call('listVacancyManagement','staff-b',A),[])
+    assert.deepEqual(call('list_vacancy_management','staff-b',A),[])
     const content={ ...publication(), compensation_type:'paid' }
     call('save_requisition_review','owner',{ ...content,state:'pending_review',expected_version:0,operation_id:'review' })
     assert.equal(state(),'in review')
@@ -120,6 +120,6 @@ test('vacancy management derives complete lifecycle and masks ungranted scopes',
     assert.equal(state(),'paused')
     call('close_job_requisition','owner',{ ...A,expected_version:2,operation_id:'close' })
     assert.equal(state(),'closed')
-    assert.ok(call('listVacancyManagement','staff-a',A)[0].updated_at)
+    assert.ok(call('list_vacancy_management','staff-a',A)[0].updated_at)
   } finally { db.close() }
 })

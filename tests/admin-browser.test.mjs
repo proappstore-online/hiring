@@ -14,8 +14,8 @@ const fixture = `import React from 'react';import{createRoot}from'react-dom/clie
 window.calls=[];window.fail=false;window.rows=[];window.conflict=false;window.templates=[];
 window.read=async(name,params)=>{window.calls.push({name,params});if(window.fail)throw Error('fixture');switch(name){
 case'list_communication_templates':return window.templates;
-case'listVacancyManagement':return[{id:'req',title:'Engineer',state:'draft',updated_at:1000}];
-case'getPDDraft':return[];
+case'list_vacancy_management':return[{id:'req',title:'Engineer',state:'draft',updated_at:1000}];
+case'get_pd_draft':return[];
 case'list_job_publications':return[{requisition_id:'req',title:'Engineer',version:1,status:'published'}];
 case'get_admin_settings':return[{organization_name:'Organization',brand_name:'Brand',can_manage_organization:0}];
 case'list_brand_admin_members':return[{id:'grant',user_id:'staff',role:'recruiter',scope_type:'brand',scope_id:'brand',granted_at:1000,source:'grant'}];
