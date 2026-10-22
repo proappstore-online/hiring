@@ -83,3 +83,37 @@ model. No browser interaction is required.
 `change_application_stage` retains its existing parameters and zero-change denial
 semantics. The static transition map, additive stage representation and atomic
 history/audit guarantees are documented in [the domain model](domain-model.md#application-stage-contract-v1-20).
+
+## Interview tools v1 (#22)
+
+All tools require authentication. Shared scope `S` is
+`tenant_id, brand_id, application_id, interview_id`; tenant means organization.
+UUID record/assignment IDs are caller-generated; actor and time are server-bound.
+Schedule fields `T` are `scheduled_at?` (UTC epoch milliseconds),
+`duration_minutes?`, `location?`, `format` (phone/video/onsite/panel).
+Optional schedule fields default to NULL; updates replace the complete schedule.
+
+| Tool | Parameters | Result / authority |
+| --- | --- | --- |
+| `create_interview` | S, T, reviewer_id, assignment_id, operation_id | Owner/recruiter; creates interview, assignment, assigned history and audit |
+| `update_interview_schedule` | S, T, expected_version, operation_id | Owner/recruiter; versioned schedule replacement and audit |
+| `assign_interviewer` | S, reviewer_id, assignment_id, reason, expected_version, operation_id | Owner/recruiter; revokes previous active assignment, appends history/audit, installs new assignment |
+| `revoke_interviewer` | S, reason, expected_version, operation_id | Owner/recruiter; revokes active assignment, appends history/audit |
+| `read_interview_packet` | S | One `packet_json` row; reviewer needs active interview assignment plus current scoped grant; owner/recruiter receives full projection |
+| `list_application_interviews` | tenant_id, brand_id, application_id | Up to 100 interview summaries, same read authority; ordered newest first |
+
+Mutation operation IDs are globally checked against audit and interview history.
+Successful exact retries append nothing; zero changes also represents denied or
+stale requests and must not be interpreted as a new success. Reassignment audit
+uses the operation ID and a derived `-revoked` ID for its two events. Version
+checks serialize concurrent changes. Self-assignment by reviewers is forbidden.
+Read denials return empty rows rather than revealing whether a record exists.
+See [packet projection and access](permissions.md#interview-assignment-and-packets-22).
+Full packets provide attachment metadata only, and preserve separate Gmail/worker
+communication arrays; history collections are scoped to the exact application.
+
+The scheduling UI calls these persisted actions and does not send invitations.
+The older Working Interview Invitation component remains a separate playbook
+workflow; interview metadata does not confer send, publication or final-decision
+authority. Tests execute the deployed SQL against SQLite with PAS-style binding;
+they do not claim a live D1 or provider probe.

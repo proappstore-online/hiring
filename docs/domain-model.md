@@ -80,3 +80,26 @@ mutation. Other stages clear the extension. Existing rows and applied migrations
 are unchanged. Consumers must use registered read models rather than interpreting
 the legacy column alone. Stage-event UPDATE and DELETE now abort, preserving
 append-only evidence alongside the existing immutable audit.
+
+## Interviews (#22; migration 0024)
+
+`interviews` stores opaque UUID identities, application, tenant (`organization_id`
+in existing aggregates), brand and requisition, nullable UTC epoch-millisecond
+`scheduled_at`, nullable duration (1–1440 minutes), bounded location, format
+(phone/video/onsite/panel), status (scheduled/cancelled/completed), optimistic
+version, unique creation operation and timestamps. New interviews are scheduled;
+this delivery introduces no completion/cancellation or hiring-decision action.
+Scope is immutable; composite foreign keys and an insert trigger enforce exact
+application/requisition agreement. Time may remain unset during coordination.
+
+`interview_assignments` preserves assigned reviewer, assigning actor/time,
+revocation time/reason and unique assignment operation. A partial unique index
+allows one active reviewer per interview. Reassignment revokes the old row before
+creating the new one; revoked assignments cannot be rewritten or deleted.
+`interview_assignment_history` snapshots every assigned/revoked event, including
+operation, authenticated event actor and event timestamp. UPDATE/DELETE abort.
+All schedule/assignment/revocation mutations compare the interview version and
+increment it once. Business state, history and attributed immutable audit commit
+in one transaction; audit failure rolls everything back. Reassignment emits two
+audit events when replacing an active assignment, one otherwise. No outbox or
+external send is created by interview metadata operations.

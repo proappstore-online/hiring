@@ -38,3 +38,28 @@ The owner UI uses the existing canonical actions: `grant_workspace_access` for b
 Migration `0014_brand_org_admin` adds an immutable publication identity table and captures names for existing publications at upgrade time. Future publication inserts capture names in the same transaction through a trigger. Organization/brand edits affect live workspace records and future publications, **not existing public publication names, contact or notice snapshots**. Historical pre-upgrade names cannot be reconstructed; legacy publications preserve their names as observed during upgrade. Brand notice version and reply identity are configuration metadata; publication still requires explicit review of its notice and contact.
 
 Regression coverage: `tests/brand_admin.test.mjs`, alongside the existing permissions and multi-brand suites.
+
+## Interview assignment and packets (#22)
+
+Interview assignment is separate from the application's operational assignee.
+`tenant_id` on interview tools maps to the existing `organization_id`. Every tool
+checks platform `:__user_id` against current organization/brand/requisition access.
+Owner/recruiter authority permits scheduling, assignment, revocation and full
+packet reads. Target interviewers must have current owner/recruiter/reviewer
+access to that same requisition; assignment alone grants no authority.
+
+Reviewers may call `list_application_interviews` and `read_interview_packet` only
+for scheduled interviews with their own active, non-revoked assignment and a
+current scoped reviewer grant. Reassignment, explicit revocation, grant revocation
+and organization suspension remove access on the next server call. Existing
+application assignment does not grant interview access. Previously downloaded
+information cannot be recalled; the UI reloads packets on focus and manual refresh.
+
+Packets are returned as `packet_json`. Reviewer objects contain exactly
+`candidate_name`, `requisition_title`, `stage`, `scheduled_at`, `duration_minutes`,
+`location`, `format`, `status`; no contact, source, notes, messages, drafts or
+attachments. Owner/recruiter objects additionally contain contact/source context,
+notes, Gmail/worker communication history, drafts and attachment metadata. Private
+storage credentials/paths and attachment bytes are never included. No packet read
+bypasses attachment quarantine. Unauthorized and missing reads both return no rows;
+denied/stale/replayed mutations return zero changes, matching existing actions.

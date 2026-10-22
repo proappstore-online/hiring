@@ -69,3 +69,13 @@ export async function saveOrgRecruitingPlaybook(organization_id: string, payload
   const result = await app.actions.call<{ results?: { rows?: { version: number }[] }[] }>('save_org_recruiting_playbook', { organization_id, payload, expected_version, operation_id: id() })
   if (!result.results?.at(-1)?.rows?.some(row => row.version === expected_version + 1)) throw Error('Save could not be confirmed. Reload and check access or version conflicts.')
 }
+
+export type Interview = { id: string; version: number; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string; reviewer_id: string | null }
+export type InterviewPacket = { candidate_name: string; requisition_title: string; stage: string; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string }
+export const interviewScope = (scope: Scope, application_id: string) => ({ tenant_id: scope.organization_id, brand_id: scope.brand_id, application_id })
+export const listApplicationInterviews = (scope: Scope, applicationId: string) => read<Interview>('list_application_interviews', interviewScope(scope, applicationId))
+export async function readInterviewPacket(scope: Scope, applicationId: string, interview_id: string) {
+  const rows = await read<{ packet_json: string }>('read_interview_packet', { ...interviewScope(scope, applicationId), interview_id })
+  return rows[0] ? JSON.parse(rows[0].packet_json) as InterviewPacket : null
+}
+export const interviewActions = { create: 'create_interview', schedule: 'update_interview_schedule', assign: 'assign_interviewer', revoke: 'revoke_interviewer' } as const

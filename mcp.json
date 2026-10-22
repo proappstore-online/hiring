@@ -1996,6 +1996,219 @@
         }
       },
       "requires_auth": true
+    },
+    {
+      "name": "create_interview",
+      "description": "create interview; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "batch",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "assignment_id": {
+          "type": "string"
+        },
+        "scheduled_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "optional": true
+        },
+        "location": {
+          "type": "string",
+          "optional": true
+        },
+        "format": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "INSERT INTO interviews(id,tenant_id,brand_id,requisition_id,application_id,scheduled_at,duration_minutes,location,format,operation_id,created_at,updated_at) SELECT :interview_id,:tenant_id,:brand_id,a.requisition_id,a.id,:scheduled_at,:duration_minutes,:location,:format,:operation_id,:__now,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:reviewer_id AND p.role IN ('owner','recruiter','reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id OR id=:operation_id||'-revoked') AND NOT EXISTS(SELECT 1 FROM interview_assignment_history WHERE operation_id=:operation_id) AND (:scheduled_at IS NULL OR (:scheduled_at=CAST(:scheduled_at AS INTEGER) AND :scheduled_at>=0)) AND (:duration_minutes IS NULL OR (:duration_minutes=CAST(:duration_minutes AS INTEGER) AND :duration_minutes BETWEEN 1 AND 1440)) AND (:location IS NULL OR length(:location)<=2000) AND :format IN ('phone','video','onsite','panel') AND length(trim(:interview_id))>0 AND length(trim(:assignment_id))>0 AND NOT EXISTS(SELECT 1 FROM interviews WHERE id=:interview_id) AND NOT EXISTS(SELECT 1 FROM interview_assignments WHERE id=:assignment_id)",
+        "INSERT INTO interview_assignments(id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,operation_id) SELECT :assignment_id,id,tenant_id,brand_id,requisition_id,application_id,:reviewer_id,:__user_id,:__now,:operation_id FROM interviews WHERE id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND operation_id=:operation_id AND changes()=1",
+        "INSERT INTO interview_assignment_history(event_id,id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,operation_id,event_type,event_at,actor_user_id) SELECT :operation_id||'-assigned',id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,:operation_id,'assigned',:__now,:__user_id FROM interview_assignments WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND id=:assignment_id AND operation_id=:operation_id AND changes()=1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,:application_id,'interview.created',:__user_id,:operation_id,:__now,'interview',:interview_id,'Interview metadata changed' WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "update_interview_schedule",
+      "description": "update interview schedule; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "batch",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "scheduled_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "optional": true
+        },
+        "location": {
+          "type": "string",
+          "optional": true
+        },
+        "format": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE interviews SET scheduled_at=:scheduled_at,duration_minutes=:duration_minutes,location=:location,format=:format,version=version+1,updated_at=:__now WHERE id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND version=:expected_version AND status='scheduled' AND EXISTS(SELECT 1 FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id OR id=:operation_id||'-revoked') AND NOT EXISTS(SELECT 1 FROM interview_assignment_history WHERE operation_id=:operation_id) AND (:scheduled_at IS NULL OR (:scheduled_at=CAST(:scheduled_at AS INTEGER) AND :scheduled_at>=0)) AND (:duration_minutes IS NULL OR (:duration_minutes=CAST(:duration_minutes AS INTEGER) AND :duration_minutes BETWEEN 1 AND 1440)) AND (:location IS NULL OR length(:location)<=2000) AND :format IN ('phone','video','onsite','panel')",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,:application_id,'interview.schedule_updated',:__user_id,:operation_id,:__now,'interview',:interview_id,'Interview metadata changed' WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "assign_interviewer",
+      "description": "assign interviewer; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "batch",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "reviewer_id": {
+          "type": "string"
+        },
+        "assignment_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE interviews SET version=version+1,updated_at=:__now WHERE id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND version=:expected_version AND status='scheduled' AND EXISTS(SELECT 1 FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id OR id=:operation_id||'-revoked') AND NOT EXISTS(SELECT 1 FROM interview_assignment_history WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:reviewer_id AND p.role IN ('owner','recruiter','reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))) AND length(trim(:reason))>0 AND length(trim(:assignment_id))>0 AND NOT EXISTS(SELECT 1 FROM interview_assignments WHERE id=:assignment_id OR operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM interview_assignments WHERE interview_id=:interview_id AND revoked_at IS NULL AND reviewer_id=:reviewer_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,:application_id,'interview.assigned',:__user_id,:operation_id,:__now,'interview',:interview_id,'Interview metadata changed' WHERE changes()=1",
+        "UPDATE interview_assignments SET revoked_at=:__now,revoke_reason=:reason WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND revoked_at IS NULL AND changes()=1 AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))",
+        "INSERT INTO interview_assignment_history(event_id,id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,operation_id,event_type,event_at,actor_user_id) SELECT :operation_id||'-revoked',id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,:operation_id,'revoked',:__now,:__user_id FROM interview_assignments WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND revoked_at=:__now AND NOT EXISTS(SELECT 1 FROM interview_assignment_history h WHERE h.id=interview_assignments.id AND h.event_type='revoked') AND changes()=1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id||'-revoked',:tenant_id,:brand_id,:application_id,'interview.assignment_revoked',:__user_id,:operation_id||'-revoked',:__now,'interview',:interview_id,'Interview metadata changed' WHERE changes()=1",
+        "INSERT INTO interview_assignments(id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,operation_id) SELECT :assignment_id,id,tenant_id,brand_id,requisition_id,application_id,:reviewer_id,:__user_id,:__now,:operation_id FROM interviews WHERE id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id AND operation_id=:operation_id AND object_id=:interview_id AND actor_user_id=:__user_id) AND version=:expected_version+1 AND NOT EXISTS(SELECT 1 FROM interview_assignment_history WHERE operation_id=:operation_id AND event_type='assigned')",
+        "INSERT INTO interview_assignment_history(event_id,id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,operation_id,event_type,event_at,actor_user_id) SELECT :operation_id||'-assigned',id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,:operation_id,'assigned',:__now,:__user_id FROM interview_assignments WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND id=:assignment_id AND operation_id=:operation_id AND changes()=1"
+      ]
+    },
+    {
+      "name": "revoke_interviewer",
+      "description": "revoke interviewer; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "batch",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE interviews SET version=version+1,updated_at=:__now WHERE id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND version=:expected_version AND status='scheduled' AND EXISTS(SELECT 1 FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id OR id=:operation_id||'-revoked') AND NOT EXISTS(SELECT 1 FROM interview_assignment_history WHERE operation_id=:operation_id) AND length(trim(:reason))>0 AND EXISTS(SELECT 1 FROM interview_assignments WHERE interview_id=:interview_id AND revoked_at IS NULL)",
+        "UPDATE interview_assignments SET revoked_at=:__now,revoke_reason=:reason WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND revoked_at IS NULL AND changes()=1 AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))",
+        "INSERT INTO interview_assignment_history(event_id,id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,operation_id,event_type,event_at,actor_user_id) SELECT :operation_id||'-revoked',id,interview_id,tenant_id,brand_id,requisition_id,application_id,reviewer_id,assigned_by,assigned_at,revoked_at,revoke_reason,:operation_id,'revoked',:__now,:__user_id FROM interview_assignments WHERE interview_id=:interview_id AND tenant_id=:tenant_id AND brand_id=:brand_id AND application_id=:application_id AND revoked_at=:__now AND NOT EXISTS(SELECT 1 FROM interview_assignment_history h WHERE h.id=interview_assignments.id AND h.event_type='revoked') AND changes()=1",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,:application_id,'interview.assignment_revoked',:__user_id,:operation_id,:__now,'interview',:interview_id,'Interview metadata changed' WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "read_interview_packet",
+      "description": "read interview packet; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "query",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT CASE WHEN EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) THEN json_object('candidate_name',c.name,'requisition_title',r.title,'stage',COALESCE(a.stage_extension,a.stage),'scheduled_at',i.scheduled_at,'duration_minutes',i.duration_minutes,'location',i.location,'format',i.format,'status',i.status,'email',c.email,'phone',c.phone,'profile_url',COALESCE((SELECT profile_url FROM hiring_application_sources WHERE application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')),'source',CASE WHEN EXISTS(SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT source FROM hiring_application_sources WHERE application_id=a.id),a.source) END,'source_detail',a.source_detail,'basis_reference',a.basis_reference,'contact_context',a.contact_context,'notes',json((SELECT json_group_array(json_object('body',body,'actor_user_id',actor_user_id,'created_at',created_at)) FROM hiring_notes WHERE application_id=a.id AND organization_id=a.organization_id AND brand_id=a.brand_id)),'attachments',json((SELECT json_group_array(json_object('id',id,'filename',filename,'mime_type',mime_type,'size_bytes',size_bytes,'scan_state',scan_state)) FROM hiring_attachments WHERE application_id=a.id AND organization_id=a.organization_id AND brand_id=a.brand_id AND deleted_at IS NULL)),'worker_communications',json((SELECT json_group_array(json_object('subject',subject,'body',body,'direction',direction)) FROM hiring_worker_communication_events WHERE application_id=a.id AND organization_id=a.organization_id AND brand_id=a.brand_id)),'communications',json((SELECT json_group_array(json_object('subject',subject,'body',body,'direction',direction)) FROM hiring_communication_events WHERE application_id=a.id AND organization_id=a.organization_id AND brand_id=a.brand_id)),'drafts',json((SELECT json_group_array(json_object('subject',subject,'body',body)) FROM hiring_outbox WHERE application_id=a.id AND organization_id=a.organization_id AND brand_id=a.brand_id))) ELSE json_object('candidate_name',c.name,'requisition_title',r.title,'stage',COALESCE(a.stage_extension,a.stage),'scheduled_at',i.scheduled_at,'duration_minutes',i.duration_minutes,'location',i.location,'format',i.format,'status',i.status) END AS packet_json FROM interviews i JOIN hiring_applications a ON a.id=i.application_id AND a.organization_id=i.tenant_id AND a.brand_id=i.brand_id AND a.requisition_id=i.requisition_id JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE i.id=:interview_id AND i.application_id=:application_id AND i.tenant_id=:tenant_id AND i.brand_id=:brand_id AND (EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) OR (EXISTS(SELECT 1 FROM hiring_effective_access p JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.reviewer_id=p.user_id AND ia.revoked_at IS NULL WHERE p.organization_id=i.tenant_id AND p.brand_id=i.brand_id AND p.user_id=:__user_id AND p.role='reviewer' AND (p.requisition_id IS NULL OR p.requisition_id=i.requisition_id)) AND i.status='scheduled')) LIMIT 1"
+    },
+    {
+      "name": "list_application_interviews",
+      "description": "list application interviews; current scoped grants enforced in SQL; mutations are atomic and operation-deduplicated",
+      "operation": "query",
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT i.id,i.version,i.scheduled_at,i.duration_minutes,i.location,i.format,i.status,(SELECT reviewer_id FROM interview_assignments WHERE interview_id=i.id AND revoked_at IS NULL) AS reviewer_id FROM interviews i JOIN hiring_applications a ON a.id=i.application_id AND a.organization_id=i.tenant_id AND a.brand_id=i.brand_id AND a.requisition_id=i.requisition_id WHERE i.tenant_id=:tenant_id AND i.brand_id=:brand_id AND i.application_id=:application_id AND (EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) OR (EXISTS(SELECT 1 FROM hiring_effective_access p JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.reviewer_id=p.user_id AND ia.revoked_at IS NULL WHERE p.organization_id=i.tenant_id AND p.brand_id=i.brand_id AND p.user_id=:__user_id AND p.role='reviewer' AND (p.requisition_id IS NULL OR p.requisition_id=i.requisition_id)) AND i.status='scheduled')) ORDER BY i.created_at DESC,i.id LIMIT 100"
     }
   ]
 }
