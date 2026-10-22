@@ -161,7 +161,7 @@ test('candidate account and application journey', async t => {
   await t.test('empty account, auth loading and unsafe return destination',async()=>{
    await go('/missing');await page.evaluate(()=>{window.empty=true});await page.getByRole('link',{name:'My Applications',exact:true}).first().click();await expect(page.getByText(/No applications recorded yet/)).toBeVisible()
    await page.evaluate(()=>{window.auth={user:null,loading:true};window.render()});await expect(page.getByRole('status')).toHaveText('Loading…')
-   await go('/sign-in?returnTo=https%3A%2F%2Fevil.example');await expect(page).toHaveURL(/dashboard/)
+   await go('/sign-in?returnTo=https%3A%2F%2Fevil.example');await expect(page).toHaveURL(/recruiter\/overview/)
   })
   await t.test('closed gate hides submission; failed account load can retry',async()=>{
    await go('/jobs');await page.evaluate(()=>window.gate='closed');await page.getByRole('link',{name:'Engineer · Brand a · Remote'}).click()

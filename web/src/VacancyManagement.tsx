@@ -1,30 +1,30 @@
 import { mutationError } from './mutation-state'
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { id, read, write, type Requisition, type Scope } from './api'
 import { PublishJob } from './Jobs'
 import { parsePD, PD_FIELDS, PositionDescription, type PDRecord } from './position-description'
-import { EmptyState, ErrorState, LoadingState } from './route-ui'
+import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { button, date, field, panel } from './ui'
 
-type ManagedVacancy = { id: string; title: string; state: string; updated_at: number }
-export function VacancyManagement({ scope, requisitions, selectedRequisitionId = '' }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[]; selectedRequisitionId?: string }) {
+export type ManagedVacancy = { id: string; title: string; status: string; state: string; updated_at: number }
+export function VacancyManagement({ scope, requisitions, selectedRequisitionId = '', selectedVacancy }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[]; selectedRequisitionId?: string; selectedVacancy?: ManagedVacancy }) {
   const [rows, setRows] = useState<ManagedVacancy[]>([])
-  const [selected, setSelected] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const seq = useRef(0)
   async function load() {
     const request = ++seq.current
     setLoading(true); setError(false)
-    try { const result = await read<ManagedVacancy>('list_vacancy_management', scope); if (request === seq.current) { setRows(result); setSelected(current => result.some(row => row.id === selectedRequisitionId) ? selectedRequisitionId : current) } }
+    try { const result = await read<ManagedVacancy>('list_vacancy_management', scope); if (request === seq.current) setRows(result) }
     catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
   }
   useEffect(() => { void load(); return () => { ++seq.current } }, [scope.organization_id, scope.brand_id, selectedRequisitionId])
-  const vacancy = rows.find(r => r.id === selected)
+  const vacancy = selectedVacancy ?? rows.find(r => r.id === selectedRequisitionId)
   return <section className={panel}><h2 className="text-xl font-semibold">Vacancy Management</h2><p className="my-3 text-sm">Draft → in review → published → paused → closed. Showing the most recent 100 requisitions.</p>
-    {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><button aria-pressed={selected === r.id} className={button + ' w-full text-left'} onClick={() => setSelected(r.id)}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></button></li>)}</ul>}
-    {selectedRequisitionId && !loading && !vacancy && <ErrorState retry={() => void load()}>This vacancy is unavailable in the selected workspace.</ErrorState>}
+    {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length && !selectedRequisitionId ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><Link aria-current={selectedRequisitionId === r.id ? 'page' : undefined} className={button + ' block w-full text-left'} to={'/recruiter/vacancies/' + encodeURIComponent(r.id) + '?' + new URLSearchParams(scope)}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></Link></li>)}</ul>}
+    {selectedRequisitionId && !loading && !vacancy && <NotFound />}
     {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><ApprovedJobDescription scope={scope} requisitionId={vacancy.id} /> <PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
       <PublishJob key={'publication:' + vacancy.id} scope={scope} requisitions={requisitions.filter(r => r.id === vacancy.id)} onChanged={load} />
     </div>}

@@ -3,15 +3,14 @@
 React Router 6 BrowserRouter owns navigation. Public routes `/`, `/jobs`,
 `/jobs/:jobId`, `/apply/:jobId` and `/sign-in` share an app-branded public
 header. Public discovery does not wait for authentication hydration. Recruiter
-routes `/dashboard`, `/applications` and `/applications/:applicationId` use
-an authenticated ProShell with `branding="app"`. Dashboard and applications
-currently reuse the existing workspace; richer pipeline views belong to UI-2.
+routes under `/recruiter/` use an authenticated ProShell with `branding="app"`.
 Unknown routes show a public 404. Render errors are caught per destination;
 loading, empty and recoverable fetch failures have distinct presentations.
 
-Protected destinations redirect to `/sign-in?returnTo=…`; only local dashboard
-and application destinations are accepted on return. OAuth continues through the
-SDK's existing provider flow; this change does not implement token exchange.
+Protected destinations redirect to `/sign-in?returnTo=…`; only local recruiter,
+legacy staff, candidate application, and apply destinations are accepted on
+return. OAuth continues through the SDK's existing provider flow; this change
+does not implement token exchange.
 
 Generated vacancy links include `organization_id` and `brand_id` query fields
 beside the job ID in the pathname. Bare `/jobs/:jobId` and `/apply/:jobId`
@@ -55,7 +54,7 @@ See [PD contracts and non-executing mapping plan](vacancies-mapping-plan.md).
 
 ## Exact recruiter application detail (#20)
 
-`/applications/:applicationId` now loads `get_application` directly, independent
+`/recruiter/applications/:applicationId` now loads `get_application` directly, independent
 of the 100-record queue. It returns full details only for current owner/recruiter
 access to the exact organization, brand and requisition. Missing and unauthorized
 IDs both return no rows. Assigned reviewers retain the restricted
@@ -69,3 +68,28 @@ criterion/rating/evidence drafts and final submissions through registered action
 and offers immutable version history with earlier-page loading. There is no new
 route or staff review override. Assignment IDs come from the authorized interview
 list; direct action calls still require exact current ownership and scoped grants.
+
+## Purpose-specific recruiter screens (#94)
+
+The protected layout owns the organization/brand selector and checks workspace
+scope before rendering a screen. `/recruiter/overview` is available to all staff;
+`/recruiter/vacancies` and `/recruiter/vacancies/:requisitionId`,
+`/recruiter/communications`, `/recruiter/playbook`, and `/recruiter/operations`
+require owner or recruiter access. `/recruiter/applications` and its exact-ID
+detail allow owner, recruiter, and reviewer access. `/recruiter/compliance`
+allows owner, recruiter, and auditor access; `/recruiter/settings` is owner-only.
+Denied screens and missing scoped resources both render the same 404 view.
+
+Each screen is a distinct route. Vacancy detail uses `get_vacancy_management`
+for an exact authorized requisition lookup even when it is older than the recent
+100-row list. Application detail uses the existing exact full read for owners
+and recruiters, and an assigned reviewer receives the restricted gateway summary.
+Application detail links to the communications screen, where a selected
+`application_id` is fetched exactly even if it has left the recent list.
+Scope changes on detail routes return to the corresponding list. Navigation
+retains `organization_id` and `brand_id` in generated links.
+
+Legacy `/dashboard`, `/admin`, `/applications`, `/applications/:applicationId`,
+`/playbook`, and `/admin/{communications,operations,compliance,settings}`
+redirect to their canonical `/recruiter/` equivalents while preserving query
+scope and application IDs.

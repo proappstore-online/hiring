@@ -1891,6 +1891,24 @@
       "sql": "SELECT r.id,r.title,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY updated_at DESC,r.id LIMIT 100"
     },
     {
+      "name": "get_vacancy_management",
+      "description": "Read one exact scoped requisition lifecycle for an authorized owner or recruiter. Missing and denied IDs both return no rows.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.id,r.title,r.status,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1"
+    },
+    {
       "name": "get_my_application",
       "description": "Read one authenticated candidate-owned application by ID, including current stage and submission time. Missing and unauthorized IDs both return no rows; no staff notes or contact data.",
       "operation": "query",

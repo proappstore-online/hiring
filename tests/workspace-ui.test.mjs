@@ -8,20 +8,20 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const dir = resolve(root, 'web/src')
 const source = () => readdirSync(dir).filter(f => /\.tsx?$/.test(f)).map(f => readFileSync(resolve(dir, f), 'utf8')).join('\n')
 
-test('workspace and application data are keyed so stale loads never render under another record', () => {
+test('recruiter screens reset scoped data and reject late responses after route changes', () => {
   const app = source()
-  assert.match(app, /work\?\.brand_id === selected \? work : emptyWork/)
-  assert.match(app, /detail\?\.scope_key === detailKey \? detail : emptyDetail/)
-  assert.match(app, /if \(seq === workSeq\.current\)/)
-  assert.match(app, /if \(seq === detailSeq\.current\)/)
+  assert.match(app, /JSON\.stringify\(\[name, params\]\)/)
+  assert.match(app, /if \(live\) setState\(\{ rows, loading: false, error: false \}\)/)
+  assert.match(app, /return \(\) => \{ live = false \}/)
+  assert.match(app, /<RecruiterContext\.Provider/)
 })
 
 test('a failed workspace load offers retry instead of the create-workspace form', () => {
-  assert.match(source(), /!spaces \? <button[^>]*onClick=\{loadSpaces\}/)
+  assert.match(source(), /spaceError \? <ErrorState retry=\{\(\) => void reloadSpaces\(\)\}/)
 })
 
 test('the assignee picker remounts once members load so it defaults to the signed-in user', () => {
-  assert.match(source(), /<CreateApplication key=\{members\.map\(m => m\.user_id\)\.join\(\)\}/)
+  assert.match(source(), /<CreateApplication[^>]*key=\{members\.rows\.map\(row => row\.user_id\)\.join\(\)\}/)
 })
 
 test('candidate and staff routes are separated; job and notice text render as escaped React content', () => {

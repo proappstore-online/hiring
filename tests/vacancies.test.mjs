@@ -123,3 +123,18 @@ test('vacancy management derives complete lifecycle and masks ungranted scopes',
     assert.ok(call('list_vacancy_management','staff-a',A)[0].updated_at)
   } finally { db.close() }
 })
+test('exact vacancy detail resolves beyond the recent list and masks denied IDs', () => {
+  const { db, call, advance } = fixture()
+  try {
+    advance()
+    for (let i = 0; i < 101; i++) call('create_requisition', 'owner', { organization_id: 'org', brand_id: 'a', requisition_id: `new-${i}`, title: `New ${i}`, operation_id: `new-op-${i}` })
+    assert.equal(call('list_vacancy_management', 'owner', A).some(row => row.id === A.requisition_id), false)
+    const detail = call('get_vacancy_management', 'staff-a', A)
+    assert.equal(detail.length, 1)
+    assert.equal(detail[0].id, A.requisition_id)
+    assert.equal(detail[0].status, 'draft')
+    assert.deepEqual(call('get_vacancy_management', 'staff-b', A), [])
+    assert.deepEqual(call('get_vacancy_management', 'staff-a', { ...A, brand_id: 'b' }), [])
+    assert.deepEqual(call('get_vacancy_management', 'staff-a', { ...A, requisition_id: 'missing' }), [])
+  } finally { db.close() }
+})

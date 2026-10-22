@@ -2,13 +2,13 @@ import { NavLink } from 'react-router-dom'
 import type { Role, Scope } from './api'
 
 export const adminSections = [
-  { path: '/playbook', label: 'Playbook', roles: ['owner', 'recruiter'] },
-  { path: '/admin', label: 'Dashboard', roles: ['owner', 'recruiter', 'reviewer', 'auditor'] },
-  { path: '/applications', label: 'Applications', roles: ['owner', 'recruiter', 'reviewer'] },
-  { path: '/admin/communications', label: 'Communications', roles: ['owner', 'recruiter'] },
-  { path: '/admin/operations', label: 'Operations', roles: ['owner', 'recruiter', 'auditor'] },
-  { path: '/admin/compliance', label: 'Compliance', roles: ['owner', 'auditor'] },
-  { path: '/admin/settings', label: 'Settings', roles: ['owner'] },
+  { path: '/recruiter/playbook', label: 'Playbook', roles: ['owner', 'recruiter'] },
+  { path: '/recruiter/overview', label: 'Overview', roles: ['owner', 'recruiter', 'reviewer', 'auditor'] },
+  { path: '/recruiter/applications', label: 'Applications', roles: ['owner', 'recruiter', 'reviewer'] },
+  { path: '/recruiter/communications', label: 'Communications', roles: ['owner', 'recruiter'] },
+  { path: '/recruiter/operations', label: 'Operations', roles: ['owner', 'recruiter'] },
+  { path: '/recruiter/compliance', label: 'Compliance', roles: ['owner', 'recruiter', 'auditor'] },
+  { path: '/recruiter/settings', label: 'Settings', roles: ['owner'] },
 ]
 export const canAccessAdmin = (path: string, role: Role) => adminSections.find(s => s.path === path)?.roles.includes(role) ?? false
 export function AdminNav({ role, scope }: { role: Role; scope: Scope }) {

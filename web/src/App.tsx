@@ -1,29 +1,16 @@
-import { Interviews } from './Interviews'
-import { PlaybookEditor } from './PlaybookEditor'
-import { ApplicationFilters } from './ApplicationFilters'
-import { canAccessAdmin } from './AdminNav'
 import { PrimaryNav, primarySections } from './PrimaryNav'
-import { AdminCommunications } from './AdminCommunications'
-import { OperationalDiagnostics } from './OperationalDiagnostics'
-import { ComplianceControls } from './ComplianceControls'
 import { mutationError } from './mutation-state'
 import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { LoadingState, ErrorState, NotFound, RouteBoundary, AccessDenied } from './route-ui'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { LoadingState, ErrorState, NotFound, RouteBoundary } from './route-ui'
+import { useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { ProShell, PageHeader, SignInButton, useAuth } from '@proappstore/sdk'
-import { app, read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
-import { ApplicationDetail } from './ApplicationDetail'
-import { Admin, CreateApplication, Setup } from './forms'
-import { button, date, field, panel } from './ui'
+import { app, read, write, type Role, type Run, type Workspace } from './api'
+import { Setup } from './forms'
+import { field, panel } from './ui'
 import { CandidateAccountPage } from './CandidateAccount'
 import { Jobs } from './Jobs'
 import { VacanciesIndexPage, VacancyDetailPage } from './Vacancies'
-import { VacancyManagement } from './VacancyManagement'
-
-type Work = { brand_id: string; requisitions: Requisition[]; members: Member[]; applications: Application[] }
-type Detail = { scope_key: string; application_id: string; notes: Note[]; drafts: Draft[]; communications: Communication[]; activities: AgentActivity[]; events: StageEvent[]; assignments: AssignmentEvent[]; audit: Audit[] }
-const emptyWork: Omit<Work, 'brand_id'> = { requisitions: [], members: [], applications: [] }
-const emptyDetail: Omit<Detail, 'application_id' | 'scope_key'> = { notes: [], drafts: [], communications: [], activities: [], events: [], assignments: [], audit: [] }
+import { OverviewScreen, VacanciesScreen, ApplicationsScreen, ApplicationScreen, CommunicationsScreen, PlaybookScreen, OperationsScreen, ComplianceScreen, SettingsScreen, RecruiterContext } from './RecruiterScreens'
 
 export default function App() {
   return <BrowserRouter><AppRoutes /></BrowserRouter>
@@ -35,35 +22,47 @@ function RouteFocus() {
 }
 function PublicShell() {
   const { user } = useAuth(app)
-  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink><NavLink to="/jobs">Jobs</NavLink>{user && <NavLink to="/my-applications">My Applications</NavLink>}<NavLink to="/dashboard">Switch to Recruiter Workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
+  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink><NavLink to="/jobs">Jobs</NavLink>{user && <NavLink to="/my-applications">My Applications</NavLink>}<NavLink to="/recruiter/overview">Switch to Recruiter Workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
 }
 function ProtectedShell() {
   const { user, loading } = useAuth(app)
   const location = useLocation()
   const navigate = useNavigate()
-  const [spaces, setSpaces] = useState<Workspace[]>([])
+  const [spaces, setSpaces] = useState<Workspace[] | null>(null)
+  const [spaceError, setSpaceError] = useState(false)
+  const reloadSpaces = useCallback(async () => { try { setSpaces(await read<Workspace>('list_my_workspaces')); setSpaceError(false) } catch { setSpaceError(true) } }, [])
   useEffect(() => {
-    if (!user) { setSpaces([]); return }
-    let cancelled = false
-    read<Workspace>('list_my_workspaces').then(rows => { if (!cancelled) setSpaces(rows) }).catch(() => { if (!cancelled) setSpaces([]) })
-    return () => { cancelled = true }
-  }, [user?.id])
+    if (!user) { setSpaces(null); return }
+    void reloadSpaces()
+  }, [user?.id, reloadSpaces])
   if (loading) return <LoadingState />
   if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
   const query = new URLSearchParams(location.search)
   const requestedOrg = query.get('organization_id')
   const requestedBrand = query.get('brand_id')
   const space = requestedOrg || requestedBrand
-    ? spaces.find(row => row.organization_id === requestedOrg && row.brand_id === requestedBrand)
-    : spaces[0]
+    ? spaces?.find(row => row.organization_id === requestedOrg && row.brand_id === requestedBrand)
+    : spaces?.[0]
   const scope = space && { organization_id: space.organization_id, brand_id: space.brand_id }
-  return <ProShell app={app} appName="hiring" branding="app" nav={space && scope ? primarySections(space.role).map(section => ({ label: section.label, href: section.path + '?' + new URLSearchParams(scope) })) : [{ label: 'Switch to Public Jobs', href: '/jobs' }]} onNavigate={navigate} renderNav={() => space && scope ? <PrimaryNav role={space.role} scope={scope} /> : <nav aria-label="Primary navigation"><Link className="inline-flex min-h-11 items-center px-3 text-sm underline" to="/jobs">Switch to Public Jobs</Link></nav>}><main id="route-content" tabIndex={-1}><Outlet /></main></ProShell>
+  const switchSpace = (brandId: string) => {
+    const next = spaces?.find(row => row.brand_id === brandId)
+    if (!next) return
+    const path = location.pathname.replace(/\/(applications|vacancies)\/[^/]+$/, '/$1')
+    navigate(path + '?' + new URLSearchParams({ organization_id: next.organization_id, brand_id: next.brand_id }))
+  }
+  return <ProShell app={app} appName="hiring" branding="app" nav={space && scope ? primarySections(space.role).map(section => ({ label: section.label, href: section.path + '?' + new URLSearchParams(scope) })) : [{ label: 'Switch to Public Jobs', href: '/jobs' }]} onNavigate={navigate} renderNav={() => space && scope ? <PrimaryNav role={space.role} scope={scope} /> : <nav aria-label="Primary navigation"><Link className="inline-flex min-h-11 items-center px-3 text-sm underline" to="/jobs">Switch to Public Jobs</Link></nav>}><main id="route-content" tabIndex={-1}><div className="mx-auto max-w-7xl px-4 py-8 md:px-8">{space && spaces && <div className="mb-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={space.brand_id} onChange={e => switchSpace(e.target.value)}>{spaces.map(row => <option key={row.organization_id + row.brand_id} value={row.brand_id}>{row.organization_name} / {row.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>}{spaceError ? <ErrorState retry={() => void reloadSpaces()}>Could not load workspaces.</ErrorState> : !spaces ? <LoadingState>Loading workspace…</LoadingState> : !space && (requestedBrand || requestedOrg) ? <NotFound /> : !space ? <SetupScreen reloadSpaces={reloadSpaces} /> : <RecruiterContext.Provider value={{ space, userId: user.id, reloadSpaces }}><Outlet /></RecruiterContext.Provider>}</div></main></ProShell>
+}
+function SetupScreen({ reloadSpaces }: { reloadSpaces: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const run: Run = async (name, params) => { setBusy(true); setError(''); try { await write(name, params); await reloadSpaces() } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
+  return <><PageHeader title="Recruiter workspace" />{error && <p role="alert">{error}</p>}<Setup busy={busy} run={run} /></>
 }
 function SignIn() {
   const { user, loading } = useAuth(app)
   const [query] = useSearchParams()
-  const target = query.get('returnTo') ?? '/dashboard'
-  const safeTarget = /^\/(admin|playbook|dashboard|applications|my-applications|apply)(\/|\?|$)/.test(target) ? target : '/dashboard'
+  const target = query.get('returnTo') ?? '/recruiter/overview'
+  const safeTarget = /^\/(recruiter|admin|playbook|dashboard|applications|my-applications|apply)(\/|\?|$)/.test(target) ? target : '/recruiter/overview'
   if (loading) return <LoadingState />
   if (user) return <Navigate replace to={safeTarget} />
   return <section className={panel}><h1 className="text-2xl font-semibold">Sign in to Hiring</h1><p className="my-4">Continue to your application or workspace.</p><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></section>
@@ -80,113 +79,39 @@ function CandidateAccount() {
   if (!user) return <Navigate replace to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)} />
   return <CandidateAccountPage key={user.id} userId={user.id} />
 }
-function StaffWorkspace() {
-  const { user } = useAuth(app)
+function Allowed({ roles, children }: { roles: Role[]; children: ReactNode }) {
+  const context = useContext(RecruiterContext)
+  return context && roles.includes(context.space.role) ? <>{children}</> : <NotFound />
+}
+function LegacyRedirect({ to, detail = false }: { to: string; detail?: boolean }) {
   const location = useLocation()
-  return user ? <WorkspaceView key={user.id + location.pathname + new URLSearchParams(location.search).get('organization_id') + new URLSearchParams(location.search).get('brand_id')} userId={user.id} /> : null
+  const { applicationId = '' } = useParams()
+  return <Navigate replace to={to + (detail ? '/' + encodeURIComponent(applicationId) : '') + location.search} />
 }
 export function AppRoutes() {
   const location = useLocation()
-  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' || location.pathname === '/applications' ? location.pathname : location.pathname + location.search}><Routes>
+  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' || location.pathname === '/recruiter/applications' ? location.pathname : location.pathname + location.search}><Routes>
     <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="my-applications" element={<CandidateAccount />} /><Route path="my-applications/:applicationId" element={<CandidateAccount />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
-    <Route element={<ProtectedShell />}><Route path="playbook" element={<StaffWorkspace />} /><Route path="dashboard" element={<StaffWorkspace />} /><Route path="admin" element={<StaffWorkspace />} /><Route path="admin/communications" element={<StaffWorkspace />} /><Route path="admin/operations" element={<StaffWorkspace />} /><Route path="admin/compliance" element={<StaffWorkspace />} /><Route path="admin/settings" element={<StaffWorkspace />} /><Route path="applications" element={<StaffWorkspace />} /><Route path="applications/:applicationId" element={<StaffWorkspace />} /><Route path="recruiter/vacancies" element={<StaffWorkspace />} /><Route path="recruiter/vacancies/:requisitionId" element={<StaffWorkspace />} /></Route>
+    <Route element={<ProtectedShell />}>
+      <Route path="recruiter/overview" element={<OverviewScreen />} />
+      <Route path="recruiter/vacancies" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
+      <Route path="recruiter/vacancies/:requisitionId" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
+      <Route path="recruiter/applications" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationsScreen /></Allowed>} />
+      <Route path="recruiter/applications/:applicationId" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationScreen /></Allowed>} />
+      <Route path="recruiter/communications" element={<Allowed roles={['owner','recruiter']}><CommunicationsScreen /></Allowed>} />
+      <Route path="recruiter/playbook" element={<Allowed roles={['owner','recruiter']}><PlaybookScreen /></Allowed>} />
+      <Route path="recruiter/operations" element={<Allowed roles={['owner','recruiter']}><OperationsScreen /></Allowed>} />
+      <Route path="recruiter/compliance" element={<Allowed roles={['owner','recruiter','auditor']}><ComplianceScreen /></Allowed>} />
+      <Route path="recruiter/settings" element={<Allowed roles={['owner']}><SettingsScreen /></Allowed>} />
+      <Route path="dashboard" element={<LegacyRedirect to="/recruiter/overview" />} />
+      <Route path="admin" element={<LegacyRedirect to="/recruiter/overview" />} />
+      <Route path="applications" element={<LegacyRedirect to="/recruiter/applications" />} />
+      <Route path="applications/:applicationId" element={<LegacyRedirect to="/recruiter/applications" detail />} />
+      <Route path="playbook" element={<LegacyRedirect to="/recruiter/playbook" />} />
+      <Route path="admin/communications" element={<LegacyRedirect to="/recruiter/communications" />} />
+      <Route path="admin/operations" element={<LegacyRedirect to="/recruiter/operations" />} />
+      <Route path="admin/compliance" element={<LegacyRedirect to="/recruiter/compliance" />} />
+      <Route path="admin/settings" element={<LegacyRedirect to="/recruiter/settings" />} />
+    </Route>
   </Routes></RouteBoundary></>
-}
-
-function WorkspaceView({ userId }: { userId: string }) {
-  const location = useLocation()
-  const adminPath = (location.pathname.startsWith('/admin') || location.pathname === '/playbook') ? location.pathname : ''
-  const [success, setSuccess] = useState('')
-  useEffect(() => { if (success) { const timer = setTimeout(() => setSuccess(''), 4000); return () => clearTimeout(timer) } }, [success])
-  const [spaces, setSpaces] = useState<Workspace[] | null>(null)
-  const [selected, setSelected] = useState<string>('')
-  const [work, setWork] = useState<Work | null>(null)
-  const { applicationId: activeId = '', requisitionId = '' } = useParams()
-  const navigate = useNavigate()
-  const [query] = useSearchParams()
-  const requestedBrand = query.get('brand_id')
-  const requestedOrg = query.get('organization_id')
-  const [workLoading, setWorkLoading] = useState(true)
-  const [workError, setWorkError] = useState('')
-  const [fallback, setFallback] = useState<{ id: string; candidate_name: string; requisition_title: string; stage: string } | null>(null)
-  const [detail, setDetail] = useState<Detail | null>(null)
-  const [detailFetch, setDetailFetch] = useState({ key: '', loading: false, error: '' })
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const workSeq = useRef(0)
-  const detailSeq = useRef(0)
-  const space = spaces?.find(s => s.brand_id === selected && (!requestedOrg || s.organization_id === requestedOrg))
-  const scope = space ? { organization_id: space.organization_id, brand_id: space.brand_id } : null
-  const detailKey = JSON.stringify([scope?.organization_id, scope?.brand_id, activeId])
-  const detailLoading = detailFetch.key !== detailKey || detailFetch.loading
-  const detailError = detailFetch.key === detailKey ? detailFetch.error : ''
-  // Data loaded for a previous workspace or application is never shown for the current one.
-  const { requisitions, members, applications } = work?.brand_id === selected ? work : emptyWork
-  const { notes, drafts, communications, activities, events, assignments, audit } = detail?.scope_key === detailKey ? detail : emptyDetail
-  const active = applications.find(a => a.id === activeId)
-  const reloadSpaces = useCallback(async () => { const rows = await read<Workspace>('list_my_workspaces'); setSpaces(rows); setSelected(old => requestedBrand ?? (rows.some(s => s.brand_id === old) ? old : rows[0]?.brand_id ?? '')) }, [requestedBrand])
-  const reloadWork = useCallback(async () => {
-    const seq = ++workSeq.current
-    if (!scope) return
-    setWorkLoading(true); setWorkError(''); setFallback(null)
-    if (location.pathname === '/dashboard') {
-      setWork({ brand_id: scope.brand_id, ...emptyWork })
-      setWorkLoading(false)
-      return
-    }
-    try {
-    const [r, m, a] = await Promise.all([read<Requisition>('list_requisitions', scope), read<Member>('list_workspace_members', scope), activeId ? read<Application>('get_application', { ...scope, application_id: activeId }) : location.pathname === '/applications' || space?.role === 'auditor' ? Promise.resolve([]) : read<Application>('list_applications', scope)])
-    if (seq === workSeq.current) {
-      setWork({ brand_id: scope.brand_id, requisitions: r, members: m, applications: a })
-      if (activeId && !a.some(row => row.id === activeId)) {
-        const rows = await read<{ id: string; candidate_name: string; requisition_title: string; stage: string }>('gateway_get_application', { ...scope, application_id: activeId })
-        if (seq === workSeq.current) setFallback(rows[0] ?? null)
-      }
-    }
-    } catch { if (seq === workSeq.current) setWorkError('Could not load applications.') }
-    finally { if (seq === workSeq.current) setWorkLoading(false) }
-  }, [space?.organization_id, space?.brand_id, space?.role, activeId, location.pathname])
-  const reloadDetail = useCallback(async () => {
-    const seq = ++detailSeq.current
-    if (!scope || !activeId) return
-    const key = JSON.stringify([scope.organization_id, scope.brand_id, activeId])
-    setDetailFetch({ key, loading: true, error: '' })
-    const p = { ...scope, application_id: activeId }
-    try {
-      const [n, d, c, x, e, h, a] = await Promise.all([read<Note>('list_application_notes', p), read<Draft>('list_communication_drafts', p), read<Communication>('list_application_communications', p), read<AgentActivity>('list_application_agent_activity', p), read<StageEvent>('list_stage_events', p), read<AssignmentEvent>('list_assignment_events', p), read<Audit>('list_application_audit', p)])
-      if (seq === detailSeq.current) setDetail({ scope_key: key, application_id: activeId, notes: n, drafts: d, communications: c, activities: x, events: e, assignments: h, audit: a })
-    } catch {
-      if (seq === detailSeq.current) setDetailFetch({ key, loading: false, error: 'Could not load communications.' })
-    } finally {
-      if (seq === detailSeq.current) setDetailFetch(old => ({ ...old, loading: false }))
-    }
-  }, [space?.organization_id, space?.brand_id, activeId])
-  const loadSpaces = useCallback(() => { setLoading(true); setError(''); reloadSpaces().catch(e => setError(String(e))).finally(() => setLoading(false)) }, [reloadSpaces])
-  useEffect(loadSpaces, [loadSpaces])
-  useEffect(() => { reloadWork().catch(e => setError(String(e))) }, [reloadWork])
-  useEffect(() => { reloadDetail().catch(e => setError(String(e))) }, [reloadDetail])
-  const run: Run = async (name, params) => {
-    setBusy(true); setError(''); setSuccess('')
-    try { await write(name, params); await reloadSpaces(); await reloadWork(); await reloadDetail(); setSuccess('Action saved successfully.') }
-    catch (e) { setError(mutationError(e)) }
-    finally { setBusy(false) }
-  }
-  return <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-    <PageHeader title="Recruiter workspace" description="Private sourcing, pipeline notes and unsent communications." />
-    <p className="mt-2 text-xs text-[var(--muted)]">Your PAS staff ID: <code>{userId}</code></p>
-    {success && <p role="status">{success}</p>}
-    {error && <p role="alert" className="mt-5 rounded-lg border border-[var(--danger)] p-3 text-sm text-[var(--danger)]">{error}</p>}
-    {loading ? <p role="status" className="mt-6">Loading workspace…</p> : !spaces ? <button type="button" className={button + ' mt-6'} onClick={loadSpaces}>Retry loading workspaces</button> : !space && (requestedBrand || activeId) ? <NotFound /> : !space ? <Setup busy={busy} run={run} /> : <>
-      <div className="my-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={selected} onChange={e => { const path = activeId ? '/applications' : requisitionId ? '/recruiter/vacancies' : location.pathname; navigate(path + '?' + new URLSearchParams({ brand_id: e.target.value, organization_id: spaces.find(s => s.brand_id === e.target.value)!.organization_id })) }}>{spaces.map(s => <option value={s.brand_id} key={s.brand_id}>{s.organization_name} / {s.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>
-      {adminPath && !canAccessAdmin(adminPath, space.role) ? <AccessDenied /> : location.pathname === '/applications' && space.role === 'auditor' ? <AccessDenied /> : location.pathname.startsWith('/recruiter/vacancies') && space.role !== 'owner' && space.role !== 'recruiter' ? <AccessDenied /> : adminPath === '/playbook' ? <PlaybookEditor key={space.organization_id + space.role} organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /> : adminPath === '/admin/settings' ? <Admin onChanged={reloadSpaces} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} /> : adminPath === '/admin/operations' ? <OperationalDiagnostics key={selected} scope={scope!} /> : adminPath === '/admin/compliance' ? <ComplianceControls role={space.role} /> : workLoading ? <LoadingState>Loading applications…</LoadingState> : workError ? <ErrorState retry={() => void reloadWork()}>{workError}</ErrorState> : adminPath === '/admin/communications' ? <AdminCommunications key={selected} scope={scope!} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /> : location.pathname === '/dashboard' ? <section className={panel}><h2 className="text-xl font-semibold">Overview</h2><p className="mt-2 text-sm">{space.organization_name} / {space.brand_name}</p><p className="mt-2 text-sm">Your role: {space.role}</p></section> : location.pathname.startsWith('/recruiter/vacancies') ? <div className="space-y-5"><h2 className="text-xl font-semibold">Vacancies</h2><VacancyManagement key={selected + requisitionId} scope={scope!} role={space.role as 'owner' | 'recruiter'} requisitions={requisitions} selectedRequisitionId={requisitionId} /></div> : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
-        <div className="space-y-6">{!requisitionId && (space.role === 'owner' || space.role === 'recruiter') && <CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />}
-          {!requisitionId && (location.pathname === '/applications' ? <ApplicationFilters key={JSON.stringify([scope, space.role])} space={space} requisitions={requisitions} members={members} /> : <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <Link key={a.id} to={'/applications/' + encodeURIComponent(a.id) + '?' + new URLSearchParams(scope!)} aria-label={`Open ${a.candidate_name} application`} className={'block min-h-[44px] w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></Link>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>)}
-          {location.pathname === '/admin' && (space.role === 'owner' || space.role === 'recruiter') && <VacancyManagement key={selected + requisitionId} scope={scope!} role={space.role} requisitions={requisitions} selectedRequisitionId={requisitionId} />}
-          {location.pathname === '/admin' && <Admin onChanged={async () => { await reloadSpaces(); await reloadWork(); await reloadDetail() }} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} />}
-        </div>
-        {!requisitionId && <div>{active ? <ApplicationDetail role={space.role} brandName={space.brand_name} detailLoading={detailLoading} detailError={detailError} retryDetail={() => void reloadDetail()} key={active.id} a={active} scope={scope!} members={members} notes={notes} drafts={drafts} communications={communications} activities={activities} events={events} assignments={assignments} audit={audit} busy={busy} run={run} /> : activeId ? <><Interviews key={detailKey} scope={scope!} applicationId={activeId} emptyState={!fallback ? <NotFound /> : undefined} />{fallback ? <section className={panel}><h2>{fallback.candidate_name}</h2><p>{fallback.requisition_title} · {stageLabel(fallback.stage)}</p><p>This record provides a restricted summary. Your role does not permit full contact or history access.</p></section> : null}</> : <section className={panel}><h2 className="font-semibold">Application details</h2><p className="mt-2 text-sm text-[var(--muted)]">Select an application to see its history, communications and agent activity.</p></section>}</div>}
-      </div>}
-    </>}
-  </div>
 }
