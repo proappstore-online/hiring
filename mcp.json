@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "get_hiring_runtime_gate",
-      "description": "Read the public Hiring intake availability gate. An authorised brand owner can change it with set_hiring_runtime_gate.",
+      "description": "Read the public Hiring intake availability gate. An authorised owner or recruiter can change it with set_hiring_runtime_gate.",
       "operation": "query",
       "sql": "SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1",
       "params": {},
@@ -10,7 +10,7 @@
     },
     {
       "name": "set_hiring_runtime_gate",
-      "description": "Owner-only, audited control for opening or closing authenticated candidate application intake. Opening requires a recent passkey verification.",
+      "description": "Audited control for opening or closing authenticated candidate application intake. Brand owners and recruiters may operate it.",
       "operation": "batch",
       "params": {
         "organization_id": {
@@ -27,9 +27,8 @@
         }
       },
       "requires_auth": true,
-      "step_up": true,
       "statements": [
-        "UPDATE hiring_runtime_gate SET intake_status=:intake_status,reason_code=CASE WHEN :intake_status='open' THEN 'owner_authorized' ELSE 'owner_closed' END,updated_at=:__now WHERE id=1 AND :intake_status IN ('open','closed') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)",
+        "UPDATE hiring_runtime_gate SET intake_status=:intake_status,reason_code=CASE WHEN :intake_status='open' THEN 'staff_authorized' ELSE 'staff_closed' END,updated_at=:__now WHERE id=1 AND :intake_status IN ('open','closed') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,NULL,CASE WHEN :intake_status='open' THEN 'intake.opened' ELSE 'intake.closed' END,:__user_id,:operation_id,:__now,'runtime_gate','1',CASE WHEN :intake_status='open' THEN 'Authenticated candidate intake enabled' ELSE 'Candidate intake disabled' END WHERE changes()=1"
       ]
     },
@@ -829,7 +828,7 @@
     },
     {
       "name": "publish_job_requisition",
-      "description": "Publish immutable job and notice snapshot. Brand owner and recent app passkey step-up required; never use a model confirmation flag.",
+      "description": "Publish immutable job and notice snapshot. Brand owners and recruiters can publish approved content.",
       "operation": "batch",
       "params": {
         "requisition_id": {
@@ -872,10 +871,9 @@
       },
       "requires_auth": true,
       "statements": [
-        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,compensation_type,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,coalesce(:compensation_type,'unspecified'),:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id) AND coalesce(:compensation_type,'unspecified') IN ('unspecified','paid','unpaid','internship','volunteer') AND NOT EXISTS (SELECT 1 FROM hiring_requisition_reviews v WHERE v.requisition_id=r.id AND (v.state!='pending_review' OR v.payload!=json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified'))))",
+        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,compensation_type,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,coalesce(:compensation_type,'unspecified'),:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id) AND coalesce(:compensation_type,'unspecified') IN ('unspecified','paid','unpaid','internship','volunteer') AND NOT EXISTS (SELECT 1 FROM hiring_requisition_reviews v WHERE v.requisition_id=r.id AND (v.state!='pending_review' OR v.payload!=json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified'))))",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.published',:__user_id,:operation_id,:__now WHERE changes()=1"
-      ],
-      "step_up": true
+      ]
     },
     {
       "name": "close_job_requisition",
@@ -1559,7 +1557,7 @@
         }
       },
       "statements": [
-        "INSERT INTO hiring_requisition_reviews(requisition_id,state,payload,actor_user_id) SELECT :requisition_id,:state,json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')),:__user_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :state IN ('draft','pending_review') AND :compensation_type IN ('paid','unpaid','internship','volunteer') AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 2000 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 2000 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 2000 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT version FROM hiring_requisition_reviews WHERE requisition_id=r.id),0) ON CONFLICT(requisition_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,actor_user_id=excluded.actor_user_id,version=version+1",
+        "INSERT INTO hiring_requisition_reviews(requisition_id,state,payload,actor_user_id) SELECT :requisition_id,:state,json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')),:__user_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :state IN ('draft','pending_review') AND :compensation_type IN ('paid','unpaid','internship','volunteer') AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 2000 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 2000 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 2000 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT version FROM hiring_requisition_reviews WHERE requisition_id=r.id),0) ON CONFLICT(requisition_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,actor_user_id=excluded.actor_user_id,version=version+1",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.review_saved',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
       ]
     },

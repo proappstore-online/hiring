@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from './route-ui'
 import { button, date, field, panel } from './ui'
 
 type ManagedVacancy = { id: string; title: string; state: string; updated_at: number }
-export function VacancyManagement({ scope, role, requisitions }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[] }) {
+export function VacancyManagement({ scope, requisitions }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[] }) {
   const [rows, setRows] = useState<ManagedVacancy[]>([])
   const [selected, setSelected] = useState('')
   const [loading, setLoading] = useState(true)
@@ -25,7 +25,7 @@ export function VacancyManagement({ scope, role, requisitions }: { scope: Scope;
   return <section className={panel}><h2 className="text-xl font-semibold">Vacancy Management</h2><p className="my-3 text-sm">Draft → in review → published → paused → closed. Showing the most recent 100 requisitions.</p>
     {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><button aria-pressed={selected === r.id} className={button + ' w-full text-left'} onClick={() => setSelected(r.id)}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></button></li>)}</ul>}
     {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
-      {role === 'owner' ? <PublishJob key={'publication:' + vacancy.id} scope={scope} requisitions={requisitions.filter(r => r.id === vacancy.id)} onChanged={load} /> : <p>Brand owners review and publish vacancies with a passkey. Save the PD draft for owner review.</p>}
+      <PublishJob key={'publication:' + vacancy.id} scope={scope} requisitions={requisitions.filter(r => r.id === vacancy.id)} onChanged={load} />
     </div>}
   </section>
 }

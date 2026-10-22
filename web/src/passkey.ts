@@ -13,7 +13,7 @@ export async function registerPublicationPasskey() {
   if (!credential) throw new Error('Passkey registration cancelled.')
   const response = credential.response as AuthenticatorAttestationResponse
   const publicKey = response.getPublicKey()
-  if (!publicKey) throw new Error('This authenticator cannot register a publication passkey.')
+  if (!publicKey) throw new Error('This authenticator cannot register a passkey.')
   await post('register', { id: credential.id, clientDataJSON: encode(response.clientDataJSON), authenticatorData: encode(response.getAuthenticatorData()), publicKey: encode(publicKey), publicKeyAlgorithm: response.getPublicKeyAlgorithm() })
 }
 export async function verifyPublicationPasskey() {

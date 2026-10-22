@@ -42,30 +42,28 @@ function fixture({ open = true } = {}) {
 }
 const counts = db => ['hiring_candidates','hiring_applications','hiring_intake_receipts','hiring_consent_records','hiring_stage_events','hiring_audit_events'].map(t => db.prepare(`SELECT count(*) AS n FROM ${t}`).get().n)
 
-test('publication requires exact brand ownership and platform passkey step-up', () => {
+test('publication requires an exact brand owner or recruiter grant', () => {
   const { db, call } = fixture()
   try {
-    assert.equal(tool('publish_job_requisition').step_up, true)
-    assert.equal(tool('close_job_requisition').step_up, true)
-    for (const user of ['staff-a','staff-b','worker','outsider']) assert.deepEqual(call('publish_job_requisition',user,publication()), [0,0])
-    assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), requisition_id: B.requisition_id }), [0,0])
+    assert.equal(tool('publish_job_requisition').step_up, undefined)
+    for (const user of ['staff-b','worker','outsider']) assert.deepEqual(call('publish_job_requisition',user,publication()), [0,0])
+    assert.deepEqual(call('publish_job_requisition','staff-a',{ ...publication(), requisition_id: B.requisition_id }), [0,0])
     assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), notice_text: '' }), [0,0])
-    assert.deepEqual(call('publish_job_requisition','owner',publication()), [1,1])
+    assert.deepEqual(call('publish_job_requisition','staff-a',publication()), [1,1])
     assert.deepEqual(call('publish_job_requisition','owner',publication()), [0,0])
     assert.equal(db.prepare('SELECT status FROM hiring_requisitions WHERE id=?').get(A.requisition_id).status, 'draft')
     assert.throws(() => db.exec("UPDATE hiring_job_publications SET notice_text='changed'"), /immutable/)
-    assert.equal(db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE action='requisition.published'").get().actor_user_id, 'owner')
+    assert.equal(db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE action='requisition.published'").get().actor_user_id, 'staff-a')
   } finally { db.close() }
 })
 
-test('only a brand owner can open or close the audited intake gate', () => {
+test('only a scoped owner or recruiter can open or close the audited intake gate', () => {
   const { db, call } = fixture({ open: false })
   try {
     const change = { ...A, intake_status: 'open', operation_id: 'intake-open' }
-    assert.equal(tool('set_hiring_runtime_gate').step_up, true)
-    assert.deepEqual(call('set_hiring_runtime_gate', 'staff-a', change), [0, 0])
+    assert.equal(tool('set_hiring_runtime_gate').step_up, undefined)
+    assert.deepEqual(call('set_hiring_runtime_gate', 'staff-a', change), [1, 1])
     assert.deepEqual(call('set_hiring_runtime_gate', 'outsider', change), [0, 0])
-    assert.deepEqual(call('set_hiring_runtime_gate', 'owner', change), [1, 1])
     assert.equal(db.prepare('SELECT intake_status FROM hiring_runtime_gate WHERE id=1').get().intake_status, 'open')
     assert.equal(db.prepare("SELECT action FROM hiring_audit_events WHERE operation_id='intake-open'").get().action, 'intake.opened')
     assert.deepEqual(call('set_hiring_runtime_gate', 'owner', change), [0, 0])
@@ -240,15 +238,14 @@ test('new action SQL has declared params, authenticated writes, no identity inpu
   }
 })
 
-test('staged review binds exact content and classification with versioned owner approval', () => {
+test('staged review binds exact content and classification with versioned staff approval', () => {
   const { db, call } = fixture()
   const draft = { ...publication(), compensation_type: 'unpaid', expected_version: 0, state: 'draft', operation_id: 'draft-save' }
-  assert.deepEqual(call('save_requisition_review','staff-a',draft), [0,0])
+  assert.deepEqual(call('save_requisition_review','staff-a',draft), [1,1])
   assert.deepEqual(call('save_requisition_review','owner',{ ...draft, requisition_id:B.requisition_id }), [0,0])
-  assert.deepEqual(call('save_requisition_review','owner',draft), [1,1])
-  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, operation_id:'stale' }), [0,0])
+  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, operation_id:'stale' }), [0,0])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [0,0])
-  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, state:'pending_review', expected_version:1, operation_id:'review-submit' }), [1,1])
+  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, state:'pending_review', expected_version:1, operation_id:'review-submit' }), [1,1])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid', notice_text:'changed notice' }), [0,0])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [1,1])
   assert.equal(call('get_public_job',null,A)[0].compensation_type,'unpaid')

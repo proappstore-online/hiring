@@ -16,6 +16,7 @@ window.read=async(name,params)=>{window.calls.push({name,params});if(window.fail
 case'list_communication_templates':return window.templates;
 case'list_vacancy_management':return[{id:'req',title:'Engineer',state:'draft',updated_at:1000}];
 case'get_pd_draft':return[];
+case'get_requisition_review':return[{version:1,payload:JSON.stringify({description:'Reviewed content',location:'Remote',arrangement:'Remote volunteer role',compensation:'Unpaid',notice_version:'v1',notice_text:'Applicant privacy notice',contact:'admin@example.test',compensation_type:'volunteer'})}];
 case'list_job_publications':return[{requisition_id:'req',title:'Engineer',version:1,status:'published'}];
 case'get_admin_settings':return[{organization_name:'Organization',brand_name:'Brand',can_manage_organization:0}];
 case'list_brand_admin_members':return[{id:'grant',user_id:'staff',role:'recruiter',scope_type:'brand',scope_id:'brand',granted_at:1000,source:'grant'}];
@@ -70,12 +71,9 @@ test('Administration UI permissions, confirmations, operational states and mobil
  await page.getByRole('button',{name:'Edit Greeting'}).click();await expect(page.getByLabel('Template body',{exact:true})).toHaveValue('Thank you');await page.evaluate(()=>window.conflict=true);await page.getByRole('button',{name:'Save template changes'}).click();await expect(page.getByRole('alert')).toContainText('Conflict or access changed')
  await page.evaluate(()=>{window.conflict=false;window.show('templates','reviewer')});await expect(page.getByRole('button',{name:'Create template'})).toHaveCount(0)
  })
- await t.test('publication confirmation, cancellation, success and conflict',async()=>{
- await page.evaluate(()=>{window.calls=[];window.show('vacancies')});await page.getByRole('button',{name:/Engineer draft/}).click();await page.getByRole('button',{name:'Pause',exact:true}).click();await expect(page.getByRole('dialog',{name:'Pause job'})).toBeVisible();assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='pause_job_requisition').length),0)
- await page.keyboard.press('Escape');await page.getByRole('button',{name:'Pause',exact:true}).click();await page.getByRole('button',{name:'Confirm availability change'}).click();await expect(page.getByText('Job availability updated.')).toBeVisible()
- for(const label of ['Job description','Location','Arrangement, duties, duration and supervision','Compensation and expenses','Organization contact','Privacy notice version','Candidate privacy notice (include retention and optional consent purposes)'])await page.getByLabel(label,{exact:true}).fill('Reviewed content')
- await page.getByLabel('Action',{exact:true}).selectOption('publish');await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Save form',exact:true}).click();await expect(page.getByRole('dialog',{name:'Publish job'})).toBeVisible();assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='publish_job_requisition').length),0);await page.getByRole('button',{name:'Confirm availability change'}).click();await expect(page.getByText('Job published. Applications will be accepted once intake opens.')).toBeVisible()
- await page.evaluate(()=>window.conflict=true);await page.getByRole('button',{name:'Close job',exact:true}).click();await page.getByRole('button',{name:'Confirm availability change'}).click();await expect(page.getByRole('alert')).toContainText('Conflict or access changed');await page.evaluate(()=>window.conflict=false)
+ await t.test('vacancy publication is one staff-controlled action',async()=>{
+ await page.evaluate(()=>{window.calls=[];window.show('vacancies')});await page.getByRole('button',{name:/Engineer draft/}).click();await page.getByRole('button',{name:'Publish & open applications'}).click();await expect(page.getByText('Published and accepting applications.')).toBeVisible()
+ assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>['save_requisition_review','publish_job_requisition','set_hiring_runtime_gate'].includes(c.name)).map(c=>c.name)),['save_requisition_review','publish_job_requisition','set_hiring_runtime_gate'])
  })
  await t.test('revocation confirmation, success, narrow capability and mobile layout',async()=>{
  await page.evaluate(()=>{window.calls=[];window.show('settings')});await page.getByText('Manage staff grants',{exact:true}).click();await page.getByRole('button',{name:'Revoke',exact:true}).click();assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='revoke_workspace_grant').length),0);await page.getByRole('button',{name:'Revoke grant',exact:true}).click();await expect(page.getByRole('status')).toContainText('Administration saved successfully')

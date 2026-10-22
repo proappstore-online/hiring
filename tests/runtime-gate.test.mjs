@@ -48,10 +48,10 @@ test('only the guarded owner action can change intake and no anonymous candidate
       } else {
         if (tool.name === 'set_hiring_runtime_gate') {
           assert.equal(tool.requires_auth, true)
-          assert.equal(tool.step_up, true)
+          assert.equal(tool.step_up, undefined)
           if (/UPDATE\s+hiring_runtime_gate/i.test(sql)) {
             assert.match(sql, /hiring_effective_access/)
-            assert.match(sql, /p\.role='owner'/)
+            assert.match(sql, /p\.role IN \('owner','recruiter'\)/)
           }
         } else assert.doesNotMatch(sql, /(?:UPDATE|INTO|DELETE FROM)\s+hiring_runtime_gate\b/i, tool.name)
         if (['list_public_jobs', 'get_public_job', 'list_vacancies', 'get_vacancy_detail'].includes(tool.name)) {

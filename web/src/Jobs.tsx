@@ -1,4 +1,3 @@
-import { ConfirmDialog } from './ConfirmDialog'
 import { mutationError } from './mutation-state'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState, EmptyState, ErrorState, NotFound } from './route-ui'
@@ -6,37 +5,31 @@ import { useEffect, useRef, useState } from 'react'
 import { SignInButton } from '@proappstore/sdk'
 import { app, id, read, readPublic, write, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
 import { CandidateApplications, applicationLink } from './CandidateAccount'
-import { Form, MultilineField, TextField, button, field, panel, val } from './ui'
+import { Form, TextField, button, field, panel, val } from './ui'
 import { DiscoveryFilters } from './DiscoveryFilters'
-import { registerPublicationPasskey, verifyPublicationPasskey } from './passkey'
 
 export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; requisitions: Requisition[]; onChanged?: () => Promise<void> }) {
-  const [pending, setPending] = useState<null | { title: string; task: () => Promise<void> }>(null)
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [reviewVersion, setReviewVersion] = useState(0)
-  const [reviewAction, setReviewAction] = useState('draft')
   const [message, setMessage] = useState('')
-  useEffect(() => { if (message && !failed) { const timer = setTimeout(() => setMessage(''), 4000); return () => clearTimeout(timer) } }, [message, failed])
-  const [intakeStatus, setIntakeStatus] = useState<'open' | 'closed'>('closed')
-  const [publications, setPublications] = useState<{ requisition_id: string; title: string; version: number; status: string }[]>([])
-  async function reload() {
-    const [publicationRows, gate] = await Promise.all([
-      read<{ requisition_id: string; title: string; version: number; status: string }>('list_job_publications', scope),
-      readPublic<{ intake_status: 'open' | 'closed' }>('get_hiring_runtime_gate')
-    ])
-    setPublications(publicationRows)
-    setIntakeStatus(gate[0]?.intake_status ?? 'closed')
+  const requisition = requisitions[0]
+  async function publishAndOpen() {
+    if (!requisition) return
+    setBusy(true); setMessage(''); setFailed(false)
+    try {
+      const review = (await read<{ version: number; payload: string }>('get_requisition_review', { ...scope, requisition_id: requisition.id }))[0]
+      if (!review) throw new Error('Add the job details before publishing.')
+      const content = JSON.parse(review.payload) as Record<string, string>
+      const details = { ...scope, requisition_id: requisition.id, description: content.description, location: content.location, arrangement: content.arrangement, compensation: content.compensation, notice_version: content.notice_version, notice_text: content.notice_text, contact: content.contact, compensation_type: content.compensation_type }
+      await write('save_requisition_review', { ...details, state: 'pending_review', expected_version: review.version, operation_id: id() })
+      await write('publish_job_requisition', { ...details, operation_id: id() })
+      await write('set_hiring_runtime_gate', { ...scope, intake_status: 'open', operation_id: id() })
+      await onChanged?.()
+      setMessage('Published and accepting applications.')
+    } catch (e) { setFailed(true); setMessage(mutationError(e)) }
+    finally { setBusy(false) }
   }
-  useEffect(() => { reload().catch(() => setMessage('Publication states could not be loaded.')) }, [scope.organization_id, scope.brand_id])
-  async function act(task: () => Promise<void>) { setBusy(true); setMessage(''); setFailed(false); try { await task(); await onChanged?.() } catch (e) { setFailed(true); setMessage(mutationError(e)) } finally { setBusy(false) } }
-  function confirm(title: string, task: () => Promise<void>) { setPending({ title, task }) }
-  return <section className={panel}>{pending && <ConfirmDialog title={pending.title} body="This changes public job availability. Review the selected requisition and privacy notice before confirming. Intake gates remain enforced." confirmLabel="Confirm availability change" onCancel={() => setPending(null)} onConfirm={() => { const task = pending.task; setPending(null); void act(task) }} />}<h2 className="font-semibold">Publish a job</h2><p className="mt-2 text-sm">Only a brand owner can publish. Review the job, arrangement and privacy notice, then verify with your passkey.</p><div className="mt-3 flex gap-3"><button className={button} disabled={busy} onClick={() => act(async () => { await registerPublicationPasskey(); setMessage('Passkey registered.') })}>Register passkey</button><button className={button} disabled={busy} onClick={() => act(async () => { await verifyPublicationPasskey(); setMessage('Identity verified. Review and publish within five minutes.') })}>Verify with passkey</button></div>
-    <section className="mt-4 rounded-lg border border-[var(--line)] p-3"><h3 className="font-medium">Application intake</h3><p className="mt-1 text-sm">Status: <strong>{intakeStatus === 'open' ? 'Open' : 'Closed'}</strong>. This controls authenticated candidate submissions; published jobs remain visible while intake is closed.</p><button className={button + ' mt-3'} disabled={busy} onClick={() => confirm(intakeStatus === 'open' ? 'Close application intake' : 'Open application intake', async () => { const next = intakeStatus === 'open' ? 'closed' : 'open'; await write('set_hiring_runtime_gate', { ...scope, intake_status: next, operation_id: id() }); setIntakeStatus(next); setMessage(next === 'open' ? 'Application intake is open.' : 'Application intake is closed.') })}>{intakeStatus === 'open' ? 'Close application intake' : 'Open application intake'}</button></section>
-    <Form busy={busy} onSubmit={f => (reviewAction === 'publish' ? (task: () => Promise<void>) => confirm('Publish job', task) : act)(async () => { await write(reviewAction === 'publish' ? 'publish_job_requisition' : 'save_requisition_review', { ...(reviewAction === 'publish' ? {} : { state: reviewAction, expected_version: reviewVersion }), compensation_type: val(f, 'compensation_type'), ...scope, requisition_id: val(f, 'requisition_id'), description: val(f, 'description'), location: val(f, 'location'), arrangement: val(f, 'arrangement'), compensation: val(f, 'compensation'), notice_version: val(f, 'notice_version'), notice_text: val(f, 'notice_text'), contact: val(f, 'contact'), operation_id: id() }); await reload(); if (reviewAction !== 'publish') { const rows = await read<{ version: number }>('get_requisition_review', { ...scope, requisition_id: val(f, 'requisition_id') }); setReviewVersion(rows[0]?.version ?? 0) }; setMessage(reviewAction === 'publish' ? 'Job published. Applications will be accepted once intake opens.' : 'Review saved.') })}>
-      <button type="button" className={button} disabled={busy} onClick={e => { const form = e.currentTarget.form!; const requisition_id = new FormData(form).get('requisition_id'); void act(async () => { const rows = await read<{ version: number; payload: string }>('get_requisition_review', { ...scope, requisition_id }); const row = rows[0]; setReviewVersion(row?.version ?? 0); if (row) { const values = JSON.parse(row.payload) as Record<string, string>; for (const [name, value] of Object.entries(values)) { const input = form.elements.namedItem(name); if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement || input instanceof HTMLSelectElement) input.value = value }; setMessage('Saved content loaded for review.') } }) }}>Load saved review</button>
-      <label className="block text-sm">Requisition<select name="requisition_id" className={field} required onChange={() => setReviewVersion(0)}>{requisitions.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}</select></label><MultilineField name="description" label="Job description" /><TextField name="location" label="Location" /><MultilineField name="arrangement" label="Arrangement, duties, duration and supervision" /><label>Compensation classification<select name="compensation_type" className={field}><option value="paid">Paid</option><option value="unpaid">Unpaid</option><option value="internship">Internship</option><option value="volunteer">Volunteer</option></select></label><TextField name="compensation" label="Compensation and expenses" /><TextField name="contact" label="Organization contact" /><TextField name="notice_version" label="Privacy notice version" /><MultilineField name="notice_text" label="Candidate privacy notice (include retention and optional consent purposes)" /><label>Action<select aria-label="Action" className={field} value={reviewAction} onChange={e => setReviewAction(e.target.value)}><option value="draft">Save draft</option><option value="pending_review">Submit for review</option><option value="publish">Approve and publish</option></select></label><label className="block text-sm"><input type="checkbox" required /> I have reviewed this public job and notice and authorize publication.</label>
-    </Form><p role={failed ? 'alert' : 'status'} className="mt-3 text-sm">{message}</p>{failed && <button className={button} onClick={() => void act(reload)}>Reload publication state</button>}<ul>{publications.map(p => <li className="mt-3" key={p.requisition_id}>{p.title} · {p.status}{p.status !== 'closed' && <><button className={button + ' ml-3'} disabled={busy} onClick={() => confirm(p.status === 'paused' ? 'Resume job' : 'Pause job', async () => { await write(p.status === 'paused' ? 'resume_job_requisition' : 'pause_job_requisition', { ...scope, requisition_id: p.requisition_id, expected_version: p.version, operation_id: id() }); await reload(); setMessage('Job availability updated.') })}>{p.status === 'paused' ? 'Resume' : 'Pause'}</button></>}{p.status !== 'closed' && <button className={button + ' ml-3'} disabled={busy} onClick={() => confirm('Close job', async () => { await write('close_job_requisition', { ...scope, requisition_id: p.requisition_id, expected_version: p.version, operation_id: id() }); await reload(); setMessage('Job closed.') })}>Close job</button>}</li>)}</ul></section>
+  return <section className={panel}><h2 className="font-semibold">Publish vacancy</h2><p className="mt-2 text-sm">Owners and recruiters can publish this prepared vacancy and open applications.</p><button className={button + ' mt-3'} disabled={busy || !requisition} onClick={() => void publishAndOpen()}>{busy ? 'Publishing…' : 'Publish & open applications'}</button><p role={failed ? 'alert' : 'status'} className="mt-3 text-sm">{message || (!requisition ? 'Select a vacancy first.' : '')}</p></section>
 }
 
 export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list' | 'detail' | 'apply' }) {
