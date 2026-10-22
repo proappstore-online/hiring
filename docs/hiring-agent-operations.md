@@ -255,3 +255,10 @@ not currently provider-idempotent: after a timeout inspect Sent/thread evidence 
 retry; never automatically resend an uncertain send. Keep the epic open until both paths'
 actual receipts and limitations are recorded and the owner chooses the operating path.
 
+
+## Organisation playbook integration (#79)
+
+For future agent onboarding, use the [versioned playbook read contract and
+bootstrap](agent-playbook-contract.md). The existing live-state observations and
+grants above do not establish playbook discovery, access or schema-1 deployment.
+This repository change does not modify the canonical instance or its instructions.
