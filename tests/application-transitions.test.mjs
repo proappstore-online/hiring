@@ -24,7 +24,6 @@ function fixture() {
         const binds = []
         const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { binds.push(params[key]); return '?' })
         assert.ok(binds.every(v => v !== undefined), `${name}: missing param`)
-        if (tool.operation !== 'query' && /^SELECT /i.test(sql)) { db.prepare(sql).all(...binds); continue }
         result.push(tool.operation === 'query' ? db.prepare(sql).all(...binds) : db.prepare(sql).run(...binds).changes)
       }
       db.exec('COMMIT')

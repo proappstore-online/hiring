@@ -24,7 +24,6 @@ function fixture() {
         const binds = []
         const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { binds.push(params[key]); return '?' })
         assert.ok(binds.every(v => v !== undefined), `${name}: missing param`)
-        if (tool.operation !== 'query' && /^SELECT /i.test(sql)) { Object.defineProperty(result, 'record', { value: db.prepare(sql).all(...binds), configurable: true }); continue }
         result.push(tool.operation === 'query' ? db.prepare(sql).all(...binds) : db.prepare(sql).run(...binds).changes)
       }
       db.exec('COMMIT')
@@ -126,13 +125,13 @@ test('cross-brand IDs, revoked grants, stale operations and audit outages are de
 
 test('exact retries return committed records, conflicting replays never claim another action succeeded',()=>{
  const f=ready();try{
- const replay=f.call('save_offer_draft','staff-a',draft);assert.equal(replay.record[0].version,1)
- assert.deepEqual(f.call('save_offer_draft','staff-a',{...draft,terms_json:terms.replace('Paid','Different')}).record,[])
+ f.call('save_offer_draft','staff-a',draft);assert.equal(f.call('get_offer_draft_result','staff-a',draft)[0].version,1)
+ assert.deepEqual(f.call('get_offer_draft_result','staff-a',{...draft,terms_json:terms.replace('Paid','Different')}),[])
  step(f,'submit_offer_for_approval')
  const submitted=f.db.prepare("SELECT * FROM hiring_offer_approval_events WHERE event_type='submitted'").get()
  const args={offer_id:offer(f).id,tenant_id:'org-a',brand_id:'brand-a',expected_version:submitted.lock_version,operation_id:submitted.operation_id}
- assert.equal(f.call('submit_offer_for_approval','staff-a',args).record[0].event_type,'submitted')
- assert.deepEqual(f.call('approve_offer','staff-a',args).record,[])
+ assert.equal(f.call('get_offer_submission_result','staff-a',args)[0].event_type,'submitted')
+ assert.deepEqual(f.call('get_offer_approval_result','staff-a',args),[])
  assert.equal(offer(f).status,'pending_approval')
  }finally{f.db.close()}
 })
@@ -165,4 +164,8 @@ test('actual sibling grants, reviewer assignments and suspended organizations co
  assert.deepEqual(f.call('get_offer','staff-a',args),[])
  assert.ok(f.call('submit_offer_for_approval','staff-a',args).every(n=>n===0))
  }finally{f.db.close()}
+})
+
+test('registered mutation batches contain only deployable write statements',()=>{
+ for(const t of tools.filter(t=>t.operation==='batch')) for(const statement of t.statements) assert.match(statement,/^(INSERT|UPDATE|DELETE)\s/i,t.name)
 })

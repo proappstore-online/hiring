@@ -158,12 +158,16 @@ platform step-up. The existing stage-change and general queue actions now also
 require it. Draft capture and scoped history reads do not. The UI uses the existing
 passkey enrollment/verification flow and displays exact terms before confirmation.
 
-Mutations end with a SELECT of the committed record. Exact operation retries return
-that record without appending evidence again; conflicting replays return no record
-or fail constraints. All reads/replays recheck current access. Mutation counts of
+Mutation batches contain writes only, as required by PAS registration. Each has
+a separate scoped `get_*_result` readback action with the same original arguments:
+`get_decision_result`, `get_offer_draft_result`, `get_offer_submission_result`,
+`get_offer_approval_result`, `get_offer_revocation_result`, and
+`get_offer_dispatch_result`. The browser write helper uses these to return the
+committed record after success or an exact retry, without appending evidence again.
+Conflicting replays return no record or fail constraints. All reads/replays recheck current access. Mutation counts of
 zero alone never establish success. SQL batches commit business records and
 redacted audit together. Audit failures roll back the entire operation. Reuse the
-same operation key after an uncertain response and inspect the returned record;
+same operation key after an uncertain response and inspect its scoped readback record;
 do not create a replacement offer/job to bypass an unknown provider outcome.
 
 Local tests execute registered SQL with PAS-style parameter binding; they do not

@@ -28,14 +28,20 @@ type Params = Record<string, unknown>
 /** Runs a write action, refreshes the workspace and reports failures in the UI. */
 export type Run = (name: string, params: Params) => void
 type Rows<T> = { rows: T[] }
-type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: number }; rows?: { operation_id?: string }[] }[] }
+type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: number } }[] }
 
 export const id = () => crypto.randomUUID()
 export const read = async <T,>(name: string, params: Params = {}) => (await app.actions.call<Rows<T>>(name, params)).rows
+const mutationReadbacks: Record<string, string> = {"record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
 export const write = async (name: string, params: Params) => {
   const result = await app.actions.call<Write>(name, params)
   const changes = result.results?.at(-1)?.meta?.changes ?? result.meta?.changes ?? 0
-  if (changes < 1 && !result.results?.at(-1)?.rows?.some(row => row.operation_id === params.operation_id)) throw new Error('No record changed. Refresh the workspace and check your access or form details.')
+  if (mutationReadbacks[name]) {
+    const rows = await read<{ operation_id: string }>(mutationReadbacks[name], params)
+    if (rows[0]?.operation_id === params.operation_id) return rows[0]
+    throw new Error('Action could not be confirmed. Refresh and check the current state.')
+  }
+  if (changes < 1) throw new Error('No record changed. Refresh the workspace and check your access or form details.')
 }
 
 export type PublicJob = Scope & { requisition_id: string; title: string; brand_name: string; organization_name: string; location: string; description: string; arrangement: string; compensation: string; contact: string; notice_version: string; notice_text: string; version: number }

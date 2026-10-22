@@ -13,10 +13,18 @@
       "description": "Owner-only, audited control for opening or closing authenticated candidate application intake. Opening requires a recent passkey verification.",
       "operation": "batch",
       "params": {
-        "organization_id": { "type": "string" },
-        "brand_id": { "type": "string" },
-        "intake_status": { "type": "string" },
-        "operation_id": { "type": "string" }
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "intake_status": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
       },
       "requires_auth": true,
       "step_up": true,
@@ -2341,8 +2349,7 @@
         "INSERT INTO hiring_decisions SELECT :operation_id,:tenant_id,:brand_id,a.requisition_id,a.id,:__user_id,(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1),:disposition,COALESCE(:rationale,''),:__now,a.version,COALESCE(a.stage_extension,a.stage),:operation_id FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND a.requisition_id=:requisition_id AND a.version=:expected_version AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1)) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
         "UPDATE hiring_applications SET stage=CASE WHEN :disposition='deferred' THEN stage ELSE :disposition END,stage_extension=CASE WHEN :disposition='deferred' THEN stage_extension ELSE NULL END,version=version+1,updated_at=:__now WHERE id=:application_id AND changes()=1 AND organization_id=:tenant_id AND brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_decisions d WHERE d.operation_id=:operation_id AND d.application_id=hiring_applications.id AND d.actor_id=:__user_id AND d.application_version=:expected_version)",
         "INSERT INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:tenant_id,:brand_id,a.id,(SELECT from_stage FROM hiring_decisions WHERE operation_id=:operation_id AND actor_id=:__user_id),COALESCE(a.stage_extension,a.stage),a.version,COALESCE(:rationale,''),:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND changes()=1",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'decision.recorded',:__user_id,:operation_id,:__now,:operation_id,'hiring_decisions',:operation_id,'decision.recorded' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_decisions WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_decisions r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.application_id=:application_id AND r.requisition_id=:requisition_id AND r.disposition=:disposition AND r.rationale=COALESCE(:rationale,'') AND r.application_version=:expected_version AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'decision.recorded',:__user_id,:operation_id,:__now,:operation_id,'hiring_decisions',:operation_id,'decision.recorded' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_decisions WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
     },
     {
@@ -2394,8 +2401,7 @@
       "statements": [
         "INSERT INTO hiring_offers(id,tenant_id,brand_id,requisition_id,application_id,created_at,updated_at,operation_id) SELECT :__uuid,:tenant_id,:brand_id,a.requisition_id,a.id,:__now,:__now,:operation_id FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND a.requisition_id=:requisition_id AND :expected_version=0 AND a.stage NOT IN ('hired','rejected','withdrawn') AND NOT EXISTS(SELECT 1 FROM hiring_offers WHERE application_id=a.id) AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
         "INSERT INTO hiring_offer_versions SELECT :operation_id,o.id,:tenant_id,:brand_id,a.requisition_id,a.id,o.current_version+1,:terms_json,:__now,:__user_id,:operation_id FROM hiring_offers o JOIN hiring_applications a ON a.id=o.application_id WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND a.requisition_id=:requisition_id AND o.tenant_id=:tenant_id AND o.brand_id=:brand_id AND o.status='draft' AND o.lock_version=:expected_version AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.draft_saved',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_versions',:operation_id,'offer.draft_saved' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_versions WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_offer_versions r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.application_id=:application_id AND r.requisition_id=:requisition_id AND r.terms_json=:terms_json AND r.version=:expected_version+1 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.draft_saved',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_versions',:operation_id,'offer.draft_saved' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_versions WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
     },
     {
@@ -2435,8 +2441,7 @@
       "step_up": true,
       "statements": [
         "INSERT INTO hiring_offer_approval_events SELECT :operation_id,o.id,:tenant_id,:brand_id,a.requisition_id,a.id,:__user_id,(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1),'submitted',:__now,:note,o.current_version,o.lock_version,:operation_id FROM hiring_offers o JOIN hiring_applications a ON a.id=o.application_id WHERE o.id=:offer_id AND o.tenant_id=:tenant_id AND o.brand_id=:brand_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1)) AND o.lock_version=:expected_version AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.submitted',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.submitted' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='submitted' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.submitted',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.submitted' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
     },
     {
@@ -2476,8 +2481,7 @@
       "step_up": true,
       "statements": [
         "INSERT INTO hiring_offer_approval_events SELECT :operation_id,o.id,:tenant_id,:brand_id,a.requisition_id,a.id,:__user_id,(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1),'approved',:__now,:note,o.current_version,o.lock_version,:operation_id FROM hiring_offers o JOIN hiring_applications a ON a.id=o.application_id WHERE o.id=:offer_id AND o.tenant_id=:tenant_id AND o.brand_id=:brand_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1)) AND o.lock_version=:expected_version AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.approved',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.approved' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='approved' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.approved',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.approved' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
     },
     {
@@ -2517,8 +2521,7 @@
       "step_up": true,
       "statements": [
         "INSERT INTO hiring_offer_approval_events SELECT :operation_id,o.id,:tenant_id,:brand_id,a.requisition_id,a.id,:__user_id,(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1),'revoked',:__now,:note,o.current_version,o.lock_version,:operation_id FROM hiring_offers o JOIN hiring_applications a ON a.id=o.application_id WHERE o.id=:offer_id AND o.tenant_id=:tenant_id AND o.brand_id=:brand_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=(SELECT p.role FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) ORDER BY p.role LIMIT 1)) AND o.lock_version=:expected_version AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.revoked',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.revoked' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='revoked' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.revoked',:__user_id,:operation_id,:__now,:operation_id,'hiring_offer_approval_events',:operation_id,'offer.revoked' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_offer_approval_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
     },
     {
@@ -2598,9 +2601,219 @@
       "step_up": true,
       "statements": [
         "INSERT INTO hiring_outbox_authorizations SELECT :operation_id,o.id,:tenant_id,:brand_id,a.id,o.current_version,o.lock_version,:draft_id,:__now,:__user_id,:operation_id FROM hiring_offers o JOIN hiring_applications a ON a.id=o.application_id WHERE o.id=:offer_id AND o.tenant_id=:tenant_id AND o.brand_id=:brand_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND (:authorized_by IS NULL OR :authorized_by=:__user_id) AND o.lock_version=:expected_version AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.dispatch_authorized',:__user_id,:operation_id,:__now,:operation_id,'hiring_outbox_authorizations',:operation_id,'offer.dispatch_authorized' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_outbox_authorizations WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)",
-        "SELECT r.* FROM hiring_outbox_authorizations r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.authorized_by=:__user_id AND r.offer_id=:offer_id AND r.draft_id=:draft_id AND r.lock_version=:expected_version AND (:authorized_by IS NULL OR :authorized_by=:__user_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:tenant_id,:brand_id,a.id,'offer.dispatch_authorized',:__user_id,:operation_id,:__now,:operation_id,'hiring_outbox_authorizations',:operation_id,'offer.dispatch_authorized' FROM hiring_applications a WHERE a.id=(SELECT application_id FROM hiring_outbox_authorizations WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:tenant_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id)"
       ]
+    },
+    {
+      "name": "get_decision_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "actor_role": {
+          "type": "string",
+          "optional": true
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_decisions r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.application_id=:application_id AND r.requisition_id=:requisition_id AND r.disposition=:disposition AND r.rationale=COALESCE(:rationale,'') AND r.application_version=:expected_version AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "get_offer_draft_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "terms_json": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_offer_versions r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.application_id=:application_id AND r.requisition_id=:requisition_id AND r.terms_json=:terms_json AND r.version=:expected_version+1 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "get_offer_submission_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "offer_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "actor_role": {
+          "type": "string",
+          "optional": true
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='submitted' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "get_offer_approval_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "offer_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "actor_role": {
+          "type": "string",
+          "optional": true
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='approved' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "get_offer_revocation_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "offer_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "actor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "actor_role": {
+          "type": "string",
+          "optional": true
+        },
+        "note": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_offer_approval_events r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.actor_id=:__user_id AND r.offer_id=:offer_id AND r.event_type='revoked' AND r.lock_version=:expected_version AND r.note IS :note AND (:actor_id IS NULL OR :actor_id=:__user_id) AND (:actor_role IS NULL OR :actor_role=r.actor_role) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "get_offer_dispatch_result",
+      "description": "Read exact committed operation result after a write or retry; current scoped access and original arguments required.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "offer_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "authorized_by": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT r.* FROM hiring_outbox_authorizations r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.authorized_by=:__user_id AND r.offer_id=:offer_id AND r.draft_id=:draft_id AND r.lock_version=:expected_version AND (:authorized_by IS NULL OR :authorized_by=:__user_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
     }
   ]
 }

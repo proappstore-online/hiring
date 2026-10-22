@@ -104,7 +104,7 @@ test('internal LinkedIn workflow is scoped, audited, and never sends', () => {
   assert.equal(call('list_communication_drafts', 'outsider', draft).length, 0)
   assert.equal(call('list_application_audit', 'staff-a', draft).length, 4)
   assert.equal(call('list_application_audit', 'outsider', draft).length, 0)
-  assert.equal(tools.some(t => /send|dispatch/i.test(t.name) && t.name !== 'authorize_offer_dispatch'), false)
+  assert.equal(tools.some(t => /send|dispatch/i.test(t.name) && t.operation !== 'query' && t.name !== 'authorize_offer_dispatch'), false)
 })
 
 test('authorized LinkedIn create accepts the bare host and makes an application visible', () => {
