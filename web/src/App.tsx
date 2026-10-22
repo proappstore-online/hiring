@@ -1,3 +1,4 @@
+import { ApplicationFilters } from './ApplicationFilters'
 import { AdminNav, canAccessAdmin } from './AdminNav'
 import { AdminCommunications } from './AdminCommunications'
 import { OperationalDiagnostics } from './OperationalDiagnostics'
@@ -65,11 +66,11 @@ function CandidateAccount() {
 function StaffWorkspace() {
   const { user } = useAuth(app)
   const location = useLocation()
-  return user ? <WorkspaceView key={user.id + location.pathname + location.search} userId={user.id} /> : null
+  return user ? <WorkspaceView key={user.id + location.pathname + new URLSearchParams(location.search).get('organization_id') + new URLSearchParams(location.search).get('brand_id')} userId={user.id} /> : null
 }
 export function AppRoutes() {
   const location = useLocation()
-  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' ? location.pathname : location.pathname + location.search}><Routes>
+  return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' || location.pathname === '/applications' ? location.pathname : location.pathname + location.search}><Routes>
     <Route element={<PublicShell />}><Route index element={<PublicJobs />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="jobs" element={<PublicJobs />} /><Route path="jobs/:jobId" element={<PublicJobs mode="detail" />} /><Route path="apply/:jobId" element={<PublicJobs mode="apply" />} /><Route path="my-applications" element={<CandidateAccount />} /><Route path="my-applications/:applicationId" element={<CandidateAccount />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}><Route path="dashboard" element={<StaffWorkspace />} /><Route path="admin" element={<StaffWorkspace />} /><Route path="admin/communications" element={<StaffWorkspace />} /><Route path="admin/operations" element={<StaffWorkspace />} /><Route path="admin/compliance" element={<StaffWorkspace />} /><Route path="admin/settings" element={<StaffWorkspace />} /><Route path="applications" element={<StaffWorkspace />} /><Route path="applications/:applicationId" element={<StaffWorkspace />} /></Route>
   </Routes></RouteBoundary></>
@@ -113,7 +114,7 @@ function WorkspaceView({ userId }: { userId: string }) {
     if (!scope) return
     setWorkLoading(true); setWorkError(''); setFallback(null)
     try {
-    const [r, m, a] = await Promise.all([read<Requisition>('list_requisitions', scope), read<Member>('list_workspace_members', scope), read<Application>('list_applications', scope)])
+    const [r, m, a] = await Promise.all([read<Requisition>('list_requisitions', scope), read<Member>('list_workspace_members', scope), location.pathname === '/applications' ? Promise.resolve([]) : read<Application>('list_applications', scope)])
     if (seq === workSeq.current) {
       setWork({ brand_id: scope.brand_id, requisitions: r, members: m, applications: a })
       if (activeId && !a.some(row => row.id === activeId)) {
@@ -160,7 +161,7 @@ function WorkspaceView({ userId }: { userId: string }) {
       <AdminNav role={space.role} scope={scope!} />
       {adminPath && !canAccessAdmin(adminPath, space.role) ? <AccessDenied /> : adminPath === '/admin/settings' ? <Admin onChanged={reloadSpaces} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} /> : adminPath === '/admin/operations' ? <OperationalDiagnostics key={selected} scope={scope!} /> : adminPath === '/admin/compliance' ? <ComplianceControls role={space.role} /> : workLoading ? <LoadingState>Loading applications…</LoadingState> : workError ? <ErrorState retry={() => void reloadWork()}>{workError}</ErrorState> : adminPath === '/admin/communications' ? <AdminCommunications key={selected} scope={scope!} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /> : <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,1.1fr)]">
         <div className="space-y-6">{(space.role === 'owner' || space.role === 'recruiter') && <CreateApplication key={members.map(m => m.user_id).join()} scope={scope!} requisitions={requisitions} members={members} userId={userId} busy={busy} run={run} />}
-          <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <Link key={a.id} to={'/applications/' + encodeURIComponent(a.id) + '?' + new URLSearchParams(scope!)} aria-label={`Open ${a.candidate_name} application`} className={'block min-h-[44px] w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></Link>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>
+          {location.pathname === '/applications' ? <ApplicationFilters key={JSON.stringify([scope, space.role])} space={space} requisitions={requisitions} members={members} /> : <section className={panel}><h2 className="text-lg font-semibold">Applications</h2><p className="mt-1 text-xs text-[var(--muted)]">{applications.length} recent records</p><div className="mt-4 space-y-2">{applications.length ? applications.map(a => <Link key={a.id} to={'/applications/' + encodeURIComponent(a.id) + '?' + new URLSearchParams(scope!)} aria-label={`Open ${a.candidate_name} application`} className={'block min-h-[44px] w-full rounded-lg border p-3 text-left text-sm hover:border-[var(--accent)] ' + (a.id === activeId ? 'border-[var(--accent)]' : 'border-[var(--line)]')}><span className="font-semibold">{a.candidate_name}</span><span className="float-right text-xs">{stageLabel(a.stage)}</span><span className="block text-xs text-[var(--muted)]">{a.requisition_title} · {date(a.updated_at)}</span></Link>) : <p className="text-sm text-[var(--muted)]">No applications yet.</p>}</div></section>}
           {(space.role === 'owner' || space.role === 'recruiter') && <VacancyManagement key={selected} scope={scope!} role={space.role} requisitions={requisitions} />}
           <Admin onChanged={async () => { await reloadSpaces(); await reloadWork(); await reloadDetail() }} scope={scope!} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} />
         </div>

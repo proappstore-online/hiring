@@ -140,13 +140,37 @@
       "name": "list_applications",
       "description": "list applications",
       "operation": "query",
-      "sql": "SELECT a.id,a.stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id JOIN hiring_requisitions r ON r.id=a.requisition_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) ORDER BY a.updated_at DESC LIMIT 100",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND (:stage IS NULL OR a.stage=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC LIMIT 100",
       "params": {
         "organization_id": {
           "type": "string"
         },
         "brand_id": {
           "type": "string"
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "assignee": {
+          "type": "string",
+          "optional": true
+        },
+        "source": {
+          "type": "string",
+          "optional": true
+        },
+        "date_from": {
+          "type": "integer",
+          "optional": true
+        },
+        "date_to": {
+          "type": "integer",
+          "optional": true
         }
       },
       "requires_auth": true
@@ -674,7 +698,7 @@
       "name": "gateway_list_applications",
       "description": "Gateway: paginated, redacted applications for a granted brand. Keyset cursor (cursor_at, cursor_id); 25 per page; no contact details or free text",
       "operation": "query",
-      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25",
+      "sql": "SELECT a.id,a.requisition_id,a.stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) AND (:stage IS NULL OR a.stage=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25",
       "params": {
         "organization_id": {
           "type": "string"
@@ -688,6 +712,30 @@
         },
         "cursor_id": {
           "type": "string",
+          "optional": true
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "assignee": {
+          "type": "string",
+          "optional": true
+        },
+        "source": {
+          "type": "string",
+          "optional": true
+        },
+        "date_from": {
+          "type": "integer",
+          "optional": true
+        },
+        "date_to": {
+          "type": "integer",
           "optional": true
         }
       },
