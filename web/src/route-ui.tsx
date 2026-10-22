@@ -10,3 +10,5 @@ export class RouteBoundary extends Component<{ children: ReactNode }, { failed: 
   static getDerivedStateFromError() { return { failed: true } }
   render() { return this.state.failed ? <ErrorState retry={() => window.location.reload()}>Something went wrong while displaying this page.</ErrorState> : this.props.children }
 }
+
+export function AccessDenied() { return <section role="alert" className="p-6"><h1 className="text-2xl font-semibold">Access denied</h1><p>Your current workspace role does not permit this section. Ask the organization creator or brand owner to review your grants.</p></section> }

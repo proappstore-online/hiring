@@ -1,3 +1,4 @@
+import { mutationError } from './mutation-state'
 import { useEffect, useRef, useState } from 'react'
 import { id, read, write, type Requisition, type Scope } from './api'
 import { PublishJob } from './Jobs'
@@ -36,6 +37,8 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
   const [loadError, setLoadError] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { if (message && !failed) { const timer = setTimeout(() => setMessage(''), 4000); return () => clearTimeout(timer) } }, [message, failed])
   const seq = useRef(0)
   const params = { ...scope, requisition_id: requisitionId }
   async function load() {
@@ -53,7 +56,7 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
   useEffect(() => { void load(); return () => { ++seq.current } }, [scope.organization_id, scope.brand_id, requisitionId])
   function payload() { return Object.fromEntries(Object.keys(PD_FIELDS).map(key => [key, ['responsibilities','requirements'].includes(key) ? JSON.stringify((values[key] ?? '').split('\n').map(v => v.trim()).filter(Boolean)) : values[key] ?? ''])) }
   async function save(showPreview: boolean) {
-    setBusy(true); setMessage(''); setPreview(null)
+    setBusy(true); setMessage(''); setFailed(false); setPreview(null)
     try {
       let current = record
       if (!locked) {
@@ -64,7 +67,7 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
       }
       if (showPreview) { const rows = await read<PDRecord>('previewPD', params); setPreview(rows[0] ?? null); setMessage(rows.length ? 'Preview loaded.' : 'No structured PD is saved.') }
       else setMessage(`PD draft saved, version ${current?.version}. Publication content must be reviewed again before publishing.`)
-    } catch (e) { setMessage(e instanceof Error ? e.message : 'PD could not be saved.'); }
+    } catch (e) { setFailed(true); setMessage(mutationError(e)); }
     finally { setBusy(false) }
   }
   if (loading) return <LoadingState>Loading PD draft…</LoadingState>
@@ -72,6 +75,6 @@ function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; req
   return <section className="space-y-4"><h3 className="text-lg font-semibold">Structured Position Description</h3><p>{locked ? 'Published content is immutable. Create a new requisition for revisions.' : 'All fields are optional. Preview saves a version first; publication requires owner review. Use one item per line for responsibilities and requirements.'}</p>
     <form onSubmit={e => { e.preventDefault(); void save(false) }} className="space-y-3"><fieldset disabled={busy || locked} className="space-y-3">{Object.entries(PD_FIELDS).map(([key,label]) => <label className="block" key={key}>{label}<textarea className={field} rows={3} maxLength={20000} value={values[key] ?? ''} onChange={e => { setValues(old => ({ ...old, [key]: e.target.value })); setPreview(null) }} /></label>)}</fieldset>
       {!locked && <button className={button} disabled={busy} type="submit">Save PD Draft</button>} <button type="button" className={button} disabled={busy} onClick={() => void save(true)}>{locked ? 'Preview saved PD' : 'Save and preview PD'}</button>
-    </form><p role="status">{message}</p>{preview && <section aria-label="Position Description preview" className={panel}><h3 className="font-semibold">Preview — version {preview.version}</h3><PositionDescription pd={parsePD(preview.payload)} /><button className={button} onClick={() => setPreview(null)}>Close preview</button></section>}
+    </form><p role={failed ? 'alert' : 'status'}>{message}</p>{preview && <section aria-label="Position Description preview" className={panel}><h3 className="font-semibold">Preview — version {preview.version}</h3><PositionDescription pd={parsePD(preview.payload)} /><button className={button} onClick={() => setPreview(null)}>Close preview</button></section>}
   </section>
 }
