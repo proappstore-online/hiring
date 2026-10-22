@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { readPublic, type PublicJob } from './api'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
-import { parsePD, PositionDescription } from './position-description'
+import { parsePD, PD_FIELDS, PositionDescription } from './position-description'
 import { DiscoveryFilters } from './DiscoveryFilters'
 import { button, field, panel } from './ui'
 
@@ -84,13 +84,32 @@ export function VacancyDetailPage() {
   if (loading) return <LoadingState>Loading vacancy…</LoadingState>
   if (error) return <ErrorState retry={() => void load()}>Vacancy could not be loaded.</ErrorState>
   if (!row) return <NotFound>This vacancy is unavailable or no longer open.</NotFound>
+  const job = row
   const pd = parsePD(row.pd_json)
-  async function copy() {
+  async function copyLink() {
     try { await navigator.clipboard.writeText(new URL(vacancyLink(row!), window.location.origin).href); setFeedback('Link copied.') }
     catch { setFeedback('Could not copy the link. Copy the address from your browser.') }
   }
+  async function copyJD() {
+    const sections = Object.entries(PD_FIELDS).flatMap(([key, label]) => {
+      const value = pd[key as keyof typeof pd]
+      if (!value || (Array.isArray(value) ? !value.some(item => item.trim()) : !value.trim())) return []
+      return [`${label}\n${Array.isArray(value) ? value.filter(item => item.trim()).map(item => `- ${item}`).join('\n') : value}`]
+    })
+    const text = [
+      job.title,
+      `${job.organization_name} / ${job.brand_name}`,
+      `Location: ${job.location}`,
+      sections.length ? sections.join('\n\n') : job.description,
+      `Working arrangement\n${job.arrangement}`,
+      `Compensation\n${job.compensation}`,
+      `Contact\n${job.contact}`,
+    ].filter(Boolean).join('\n\n')
+    try { await navigator.clipboard.writeText(text); setFeedback('Full job description copied.') }
+    catch { setFeedback('Could not copy the job description. Select and copy the text on this page.') }
+  }
   return <article className="mx-auto max-w-3xl space-y-6 py-6"><Link className="underline" to="/vacancies">All vacancies</Link><h1 className="text-3xl font-semibold">{row.title}</h1><p>{row.organization_name} / {row.brand_name} · {row.location}</p>
-    <button className={button} onClick={() => void copy()}>Copy vacancy link</button><p role="status">{feedback}</p>
+    <div className="flex flex-wrap gap-2"><button className={button} onClick={() => void copyJD()}>Copy job description</button><button className={button} onClick={() => void copyLink()}>Copy vacancy link</button></div><p role="status">{feedback}</p>
     <PositionDescription pd={Object.keys(pd).length ? pd : { overview: row.description, workingArrangement: row.arrangement, compensation: row.compensation, privacyContact: row.contact }} />
     <p>Contact: {row.contact}</p><section><h2 className="text-lg font-semibold">Candidate privacy notice — {row.notice_version}</h2><p className="whitespace-pre-wrap">{row.notice_text}</p></section>
     {available ? <Link className={button + ' inline-flex min-h-[44px] items-center'} to={'/apply/' + encodeURIComponent(row.requisition_id) + '?' + new URLSearchParams({ organization_id: row.organization_id, brand_id: row.brand_id })}>Apply for this vacancy</Link> : <p role="status">Applications are not open yet. Please check back later.</p>}
