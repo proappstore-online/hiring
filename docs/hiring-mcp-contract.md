@@ -64,3 +64,10 @@ Retain records indefinitely without an automatic purge; explicit rights/deletion
 ## Issue #3 action additions
 
 Public `list_public_jobs` / `get_public_job` expose approved published snapshots only. Owner publication/closure require platform passkey step-up. Authenticated worker-profile, submission, receipt and attachment actions derive identity from `:__user_id`; they do not grant staff permissions. Submission requires the runtime gate open; no registered action opens it. Attachments stay pending and no user-callable scan verdict or byte-download capability exists. Exact contracts and remaining #3 release gates: [candidate intake](candidate-intake.md).
+
+## Organisation playbooks
+
+The org-only `get_org_recruiting_playbook` action uses `organization_id` without a
+brand argument. Its schema version, grants, secret redaction and fail-closed agent
+behavior are defined in [the agent playbook contract](agent-playbook-contract.md).
+Its raw rows are not the generic gateway envelope described above.

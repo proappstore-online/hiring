@@ -1945,7 +1945,7 @@
     },
     {
       "name": "get_org_recruiting_playbook",
-      "description": "Return the latest organisation recruiting playbook to authorised owners/recruiters, including agents granted recruiter access; secret_* and meeting_password fields are redacted recursively server-side",
+      "description": "Read contract schema_version=1: latest versioned organisation recruiting playbook for authenticated owners/recruiters (agents need recruiter grants). All readers receive recursive secret_* / meeting_password redaction. Version 0 means unconfigured; no rows means unavailable/denied. Stop policy-dependent activity on either fallback. See docs/agent-playbook-contract.md.",
       "operation": "query",
       "requires_auth": true,
       "params": {
@@ -1953,7 +1953,7 @@
           "type": "string"
         }
       },
-      "sql": "WITH RECURSIVE latest AS (SELECT version,payload,updated_at,actor_user_id FROM hiring_org_playbooks WHERE organization_id=:organization_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY version DESC LIMIT 1), secrets AS (SELECT fullkey,ROW_NUMBER() OVER (ORDER BY length(fullkey) DESC,fullkey) AS n FROM latest,json_tree(latest.payload) WHERE typeof(key)='text' AND (substr(lower(key),1,7)='secret_' OR lower(key)='meeting_password')), redacted(n,payload) AS (SELECT 0,payload FROM latest UNION ALL SELECT s.n,json_remove(r.payload,s.fullkey) FROM redacted r JOIN secrets s ON s.n=r.n+1) SELECT l.version,r.payload,l.updated_at,l.actor_user_id,NULL AS message FROM latest l JOIN redacted r ON r.n=(SELECT count(*) FROM secrets) UNION ALL SELECT 0,NULL,NULL,NULL,'No playbook configured' WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND NOT EXISTS (SELECT 1 FROM latest)"
+      "sql": "WITH RECURSIVE latest AS (SELECT version,payload,updated_at,actor_user_id FROM hiring_org_playbooks WHERE organization_id=:organization_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY version DESC LIMIT 1), secrets AS (SELECT fullkey,ROW_NUMBER() OVER (ORDER BY length(fullkey) DESC,fullkey) AS n FROM latest,json_tree(latest.payload) WHERE typeof(key)='text' AND (substr(lower(key),1,7)='secret_' OR lower(key)='meeting_password')), redacted(n,payload) AS (SELECT 0,payload FROM latest UNION ALL SELECT s.n,json_remove(r.payload,s.fullkey) FROM redacted r JOIN secrets s ON s.n=r.n+1) SELECT 1 AS schema_version,l.version,r.payload,l.updated_at,l.actor_user_id,NULL AS message FROM latest l JOIN redacted r ON r.n=(SELECT count(*) FROM secrets) UNION ALL SELECT 1,0,NULL,NULL,NULL,'No playbook configured' WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND NOT EXISTS (SELECT 1 FROM latest)"
     },
     {
       "name": "save_org_recruiting_playbook",

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hiring:org-playbook-read:1",
+  "title": "get_org_recruiting_playbook rows, schema version 1",
+  "type": "array",
+  "maxItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["schema_version", "version", "payload", "updated_at", "actor_user_id", "message"],
+    "properties": {
+      "schema_version": { "const": 1 },
+      "version": { "type": "integer", "minimum": 0 },
+      "payload": { "type": ["string", "null"], "description": "JSON object encoded as text, recursively redacted by the server" },
+      "updated_at": { "type": ["integer", "null"], "minimum": 0 },
+      "actor_user_id": { "type": ["string", "null"] },
+      "message": { "type": ["string", "null"] }
+    },
+    "oneOf": [
+      { "properties": { "version": { "const": 0 }, "payload": { "type": "null" }, "updated_at": { "type": "null" }, "actor_user_id": { "type": "null" }, "message": { "const": "No playbook configured" } } },
+      { "properties": { "version": { "minimum": 1 }, "payload": { "type": "string" }, "updated_at": { "type": "integer" }, "actor_user_id": { "type": "string", "minLength": 1 }, "message": { "type": "null" } } }
+    ]
+  }
+}

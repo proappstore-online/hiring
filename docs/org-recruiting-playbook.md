@@ -123,3 +123,10 @@ applications need no new fields and show “No working interview recorded”.
 
 Delivery is stacked on `feat/org-recruiting-playbook-77` (PR #80), references #78
 and parent #76, and preserves the #74 pipeline-filter work. No merge or deployment.
+
+## Agent read contract (#79)
+
+Registered reads now include `schema_version: 1` independently of the stored policy
+`version`. See [the agent integration contract](agent-playbook-contract.md) for the
+machine-readable response schema, tested caller adapter, bootstrap and operational
+migration guidance. No live agent configuration has been changed.
