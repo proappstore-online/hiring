@@ -131,3 +131,41 @@ they do not claim a live D1 or provider probe.
 
 The interview list includes its active `assignment_id` for explicit scorecard
 ownership. Full validation and lifecycle: [domain model](domain-model.md#structured-scorecards-23).
+
+## Decisions and offers (#24)
+
+Root `mcp.json` is the action registry; there is no `contracts/mcp.json`.
+All new actions require authentication and exact tenant/brand/requisition access.
+Every mutation requires a fresh `operation_id`. Actor/time/role are server-derived;
+optional actor claims are equality checks, never authorization. System identities
+are denied. Human actions use the existing platform `step_up: true` passkey gate;
+no `human_confirmed` boolean is trusted. This gate is enforced by PAS, outside SQL.
+
+| Action | Parameters beyond tenant_id/brand_id |
+| --- | --- |
+| `record_decision` | requisition_id, application_id, disposition, rationale?, expected_version, actor_id?, actor_role?, operation_id |
+| `list_application_decisions` | application_id; up to 100 records |
+| `save_offer_draft` | requisition_id, application_id, terms_json, expected_version, operation_id |
+| `submit_offer_for_approval` | offer_id, expected_version, actor_id?, actor_role?, note?, operation_id |
+| `approve_offer` | offer_id, expected_version, actor_id?, actor_role?, note?, operation_id |
+| `revoke_offer` | offer_id, expected_version, actor_id?, actor_role?, note?, operation_id |
+| `get_offer` | offer_id? and/or application_id?; at least one is required |
+| `list_offer_versions` | offer_id, before_version?; up to 50 descending revisions |
+| `authorize_offer_dispatch` | offer_id, draft_id, expected_version, authorized_by?, operation_id |
+
+Decision, submission, approval, revocation and dispatch authorization require
+platform step-up. The existing stage-change and general queue actions now also
+require it. Draft capture and scoped history reads do not. The UI uses the existing
+passkey enrollment/verification flow and displays exact terms before confirmation.
+
+Mutations end with a SELECT of the committed record. Exact operation retries return
+that record without appending evidence again; conflicting replays return no record
+or fail constraints. All reads/replays recheck current access. Mutation counts of
+zero alone never establish success. SQL batches commit business records and
+redacted audit together. Audit failures roll back the entire operation. Reuse the
+same operation key after an uncertain response and inspect the returned record;
+do not create a replacement offer/job to bypass an unknown provider outcome.
+
+Local tests execute registered SQL with PAS-style parameter binding; they do not
+perform live platform authentication ceremonies or provider sends. Existing
+independent mail archive actions record evidence, rather than dispatch messages.

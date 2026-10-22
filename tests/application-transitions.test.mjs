@@ -24,6 +24,7 @@ function fixture() {
         const binds = []
         const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { binds.push(params[key]); return '?' })
         assert.ok(binds.every(v => v !== undefined), `${name}: missing param`)
+        if (tool.operation !== 'query' && /^SELECT /i.test(sql)) { db.prepare(sql).all(...binds); continue }
         result.push(tool.operation === 'query' ? db.prepare(sql).all(...binds) : db.prepare(sql).run(...binds).changes)
       }
       db.exec('COMMIT')
@@ -41,6 +42,11 @@ function seeded() {
   const f = fixture()
   f.call('create_workspace', 'staff-a', bootstrap)
   f.call('create_linkedin_application', 'staff-a', candidate)
+  const offerScope={tenant_id:'org-a',brand_id:'brand-a',application_id:'app-a',requisition_id:'req-a'}
+  f.call('save_offer_draft','staff-a',{...offerScope,terms_json:JSON.stringify({compensation_type:'paid',subject:'Offer',body:'Paid terms'}),expected_version:0,operation_id:'offer-fixture'})
+  const offer=f.call('get_offer','staff-a',offerScope)[0]
+  f.call('submit_offer_for_approval','staff-a',{...offerScope,offer_id:offer.id,expected_version:1,operation_id:'submit-fixture'})
+  f.call('approve_offer','staff-a',{...offerScope,offer_id:offer.id,expected_version:2,operation_id:'approve-fixture'})
   return f
 }
 function setStage(db, stage) {
@@ -59,6 +65,7 @@ test('every allowed edge succeeds with canonical stage, one version, attributed 
       assert.equal(call('list_applications','staff-a',{...scope,stage:to})[0].stage,to)
       assert.equal(call('gateway_get_application','staff-a',{...scope,application_id:'app-a'})[0].stage,to)
       const event=db.prepare("SELECT * FROM hiring_stage_events WHERE id='transition'").get()
+      if (['hired','rejected'].includes(to)) assert.equal(db.prepare("SELECT disposition FROM hiring_decisions WHERE operation_id='transition'").get().disposition,to)
       assert.equal(event.from_stage,from);assert.equal(event.to_stage,to);assert.equal(event.version,2);assert.equal(event.actor_user_id,'staff-a')
       assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id='transition' AND action='application.stage_changed'").get().n,1)
       assert.ok(call('change_application_stage','staff-a',change(from,to)).every(n=>n===0))
@@ -124,5 +131,5 @@ test('direct full detail works outside the queue and denies sibling brands, tena
 
 test('registered server predicate is compiled from the same static map as the UI', async()=>{
  const {transitionPredicate}=await import('../scripts/application-stages.mjs')
- assert.ok(action('change_application_stage').statements[0].includes(`AND ${transitionPredicate} AND`))
+ assert.ok(action('change_application_stage').statements.slice(0,2).every(statement => statement.includes(`AND ${transitionPredicate} AND`)))
 })

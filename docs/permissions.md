@@ -75,3 +75,12 @@ revocation and tenant suspension deny subsequent scorecard requests. Returning
 reviewers receive a new assignment and cannot reopen the old assignment's review.
 See [structured scorecards](domain-model.md#structured-scorecards-23) for revision,
 submission, validation and pagination contracts.
+
+## Human decisions and offers (#24)
+
+Current scoped owner/recruiter authority is required for all decision/offer reads
+and writes. Interview or scorecard assignment does not confer this authority.
+Caller-supplied actor IDs/roles are checked against the platform identity/current
+grant; no system/automation/API-key role can produce human evidence. Human actions
+also require platform passkey step-up, following publication's existing boundary.
+Every history/retry read recomputes grants, including organization suspension.

@@ -146,3 +146,44 @@ audit event commit in one registered transaction. An audit failure rolls back th
 revision. Stale versions and duplicate operation IDs append nothing, including
 retries from another principal/scope. Zero changes is not confirmation of a save.
 Audit summaries exclude criteria/evidence; no outbox work is created.
+
+## Human decisions and offer approvals (#24)
+
+Migration `0026_human_decisions_offers` adds scoped, append-only decisions,
+offer terms revisions, approval events and outbox authorizations. Existing rows
+and migrations remain unchanged; historical offered stages do not imply approval.
+Tenant IDs on these actions are organization IDs. Actor identity, role and time
+come from platform authentication and current effective owner/recruiter grants.
+Optional actor claims must match that identity and role; they confer no authority.
+Reviewers, including assigned scorecard owners, cannot read these records.
+
+`record_decision` records hired/rejected/withdrawn/deferred against an expected
+application version and atomically updates stage/version, stage evidence and audit.
+Deferred preserves the current stage. Hired requires offered stage and an approved
+paid offer. Rejected requires a review/offer/interview/decision stage. Withdrawn and
+deferred require a nonterminal application. Only one hired/rejected final decision
+is allowed. Existing stage actions now require platform passkey step-up; entry to
+offered/hired also requires approved paid terms. Final hires/rejections through the existing
+stage action also append a decision record in its atomic stage/audit batch.
+Score capture supplies no authority.
+
+Each application has at most one offer header. Draft saves append immutable
+`terms_json` objects containing `compensation_type`, `subject` and `body`; optional
+additional terms remain in the exact approved JSON snapshot. `expected_version`
+is the header's `lock_version` (zero for creation), incremented on each revision
+or status change. Terms versions are independently numbered from one. Lifecycle:
+`draft → pending_approval → approved`; any non-revoked state can become revoked.
+Submitted terms cannot be edited or replaced; revoked offers cannot reopen.
+Approvals always identify the exact immutable terms version. Approval is not send.
+
+The explicit #24 dispatch rule blocks unpaid, internship and volunteer offer
+snapshots, even when approved. This does not add a legal-review requirement or
+change the existing unpaid job-publication policy.
+
+Dispatch authorization binds one approved paid offer version to an existing exact
+candidate-addressed draft, subject and body. The authorized payload is immutable.
+Queue and claim reject every other draft for an application with an offer, and
+reject revoked offers or terminal applications. Authorization alone neither queues
+nor sends. Revocation after a provider attempt has been claimed is rejected: it
+cannot truthfully recall a send. Pending jobs for revoked offers remain durable
+and blocked, with their actual pending state visible for reconciliation.

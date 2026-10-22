@@ -147,3 +147,18 @@ and a local Vite server with only the API read boundary mocked. It exercises
 keyboard expansion/collapse, loading/error/retry, pagination, pending requests
 across applications, stable card identity, and the 375px layout. CI installs
 Chromium before running the same full suite.
+
+## Offer authorization (#24)
+
+An offer authorization is immutable evidence for one exact paid terms revision and
+one exact draft payload/recipient. Once an application has an offer, its queue and
+claim transitions require that authorization and a currently approved offer; revoked
+or terminal applications cannot dispatch it. Generic drafts cannot bypass an
+existing offer. Queue now requires human passkey step-up. Existing general
+correspondence for applications without an offer retains its separate queue flow;
+this is not an automated content classifier for arbitrary message bodies.
+
+Approval/authorization do not mean queued, accepted or delivered. Revocation blocks
+an unclaimed job. Once claimed, revocation is rejected rather than representing an
+irreversible provider attempt as recalled. Original sending/unknown states and
+exclusive claims remain durable; no new retry/reclaim capability is added.
