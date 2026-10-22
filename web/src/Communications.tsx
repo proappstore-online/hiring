@@ -3,13 +3,13 @@ import { read, type Communication, type Draft, type EmailStatusEvent, type Scope
 import { emailCards, statusLabel } from './email-model'
 import { date } from './ui'
 
-export function Communications({ scope, applicationId, drafts, communications, loading = false, error = '', onRetry }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[]; loading?: boolean; error?: string; onRetry?: () => void }) {
+export function Communications({ scope, applicationId, drafts, communications, loading = false, error = '', onRetry, brandName }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[]; loading?: boolean; error?: string; onRetry?: () => void; brandName?: string }) {
   const cards = emailCards(drafts, communications)
   if (loading && !cards.length) return <p role="status" className="mt-4">Loading communications…</p>
   if (error) return <div role="alert" className="mt-4">Could not load communications. {onRetry && <button type="button" className="min-h-[44px] min-w-[44px] underline" onClick={onRetry}>Retry communications</button>}</div>
-  return cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, card.logicalId || card.key])} card={card} scope={scope} applicationId={applicationId} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>
+  return <><section aria-label="Delivery reconciliation" className="my-3 border p-3"><h3 className="font-semibold">Delivery reconciliation</h3><p>{cards.filter(c => statusLabel(c.status) === 'Unknown').length} unresolved unknown outcomes in loaded records</p>{cards.some(c => statusLabel(c.status) === 'Unknown') && <p>Manual reconciliation required — check provider dashboard for delivery status. Compare the provider reference and status history below, then refresh records after evidence is recorded through the approved connector workflow. Do not resend while the outcome is unknown.</p>}<p>Provider acceptance does not confirm delivery. This page cannot record reconciliation decisions.</p></section>{cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, card.logicalId || card.key])} card={card} scope={scope} applicationId={applicationId} brandName={brandName} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>}</>
 }
-function EmailCard({ card, scope, applicationId }: { card: ReturnType<typeof emailCards>[number]; scope: Scope; applicationId: string }) {
+function EmailCard({ card, scope, applicationId, brandName }: { card: ReturnType<typeof emailCards>[number]; scope: Scope; applicationId: string; brandName?: string }) {
   const [expanded, setExpanded] = useState(false)
   const [events, setEvents] = useState<EmailStatusEvent[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -27,7 +27,7 @@ function EmailCard({ card, scope, applicationId }: { card: ReturnType<typeof ema
     finally { setLoading(false) }
   }
   return <li className="rounded-lg border border-[var(--line)] p-3 text-sm break-words">
-    <p className="font-medium">{statusLabel(card.status)}</p>
+    <p className="font-medium">{statusLabel(card.status)}</p><p>Brand: {brandName || scope.brand_id} · Provider: {card.provider === 'gmail' ? 'Gmail' : card.provider === 'cloudflare' ? 'Cloudflare email' : 'Not recorded'}</p>
     <p className="text-xs text-[var(--muted)]">{card.timeLabel}: {date(card.at)}</p>
     {card.legacy && <p className="text-xs">Legacy / Unverified link</p>}
     <h4 className="mt-1 font-medium">{card.subject}</h4>

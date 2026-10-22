@@ -12,7 +12,7 @@
       "name": "list_my_workspaces",
       "description": "list my workspaces",
       "operation": "query",
-      "sql": "SELECT DISTINCT o.id AS organization_id,o.name AS organization_name,b.id AS brand_id,b.name AS brand_name,m.role,(o.created_by=:__user_id) AS can_create_brand FROM hiring_effective_access m JOIN hiring_organizations o ON o.id=m.organization_id JOIN hiring_brands b ON b.id=m.brand_id WHERE m.user_id=:__user_id ORDER BY o.created_at DESC LIMIT 100",
+      "sql": "SELECT DISTINCT o.id AS organization_id,o.name AS organization_name,b.id AS brand_id,b.name AS brand_name,m.role,EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=o.id AND p.brand_id=b.id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AS can_manage_templates,EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=o.id AND p.brand_id=b.id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AS can_create_requisition,(o.created_by=:__user_id) AS can_create_brand FROM hiring_effective_access m JOIN hiring_organizations o ON o.id=m.organization_id JOIN hiring_brands b ON b.id=m.brand_id WHERE m.user_id=:__user_id ORDER BY o.created_at DESC LIMIT 100",
       "params": {},
       "requires_auth": true
     },
@@ -1827,6 +1827,73 @@
       },
       "requires_auth": true,
       "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.created_at,a.stage,q.title,b.name AS brand_name,o.name AS organization_name FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id JOIN hiring_requisitions q ON q.id=r.requisition_id JOIN hiring_brands b ON b.id=r.brand_id JOIN hiring_organizations o ON o.id=r.organization_id WHERE r.worker_user_id=:__user_id AND r.application_id=:application_id LIMIT 1"
+    },
+    {
+      "name": "list_communication_templates",
+      "description": "List brand templates for brand-wide owners and recruiters; templates never authorize sending",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT id,name,subject,body,version,updated_at FROM hiring_communication_templates WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY updated_at DESC,id LIMIT 100"
+    },
+    {
+      "name": "save_communication_template",
+      "description": "Create or edit a scoped unsent template with optimistic concurrency and audit evidence",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "number"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_communication_templates(id,organization_id,brand_id,name,subject,body,version,updated_at,operation_id) SELECT :template_id,:organization_id,:brand_id,:name,:subject,:body,1,:__now,:operation_id WHERE :expected_version=0 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND length(trim(:name)) BETWEEN 1 AND 200 AND length(trim(:subject)) BETWEEN 1 AND 500 AND length(trim(:body)) BETWEEN 1 AND 20000 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_communication_templates WHERE id=:template_id)",
+        "UPDATE hiring_communication_templates SET name=:name,subject=:subject,body=:body,version=version+1,updated_at=:__now,operation_id=:operation_id WHERE id=:template_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND :expected_version>0 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND length(trim(:name)) BETWEEN 1 AND 200 AND length(trim(:subject)) BETWEEN 1 AND 500 AND length(trim(:body)) BETWEEN 1 AND 20000 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'communication.template_saved',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_communication_templates WHERE id=:template_id AND organization_id=:organization_id AND brand_id=:brand_id AND operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)"
+      ]
+    },
+    {
+      "name": "list_operational_diagnostics",
+      "description": "Read authorized redacted activity metadata, excluding all candidate content, URLs and summaries; no result evidence means unknown",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT x.id,x.agent_instance_id,x.activity_type AS action,x.occurred_at,'unknown' AS outcome FROM hiring_agent_activity x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=x.organization_id AND p.brand_id=x.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter','auditor') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) ORDER BY x.occurred_at DESC,x.id LIMIT 100"
     }
   ]
 }

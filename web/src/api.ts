@@ -11,7 +11,7 @@ export const stageLabel = (stage: string) => stage.replaceAll('_', ' ')
 export type Role = 'owner' | 'recruiter' | 'reviewer' | 'auditor'
 
 export type Scope = { organization_id: string; brand_id: string }
-export type Workspace = Scope & { organization_name: string; brand_name: string; role: Role; can_create_brand: number }
+export type Workspace = Scope & { organization_name: string; brand_name: string; role: Role; can_create_brand: number; can_manage_templates?: number; can_create_requisition?: number }
 export type Requisition = { id: string; title: string; status: string }
 export type Member = { user_id: string; role: Role }
 export type Application = { id: string; stage: Stage; version: number; candidate_name: string; email: string | null; phone: string | null; linkedin_url: string | null; profile_url: string | null; source: string; requisition_title: string; source_detail: string; basis_reference: string; contact_context: string; assignee_user_id: string; updated_at: number }
