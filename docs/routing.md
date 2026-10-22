@@ -1,56 +1,51 @@
-# Routing foundation (UI-1, #63)
+# Hiring URL contract v1 (#91)
 
-React Router 6 BrowserRouter owns navigation. Public routes `/`, `/jobs`,
-`/jobs/:jobId`, `/apply/:jobId` and `/sign-in` share an app-branded public
-header. Public discovery does not wait for authentication hydration. Recruiter
-routes under `/recruiter/` use an authenticated ProShell with `branding="app"`.
-Unknown routes show a public 404. Render errors are caught per destination;
-loading, empty and recoverable fetch failures have distinct presentations.
+React Router 6 BrowserRouter owns navigation. The public header is app branded;
+authenticated recruiter pages use ProShell with `branding="app"`. Vite and the
+production host provide the SPA fallback for direct nested loads.
 
-Protected destinations redirect to `/sign-in?returnTo=…`; only local recruiter,
-legacy staff, candidate application, and apply destinations are accepted on
-return. OAuth continues through the SDK's existing provider flow; this change
-does not implement token exchange.
+| Journey | Canonical URL | Scope and authorization |
+| --- | --- | --- |
+| Public vacancy list | `/vacancies` | Published, open records only |
+| Public vacancy detail | `/vacancies/:requisitionId` | Exact globally unique requisition ID |
+| Apply to vacancy | `/vacancies/:requisitionId/apply` | Same exact published record; intake and candidate sign-in gates |
+| Candidate applications | `/my-applications` | Signed-in candidate's own records |
+| Candidate application record | `/my-applications/:applicationId` | Exact candidate-owned read |
+| Recruiter vacancy list/detail | `/recruiter/vacancies[/:requisitionId]?organization_id=…&brand_id=…` | Exact validated workspace and server-side owner/recruiter grant |
+| Recruiter application list/detail | `/recruiter/applications[/:applicationId]?organization_id=…&brand_id=…` | Exact validated workspace; owner/recruiter full read, assigned reviewer restricted read |
+| Brand settings | `/recruiter/organizations/:organizationId/brands/:brandId/settings` | Both IDs must identify an owner workspace |
+| Organisation settings | `/recruiter/organizations/:organizationId/settings` | Organisation ID must identify a workspace created by the signed-in owner |
 
-Generated vacancy links include `organization_id` and `brand_id` query fields
-beside the job ID in the pathname. Bare `/jobs/:jobId` and `/apply/:jobId`
-resolve scope through paginated public summaries, then fetch the exact public
-snapshot. A supplied incorrect scope is never replaced with another scope.
-Generated recruiter links likewise include exact organization and brand IDs;
-links without scope use the user's default workspace. No candidate name,
-contact information or secret appears in generated URLs.
+Organisation settings expose organisation identity and grants; brand settings
+expose brand identity, brand grants and requisition creation. Other recruiter
+sections retain `/recruiter/{overview,communications,playbook,operations,compliance}`
+with validated `organization_id` and `brand_id` query fields. Selected communications use `/recruiter/communications/:applicationId` and exact application authorization. Settings has
+explicit scope in its path. Requisition and application IDs are globally unique
+primary keys; public and candidate exact reads need no scope selector. Staff
+scope is needed for authorization and is resolved by `get_my_workspace` for
+explicit scoped URLs before any protected screen mounts. The workspace list
+only populates the selector and supplies the default workspace. Every detail action uses an exact ID lookup;
+no route scans a paginated list to infer scope. Missing, removed, cross-scope,
+and unauthorized staff records all show the same 404 view.
 
-All authorization remains in the existing registered server actions. The full
-recruiter workspace list returns at most 100 recent records. Direct links use
-`get_application` for full owner/recruiter detail independent of that limit.
-Assigned reviewers use `gateway_get_application`, which supplies a restricted
-summary without contact or history fields. Missing and unauthorized records
-share the same 404 UI.
-Scope/destination changes remount loaded state; in-flight loads cannot populate
-the next destination. Scoped APIs and intake/attachment gates are unchanged.
+List query parameters carry only non-sensitive transient state: public vacancy
+`q`, `filter_brand`, `arrangement`; staff application `requisition`, `stage`,
+`source`, `assignee`, `date_from`, `date_to`; and the staff workspace scope.
+Candidate names and source-detail search stay in memory. Detail links may carry
+a `back` pointer to a whitelisted list path with allowed filters; it is
+validated again before rendering a back link. Copy/share actions omit `back` and
+emit the stable canonical URL. No applicant contact data is placed in a URL.
 
-Vite uses `appType: 'spa'`; Workbox uses `/index.html` as navigation fallback,
-keeping `/.pas/` excluded. The existing production host returned app HTML and
-HTTP 200 for a fresh nested `/jobs/route-probe` request on 22 October 2026.
-This verifies host fallback, not deployment of this branch. Tests exercise fresh
-nested loads locally with the actual route tree and synthetic SDK/API fixtures.
-
-Legacy `?view=jobs` routing has been removed. Replace saved links with `/jobs`
-or scoped `/jobs/:jobId` links. Browser links, refresh, back/forward and keyboard
-navigation use real URLs. Navigation includes a skip link, main landmark focus
-and current-page navigation indicators.
-
-This delivery uses a branch and PR under the owner's explicit instruction;
-older direct-to-main documentation does not apply to this delivery. No merge,
-deployment or opening of intake is authorized by UI-1.
-
-## Vacancies foundation (#68)
-
-Public `/vacancies` and `/vacancies/:vacancyId` add discovery and structured PDs;
-canonical shared links retain organization/brand scope. Existing job/application
-routes remain intact. Signed-in navigation includes Vacancies; owner/recruiter
-workspaces include Vacancy Management with lifecycle states and PD editing.
-See [PD contracts and non-executing mapping plan](vacancies-mapping-plan.md).
+`/jobs` redirects to `/vacancies`; `/jobs/:id` and `/apply/:id` validate any
+supplied legacy organisation/brand pair against the exact published record,
+then redirect to the canonical vacancy or apply URL. A partial or mismatched
+pair resolves to 404, never to a different record. Legacy `/dashboard`,
+`/admin/*`, `/playbook`, and `/applications[/:id]` redirect to their matching
+recruiter screens, preserving exact IDs and validated workspace scope. The old
+`/recruiter/settings` URL redirects to explicit brand settings after the owner
+workspace is resolved. Public browsing does not wait for auth hydration;
+protected pages redirect to `/sign-in?returnTo=…` and restore a local allowed
+path after sign-in.
 
 ## Exact recruiter application detail (#20)
 
@@ -77,7 +72,7 @@ scope before rendering a screen. `/recruiter/overview` is available to all staff
 `/recruiter/communications`, `/recruiter/playbook`, and `/recruiter/operations`
 require owner or recruiter access. `/recruiter/applications` and its exact-ID
 detail allow owner, recruiter, and reviewer access. `/recruiter/compliance`
-allows owner, recruiter, and auditor access; `/recruiter/settings` is owner-only.
+allows owner, recruiter, and auditor access; explicit organisation and brand settings routes are owner-only.
 Denied screens and missing scoped resources both render the same 404 view.
 
 Each screen is a distinct route. Vacancy detail uses `get_vacancy_management`
@@ -86,10 +81,8 @@ for an exact authorized requisition lookup even when it is older than the recent
 and recruiters, and an assigned reviewer receives the restricted gateway summary.
 Application detail links to the communications screen, where a selected
 `application_id` is fetched exactly even if it has left the recent list.
-Scope changes on detail routes return to the corresponding list. Navigation
-retains `organization_id` and `brand_id` in generated links.
+Scope changes on detail routes return to the corresponding list. Navigation retains validated `organization_id` and `brand_id` in staff links.
 
 Legacy `/dashboard`, `/admin`, `/applications`, `/applications/:applicationId`,
 `/playbook`, and `/admin/{communications,operations,compliance,settings}`
-redirect to their canonical `/recruiter/` equivalents while preserving query
-scope and application IDs.
+redirect to their canonical `/recruiter/` equivalents while preserving query scope and application IDs. Legacy `application_id` on communications redirects to `/recruiter/communications/:applicationId`.

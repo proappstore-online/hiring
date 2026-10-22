@@ -314,12 +314,14 @@ test('candidate and requisition deduplication survives new keys and preserves pr
   } finally { db.close() }
 })
 
-test('candidate browser calls scoped candidate actions and renders an external vacancy link', () => {
+test('candidate browser calls scoped candidate actions and renders a canonical vacancy link', () => {
   const source=readFileSync(new URL('../web/src/Jobs.tsx',import.meta.url),'utf8')
+  const routes=readFileSync(new URL('../web/src/routes.ts',import.meta.url),'utf8')
   assert.match(source,/name="website" autoComplete="off" tabIndex=\{-1\}/)
   assert.match(source,/website: val\(f, 'website'\)/)
   assert.match(source,/'get_my_requisition_receipt'/)
-  assert.match(source,/new URLSearchParams\(\{ organization_id: row.organization_id, brand_id: row.brand_id \}\)/)
+  assert.match(source,/applyUrl\(row.requisition_id\)/)
+  assert.match(routes,/\/vacancies\/\$\{encodeURIComponent\(id\)\}/)
   assert.match(source,/provider="google"/)
   assert.doesNotMatch(source,/app\.db\.|app\.proxy\.|staff_token|D1_TOKEN|R2_SECRET|CLIENT_SECRET|dangerouslySetInnerHTML/)
   const action=tool('submit_job_application')

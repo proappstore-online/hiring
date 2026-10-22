@@ -6,9 +6,13 @@ import { PublishJob } from './Jobs'
 import { parsePD, PD_FIELDS, PositionDescription, type PDRecord } from './position-description'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { button, date, field, panel } from './ui'
+import { recruiterVacancyUrl, staffBack, withBack } from './routes'
+import { useSearchParams } from 'react-router-dom'
 
 export type ManagedVacancy = { id: string; title: string; status: string; state: string; updated_at: number }
 export function VacancyManagement({ scope, requisitions, selectedRequisitionId = '', selectedVacancy }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[]; selectedRequisitionId?: string; selectedVacancy?: ManagedVacancy }) {
+  const [query] = useSearchParams()
+  const [copyMessage, setCopyMessage] = useState('')
   const [rows, setRows] = useState<ManagedVacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -23,9 +27,9 @@ export function VacancyManagement({ scope, requisitions, selectedRequisitionId =
   useEffect(() => { void load(); return () => { ++seq.current } }, [scope.organization_id, scope.brand_id, selectedRequisitionId])
   const vacancy = selectedVacancy ?? rows.find(r => r.id === selectedRequisitionId)
   return <section className={panel}><h2 className="text-xl font-semibold">Vacancy Management</h2><p className="my-3 text-sm">Draft → in review → published → paused → closed. Showing the most recent 100 requisitions.</p>
-    {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length && !selectedRequisitionId ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><Link aria-current={selectedRequisitionId === r.id ? 'page' : undefined} className={button + ' block w-full text-left'} to={'/recruiter/vacancies/' + encodeURIComponent(r.id) + '?' + new URLSearchParams(scope)}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></Link></li>)}</ul>}
+    {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length && !selectedRequisitionId ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><Link aria-current={selectedRequisitionId === r.id ? 'page' : undefined} className={button + ' block w-full text-left'} to={withBack(recruiterVacancyUrl(r.id, scope), staffBack('/recruiter/vacancies?' + query, scope, 'vacancies'))}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></Link></li>)}</ul>}
     {selectedRequisitionId && !loading && !vacancy && <NotFound />}
-    {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><ApprovedJobDescription scope={scope} requisitionId={vacancy.id} /> <PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
+    {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><Link className="underline" to={staffBack(query.get('back'), scope, 'vacancies')}>All managed vacancies</Link><button className={button} onClick={() => void navigator.clipboard.writeText(new URL(recruiterVacancyUrl(vacancy.id, scope), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button><p role="status">{copyMessage}</p><ApprovedJobDescription scope={scope} requisitionId={vacancy.id} /> <PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
       <PublishJob key={'publication:' + vacancy.id} scope={scope} requisitions={requisitions.filter(r => r.id === vacancy.id)} onChanged={load} />
     </div>}
   </section>

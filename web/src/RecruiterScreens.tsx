@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@proappstore/sdk'
 import { read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
 import { ApplicationFilters } from './ApplicationFilters'
@@ -14,6 +14,7 @@ import { Admin, CreateApplication } from './forms'
 import { mutationError } from './mutation-state'
 import { LoadingState, ErrorState, NotFound } from './route-ui'
 import { panel } from './ui'
+import { brandSettingsUrl, organizationSettingsUrl, recruiterApplicationUrl, staffBack } from './routes'
 
 type Context = { space: Workspace; userId: string; reloadSpaces: () => Promise<void> }
 export const RecruiterContext = createContext<Context | null>(null)
@@ -45,6 +46,8 @@ export function ApplicationsScreen() {
 }
 export function ApplicationScreen() {
   const { space } = useWorkspace(); const { applicationId = '' } = useParams(); const scope = scopeOf(space); const params = { ...scope, application_id: applicationId }
+  const [query] = useSearchParams()
+  const back = staffBack(query.get('back'), scope, 'applications')
   const staff = space.role === 'owner' || space.role === 'recruiter'
   const full = useRows<Application>(staff ? 'get_application' : null, params)
   const fallback = useRows<Pick<Application, 'id' | 'candidate_name' | 'requisition_title' | 'stage'>>(staff ? null : 'gateway_get_application', params)
@@ -52,10 +55,12 @@ export function ApplicationScreen() {
   if (full.error || fallback.error) return <ErrorState retry={() => { full.retry(); fallback.retry() }}>Could not load application.</ErrorState>
   if (full.rows[0]) return <FullApplicationScreen application={full.rows[0]} applicationId={applicationId} retryApplication={full.retry} />
   if (!fallback.rows[0]) return <NotFound />
-  return <Screen title="Application details"><Interviews key={applicationId} scope={scope} applicationId={applicationId} /><section className={panel}><h2 className="text-xl font-semibold">{fallback.rows[0].candidate_name}</h2><p>{fallback.rows[0].requisition_title} · {stageLabel(fallback.rows[0].stage)}</p><p>This record provides a restricted summary. Your role does not permit full contact or history access.</p></section></Screen>
+  return <Screen title="Application details"><Link className="underline" to={back}>All applications</Link><Interviews key={applicationId} scope={scope} applicationId={applicationId} /><section className={panel}><h2 className="text-xl font-semibold">{fallback.rows[0].candidate_name}</h2><p>{fallback.rows[0].requisition_title} · {stageLabel(fallback.rows[0].stage)}</p><p>This record provides a restricted summary. Your role does not permit full contact or history access.</p></section></Screen>
 }
 function FullApplicationScreen({ application, applicationId, retryApplication }: { application: Application; applicationId: string; retryApplication: () => void }) {
   const { space } = useWorkspace(); const scope = scopeOf(space); const params = { ...scope, application_id: applicationId }
+  const [query] = useSearchParams()
+  const [copyMessage, setCopyMessage] = useState('')
   const members = useRows<Member>('list_workspace_members', scope)
   const notes = useRows<Note>('list_application_notes', params)
   const activities = useRows<AgentActivity>('list_application_agent_activity', params); const events = useRows<StageEvent>('list_stage_events', params); const assignments = useRows<AssignmentEvent>('list_assignment_events', params); const audit = useRows<Audit>('list_application_audit', params)
@@ -65,13 +70,14 @@ function FullApplicationScreen({ application, applicationId, retryApplication }:
   const retryDetail = () => { notes.retry(); activities.retry(); events.retry(); assignments.retry(); audit.retry() }
   if (members.loading) return <LoadingState>Loading application…</LoadingState>
   if (members.error) return <ErrorState retry={members.retry}>Could not load application.</ErrorState>
-  return <Screen title="Application details">{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} busy={busy} run={run} />}</Screen>
+  return <Screen title="Application details"><Link className="underline" to={staffBack(query.get('back'), scope, 'applications')}>All applications</Link><button className="ml-3 underline" onClick={() => void navigator.clipboard.writeText(new URL(recruiterApplicationUrl(applicationId, scope), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button><p role="status">{copyMessage}</p>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} busy={busy} run={run} />}</Screen>
 }
 export function CommunicationsScreen() {
-  const { space } = useWorkspace(); const scope = scopeOf(space); const [query] = useSearchParams(); const applicationId = query.get('application_id') ?? ''
+  const { space } = useWorkspace(); const scope = scopeOf(space); const { applicationId = '' } = useParams()
   const data = useRows<Application>('list_applications', scope)
   const exact = useRows<Application>(applicationId ? 'get_application' : null, { ...scope, application_id: applicationId })
   const applications = exact.rows[0] ? [exact.rows[0], ...data.rows.filter(row => row.id !== applicationId)] : data.rows
+  if (applicationId && !exact.loading && !exact.error && !exact.rows.length) return <NotFound />
   return <RowsState loading={data.loading || exact.loading} error={data.error || exact.error} retry={() => { data.retry(); exact.retry() }}><AdminCommunications scope={scope} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /></RowsState>
 }
 export function PlaybookScreen() { const { space } = useWorkspace(); return <Screen title="Playbook"><PlaybookEditor organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /></Screen> }
@@ -79,6 +85,9 @@ export function OperationsScreen() { const { space } = useWorkspace(); return <O
 export function ComplianceScreen() { const { space } = useWorkspace(); return <ComplianceControls role={space.role} /> }
 export function SettingsScreen() {
   const { space, reloadSpaces } = useWorkspace(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')
+  const location = useLocation()
   const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); await reloadSpaces(); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
-  return <Screen title="Settings">{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} /></Screen>
+  const brandPath = brandSettingsUrl(space), organizationPath = organizationSettingsUrl(space.organization_id)
+  if (location.pathname === organizationPath && !space.can_create_brand) return <NotFound />
+  return <Screen title="Settings"><nav aria-label="Management scope" className="mb-4 flex gap-4"><Link className="underline" aria-current={location.pathname === brandPath ? 'page' : undefined} to={brandPath}>Brand management</Link>{Boolean(space.can_create_brand) && <Link className="underline" aria-current={location.pathname === organizationPath ? 'page' : undefined} to={organizationPath}>Organisation management</Link>}</nav>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
 }

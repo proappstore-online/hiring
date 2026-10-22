@@ -4,8 +4,10 @@ import { read, stageLabel, type CandidateApplication } from './api'
 import { Attachments } from './attachments'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { date, panel } from './ui'
+import { candidateApplicationUrl, safeBack } from './routes'
+import { useSearchParams } from 'react-router-dom'
 
-export const applicationLink = (id: string) => '/my-applications/' + encodeURIComponent(id)
+export const applicationLink = candidateApplicationUrl
 
 export function CandidateApplicationCard({ application: a, userId, detail = false }: { application: CandidateApplication; userId: string; detail?: boolean }) {
   return <article className={panel + ' space-y-3 break-words'}>
@@ -27,11 +29,7 @@ export function CandidateApplications({ userId, applicationId }: { userId: strin
     setLoading(true); setError(false); setRows([])
     async function load() {
       if (!applicationId) return read<CandidateApplication>('list_my_job_applications')
-      try { return await read<CandidateApplication>('get_my_application', { application_id: applicationId }) }
-      catch {
-        // Compatibility with a server that has not registered the additive action yet.
-        return (await read<CandidateApplication>('list_my_job_applications')).filter(a => a.application_id === applicationId)
-      }
+      return read<CandidateApplication>('get_my_application', { application_id: applicationId })
     }
     load().then(data => { if (current) setRows(data) }).catch(() => { if (current) setError(true) }).finally(() => { if (current) setLoading(false) })
     return () => { current = false }
@@ -44,8 +42,9 @@ export function CandidateApplications({ userId, applicationId }: { userId: strin
 
 export function CandidateAccountPage({ userId }: { userId: string }) {
   const { applicationId } = useParams()
+  const [query] = useSearchParams()
   return <div className="mx-auto max-w-3xl space-y-5 py-6">
-    {applicationId && <Link className="underline" to="/my-applications">My Applications</Link>}
+    {applicationId && <Link className="underline" to={safeBack(query.get('back'), 'my-applications')}>My Applications</Link>}
     <h1 className="text-2xl font-semibold">{applicationId ? 'Application status' : 'My Applications'}</h1>
     <CandidateApplications key={userId + (applicationId ?? '')} userId={userId} applicationId={applicationId} />
   </div>

@@ -42,6 +42,18 @@ function fixture({ open = true } = {}) {
 }
 const pd = (scope = A, version = 0, operation_id = crypto.randomUUID()) => ({ ...scope, overview: 'Engineer overview', rolePurpose: 'Build things', responsibilities: '["Ship safely","Review changes"]', requirements: '["Engineering experience"]', workingArrangement: 'Remote', compensation: 'AUD 100,000', benefits: 'Leave', applicationProcess: 'Apply online', privacyContact: 'hiring@example.com', expected_version: version, operation_id })
 
+test('exact workspace lookup validates organisation, brand and owner scope', () => {
+  const { db, call } = fixture()
+  try {
+    assert.equal(call('get_my_workspace','owner',{ organization_id:'org', brand_id:'a' })[0].brand_id,'a')
+    assert.equal(call('get_my_workspace','owner',{ organization_id:'org', owner_only:1 })[0].role,'owner')
+    assert.equal(call('get_my_workspace','staff-a',{ organization_id:'org', brand_id:'a' })[0].role,'recruiter')
+    assert.deepEqual(call('get_my_workspace','staff-a',{ organization_id:'org', owner_only:1 }),[])
+    assert.deepEqual(call('get_my_workspace','staff-a',{ organization_id:'org', brand_id:'b' }),[])
+    assert.deepEqual(call('get_my_workspace','owner',{ organization_id:'wrong', brand_id:'a' }),[])
+  } finally { db.close() }
+})
+
 test('PD drafts enforce tenant/role, version, validation, replay and review reset', () => {
   const { db, call } = fixture()
   try {
@@ -74,6 +86,7 @@ test('public vacancies contain only immutable published PD snapshots and preserv
     const list = call('list_vacancies',null,{ after_id:'',organization_id:'org',brand_id:'a' })
     assert.equal(list.length,1)
     const detail = call('get_vacancy_detail',null,A)[0]
+    assert.equal(call('get_vacancy_detail',null,{ requisition_id:A.requisition_id })[0].requisition_id,A.requisition_id)
     assert.equal(JSON.parse(detail.pd_json).overview,'Engineer overview')
     assert.equal(detail.pd_version,1)
     for (const key of ['actor_user_id','operation_id','candidate_name','email','internal_notes','payload']) assert.equal(key in detail,false,key)
@@ -83,6 +96,9 @@ test('public vacancies contain only immutable published PD snapshots and preserv
     assert.equal(call('list_vacancies',null,{ after_id:A.requisition_id }).length,1)
     assert.equal(call('get_vacancy_detail',null,B)[0].pd_json,null)
     assert.equal(call('get_public_job',null,A)[0].description,publication().description)
+    assert.equal(call('get_public_job',null,{ requisition_id:A.requisition_id })[0].requisition_id,A.requisition_id)
+    assert.deepEqual(call('get_public_job',null,{ requisition_id:A.requisition_id,organization_id:'wrong',brand_id:'a' }),[])
+    assert.deepEqual(call('get_public_job',null,{ requisition_id:A.requisition_id,brand_id:'a' }),[])
     assert.deepEqual(call('save_pd_draft','owner',pd(A,1)),[0,0])
     assert.throws(()=>db.exec("UPDATE hiring_pd_publications SET payload='{}'"),/immutable/)
     call('pause_job_requisition','owner',{ ...A,expected_version:1,operation_id:'pause' })

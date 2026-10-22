@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { readPublic, type PublicJob } from './api'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { parsePD, PD_FIELDS, PositionDescription } from './position-description'
 import { DiscoveryFilters } from './DiscoveryFilters'
 import { button, field, panel } from './ui'
+import { applyUrl, safeBack, vacancyUrl, withBack } from './routes'
 
 type Vacancy = PublicJob & { pd_json: string | null; pd_version: number | null; status: 'published' }
-export const vacancyLink = (v: Pick<Vacancy, 'requisition_id' | 'organization_id' | 'brand_id'>) => '/vacancies/' + encodeURIComponent(v.requisition_id) + '?' + new URLSearchParams({ organization_id: v.organization_id, brand_id: v.brand_id })
+export const vacancyLink = (v: Pick<Vacancy, 'requisition_id'>) => vacancyUrl(v.requisition_id)
 export function VacanciesIndexPage() {
   const [query, setQuery] = useSearchParams()
   const [rows, setRows] = useState<Vacancy[]>([])
@@ -15,8 +16,10 @@ export function VacanciesIndexPage() {
   const [error, setError] = useState(false)
   const [more, setMore] = useState(false)
   const seq = useRef(0)
-  const organization_id = query.get('organization_id') ?? ''
-  const brand_id = query.get('brand_id') ?? ''
+  useEffect(() => {
+    const clean = new URL(safeBack('/vacancies?' + query, 'vacancies'), 'https://hiring.invalid').searchParams
+    if (clean.toString() !== query.toString()) setQuery(clean, { replace: true })
+  }, [query, setQuery])
   const search = query.get('q') ?? ''
   const arrangement = query.get('arrangement') ?? ''
   const brand = query.get('filter_brand') ?? ''
@@ -25,12 +28,12 @@ export function VacanciesIndexPage() {
     const request = ++seq.current
     setLoading(true); setError(false)
     try {
-      const page = await readPublic<Vacancy>('list_vacancies', { after_id, organization_id, brand_id })
+      const page = await readPublic<Vacancy>('list_vacancies', { after_id })
       if (request === seq.current) { setRows(old => after_id ? [...old, ...page] : page); setMore(page.length === 25) }
     } catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
   }
-  useEffect(() => { setRows([]); void load(); return () => { ++seq.current } }, [organization_id, brand_id])
+  useEffect(() => { setRows([]); void load(); return () => { ++seq.current } }, [])
   const arrangements = [...new Set(rows.map(r => String(parsePD(r.pd_json).workingArrangement || r.arrangement || '')).filter(Boolean))]
   const filtered = rows.filter(r => {
     const pd = parsePD(r.pd_json)
@@ -43,14 +46,13 @@ export function VacanciesIndexPage() {
     <p className="text-sm">Showing published, open vacancies only. Search and filters apply to loaded results.</p>
     {loading && <LoadingState>Loading vacancies…</LoadingState>}{error && <ErrorState retry={() => void load()}>Vacancies could not be loaded.</ErrorState>}
     {!loading && !error && !filtered.length && <EmptyState>{rows.length ? 'No vacancies match these filters.' : 'No vacancies currently open'}</EmptyState>}
-    <ul className="grid gap-4 sm:grid-cols-2">{filtered.map(v => { const pd = parsePD(v.pd_json); return <li className={panel} key={v.requisition_id}><h2 className="text-lg font-semibold"><Link className="inline-flex min-h-[44px] items-center underline" to={vacancyLink(v)}>{v.title}</Link></h2><p>{v.brand_name} · {v.location}</p><p className="whitespace-pre-wrap">{pd.workingArrangement || v.arrangement}</p><p>{String(pd.overview || v.description || '').slice(0, 240)}</p><Link className="inline-flex min-h-[44px] items-center underline" to={vacancyLink(v)}>View role and apply<span className="sr-only"> — {v.title}</span></Link></li> })}</ul>
+    <ul className="grid gap-4 sm:grid-cols-2">{filtered.map(v => { const pd = parsePD(v.pd_json); return <li className={panel} key={v.requisition_id}><h2 className="text-lg font-semibold"><Link className="inline-flex min-h-[44px] items-center underline" to={withBack(vacancyLink(v), safeBack('/vacancies' + (query.size ? '?' + query : ''), 'vacancies'))}>{v.title}</Link></h2><p>{v.brand_name} · {v.location}</p><p className="whitespace-pre-wrap">{pd.workingArrangement || v.arrangement}</p><p>{String(pd.overview || v.description || '').slice(0, 240)}</p><Link className="inline-flex min-h-[44px] items-center underline" to={withBack(vacancyLink(v), safeBack('/vacancies' + (query.size ? '?' + query : ''), 'vacancies'))}>View role and apply<span className="sr-only"> — {v.title}</span></Link></li> })}</ul>
     {more && <button className={button} disabled={loading} onClick={() => void load(rows.at(-1)!.requisition_id)}>Load more vacancies</button>}
   </div>
 }
 export function VacancyDetailPage() {
   const { vacancyId } = useParams()
   const [query] = useSearchParams()
-  const location = useLocation()
   const [row, setRow] = useState<Vacancy | null>(null)
   const [available, setAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -61,26 +63,14 @@ export function VacancyDetailPage() {
     const request = ++seq.current
     setLoading(true); setError(false); setRow(null)
     try {
-      let organization_id = query.get('organization_id') ?? '', brand_id = query.get('brand_id') ?? ''
-      if (!organization_id && !brand_id) {
-        let after_id = ''
-        while (request === seq.current) {
-          const page = await readPublic<Vacancy>('list_vacancies', { after_id })
-          const match = page.find(v => v.requisition_id === vacancyId)
-          if (match) { organization_id = match.organization_id; brand_id = match.brand_id; break }
-          const next = page.at(-1)?.requisition_id ?? ''
-          if (page.length < 25 || next <= after_id) break
-          after_id = next
-        }
-      }
-      if (request !== seq.current) return
-      const details = organization_id && brand_id ? await readPublic<Vacancy>('get_vacancy_detail', { organization_id, brand_id, requisition_id: vacancyId }) : []
+      const details = vacancyId ? await readPublic<Vacancy>('get_vacancy_detail', { requisition_id: vacancyId }) : []
       const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate')
-      if (request === seq.current) { setRow(details[0] ?? null); setAvailable(gates[0]?.intake_status === 'open') }
+      const scoped = !query.has('organization_id') && !query.has('brand_id') || Boolean(query.get('organization_id') && query.get('brand_id') && details[0]?.organization_id === query.get('organization_id') && details[0]?.brand_id === query.get('brand_id'))
+      if (request === seq.current) { setRow(scoped ? details[0] ?? null : null); setAvailable(gates[0]?.intake_status === 'open') }
     } catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
   }
-  useEffect(() => { setFeedback(''); void load(); return () => { ++seq.current } }, [vacancyId, location.search])
+  useEffect(() => { setFeedback(''); void load(); return () => { ++seq.current } }, [vacancyId])
   if (loading) return <LoadingState>Loading vacancy…</LoadingState>
   if (error) return <ErrorState retry={() => void load()}>Vacancy could not be loaded.</ErrorState>
   if (!row) return <NotFound>This vacancy is unavailable or no longer open.</NotFound>
@@ -108,10 +98,10 @@ export function VacancyDetailPage() {
     try { await navigator.clipboard.writeText(text); setFeedback('Full job description copied.') }
     catch { setFeedback('Could not copy the job description. Select and copy the text on this page.') }
   }
-  return <article className="mx-auto max-w-3xl space-y-6 py-6"><Link className="underline" to="/vacancies">All vacancies</Link><h1 className="text-3xl font-semibold">{row.title}</h1><p>{row.organization_name} / {row.brand_name} · {row.location}</p>
+  return <article className="mx-auto max-w-3xl space-y-6 py-6"><Link className="underline" to={safeBack(query.get('back'), 'vacancies')}>All vacancies</Link><h1 className="text-3xl font-semibold">{row.title}</h1><p>{row.organization_name} / {row.brand_name} · {row.location}</p>
     <div className="flex flex-wrap gap-2"><button className={button} onClick={() => void copyJD()}>Copy job description</button><button className={button} onClick={() => void copyLink()}>Copy vacancy link</button></div><p role="status">{feedback}</p>
     <PositionDescription pd={Object.keys(pd).length ? pd : { overview: row.description, workingArrangement: row.arrangement, compensation: row.compensation, privacyContact: row.contact }} />
     <p>Contact: {row.contact}</p><section><h2 className="text-lg font-semibold">Candidate privacy notice — {row.notice_version}</h2><p className="whitespace-pre-wrap">{row.notice_text}</p></section>
-    {available ? <Link className={button + ' inline-flex min-h-[44px] items-center'} to={'/apply/' + encodeURIComponent(row.requisition_id) + '?' + new URLSearchParams({ organization_id: row.organization_id, brand_id: row.brand_id })}>Apply for this vacancy</Link> : <p role="status">Applications are not open yet. Please check back later.</p>}
+    {available ? <Link className={button + ' inline-flex min-h-[44px] items-center'} to={withBack(applyUrl(row.requisition_id), safeBack(query.get('back'), 'vacancies'))}>Apply for this vacancy</Link> : <p role="status">Applications are not open yet. Please check back later.</p>}
   </article>
 }

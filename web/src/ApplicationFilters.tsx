@@ -5,6 +5,7 @@ import { FILTER_STAGES, filterQuery, matchesSearch, type FilterKey } from './fil
 import { useFilterParams } from './useFilterParams'
 import { ErrorState, AccessDenied } from './route-ui'
 import { button, field, panel } from './ui'
+import { recruiterApplicationUrl, staffBack, withBack } from './routes'
 
 type Row = Pick<Application, 'id' | 'candidate_name' | 'stage' | 'requisition_title' | 'assignee_user_id' | 'source' | 'requisition_id'> & { source_detail?: string; created_at?: number | string }
 export function ApplicationFilters({ space, requisitions, members }: { space: Workspace; requisitions: Requisition[]; members: Member[] }) {
@@ -50,7 +51,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
     <p className="text-sm">Showing up to {staff ? 100 : 25} recent authorized matches. Text search applies to these loaded results and stays on this page only.{!staff && ' Source detail is unavailable for reviewers.'}</p>
     {pending ? <div role="status" className="animate-pulse p-4">Loading applications…</div> : error ? <ErrorState retry={() => setRetry(value => value + 1)}>{error}</ErrorState> : <>
       <p role="status" aria-live="polite">{visible.length} matching applications{rows.length === (staff ? 100 : 25) ? ' (limit reached; narrow filters)' : ''}</p>
-      {!visible.length ? <div><p>{!search && !Object.values(filters).some(Boolean) ? 'No applications yet.' : 'No applications match these filters.'}</p><button type="button" className={button} onClick={reset}>Clear filters</button></div> : <ul className="mt-4 space-y-2">{visible.map(row => <li key={row.id}><Link className="block min-h-[44px] rounded border border-[var(--line)] p-3" to={'/recruiter/applications/' + encodeURIComponent(row.id) + '?' + query}><strong>{row.candidate_name}</strong><span className="block">{row.requisition_title} · {stageLabel(row.stage)} · {row.source}</span></Link></li>)}</ul>}
+      {!visible.length ? <div><p>{!search && !Object.values(filters).some(Boolean) ? 'No applications yet.' : 'No applications match these filters.'}</p><button type="button" className={button} onClick={reset}>Clear filters</button></div> : <ul className="mt-4 space-y-2">{visible.map(row => <li key={row.id}><Link className="block min-h-[44px] rounded border border-[var(--line)] p-3" to={withBack(recruiterApplicationUrl(row.id, space), staffBack('/recruiter/applications?' + query, space, 'applications'))}><strong>{row.candidate_name}</strong><span className="block">{row.requisition_title} · {stageLabel(row.stage)} · {row.source}</span></Link></li>)}</ul>}
     </>}
   </section>
 }

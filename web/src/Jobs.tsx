@@ -7,6 +7,7 @@ import { app, id, read, readPublic, write, type IntakeReceipt, type PublicJob, t
 import { CandidateApplications, applicationLink } from './CandidateAccount'
 import { button, field, panel, val } from './ui'
 import { DiscoveryFilters } from './DiscoveryFilters'
+import { applyUrl, safeBack, vacancyUrl, withBack } from './routes'
 
 export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; requisitions: Requisition[]; onChanged?: () => Promise<void> }) {
   const [failed, setFailed] = useState(false)
@@ -33,7 +34,8 @@ export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; r
 }
 
 export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list' | 'detail' | 'apply' }) {
-  const { jobId } = useParams()
+  const { jobId, vacancyId } = useParams()
+  const recordId = vacancyId ?? jobId
   const location = useLocation()
   const [query] = useSearchParams()
   const organization_id = query.get('organization_id') ?? ''
@@ -49,7 +51,7 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
   const brands = [...new Map(jobs.map(j => [j.brand_id, { id: j.brand_id, name: j.brand_name }])).values()]
   const filtered = jobs.filter(j => (!brand || j.brand_id === brand) && (j.title + ' ' + j.brand_name + ' ' + j.location).toLowerCase().includes(search.toLowerCase()))
   const selection = useRef(0)
-  const link = (row: Pick<PublicJob, 'organization_id' | 'brand_id' | 'requisition_id'>, prefix = '/jobs/') => prefix + encodeURIComponent(row.requisition_id) + '?' + new URLSearchParams({ organization_id: row.organization_id, brand_id: row.brand_id })
+  const link = (row: Pick<PublicJob, 'requisition_id'>, apply = false) => apply ? applyUrl(row.requisition_id) : vacancyUrl(row.requisition_id)
   async function load(after = '') {
     const seq = ++selection.current
     setLoading(true); setError('')
@@ -58,23 +60,10 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
         const rows = await readPublic<PublicJob>('list_public_jobs', { after_id: after })
         if (seq === selection.current) { setJobs(old => after ? [...old, ...rows] : rows); setMore(rows.length === 25) }
       } else {
-        let jobScope = { organization_id, brand_id }
-        // Bare job URLs resolve scope from approved public summaries only.
-        if (!organization_id && !brand_id) {
-          let after_id = ''
-          while (seq === selection.current) {
-            const page = await readPublic<PublicJob>('list_public_jobs', { after_id })
-            const found = page.find(row => row.requisition_id === jobId)
-            if (found) { jobScope = found; break }
-            const next = page.at(-1)?.requisition_id ?? ''
-            if (page.length < 25 || next <= after_id) break
-            after_id = next
-          }
-        }
-        if (seq !== selection.current) return
-        const rows = jobScope.organization_id && jobScope.brand_id ? await readPublic<PublicJob>('get_public_job', { organization_id: jobScope.organization_id, brand_id: jobScope.brand_id, requisition_id: jobId }) : []
+        const rows = recordId ? await readPublic<PublicJob>('get_public_job', { requisition_id: recordId }) : []
+        const scoped = !query.has('organization_id') && !query.has('brand_id') || Boolean(organization_id && brand_id && rows[0]?.organization_id === organization_id && rows[0]?.brand_id === brand_id)
         const gates = await readPublic<{ intake_status: string }>('get_hiring_runtime_gate')
-        if (seq === selection.current) { setJob(rows[0] ?? null); setAvailable(gates[0]?.intake_status === 'open') }
+        if (seq === selection.current) { setJob(scoped ? rows[0] ?? null : null); setAvailable(gates[0]?.intake_status === 'open') }
       }
     } catch { if (seq === selection.current) setError('Jobs could not be loaded. Please retry.') }
     finally { if (seq === selection.current) setLoading(false) }
@@ -83,10 +72,11 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
   useEffect(() => { void load(); return () => { ++selection.current } }, [])
   if (loading && !jobs.length) return <LoadingState>Loading jobs…</LoadingState>
   if (error) return <ErrorState retry={() => void load()}>{error}</ErrorState>
-  if (mode !== 'list' && !job) return <NotFound>This job is no longer available. Open a vacancy link from the jobs list to include its organization and brand.</NotFound>
+  if (mode !== 'list' && !job) return <NotFound>This vacancy is unavailable or no longer open.</NotFound>
   return <div className="mx-auto max-w-4xl space-y-5 px-4 py-8">
     {mode === 'list' && <><h1 className="text-2xl font-semibold">Jobs</h1><button className={button} disabled={loading} onClick={() => void load()}>Refresh jobs</button><DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={setSearch} onBrand={setBrand} /><p>Search and filters apply to loaded results.</p><ul className="space-y-2">{filtered.map(j => <li key={j.requisition_id}><Link className={panel + ' block min-h-[44px] text-left'} to={link(j)}>{j.title} · {j.brand_name} · {j.location}</Link></li>)}</ul>{!filtered.length && <EmptyState>{jobs.length ? 'No jobs match these filters.' : 'No published jobs are available.'}</EmptyState>}{loading && <LoadingState />}{more && <button className={button} disabled={loading} onClick={() => void load(jobs.at(-1)!.requisition_id)}>More jobs</button>}</>}
-    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={link(job, '/apply/')}>Apply for this job</Link> : !userId ? <div className="mt-4 space-y-3"><p>Sign in to apply with your own candidate account.</p><Link className="inline-flex min-h-[44px] items-center underline" to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)}>Sign in to continue</Link><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={async () => setRefreshMine(n => n + 1)} />}</section>}
+    {job && mode !== 'list' && <Link className="underline" to={withBack(vacancyUrl(job.requisition_id), safeBack(query.get('back'), 'vacancies'))}>Vacancy details</Link>}
+    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={withBack(link(job, true), safeBack(query.get('back'), 'vacancies'))}>Apply for this job</Link> : !userId ? <div className="mt-4 space-y-3"><p>Sign in to apply with your own candidate account.</p><Link className="inline-flex min-h-[44px] items-center underline" to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)}>Sign in to continue</Link><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={async () => setRefreshMine(n => n + 1)} />}</section>}
     {userId && <section className={panel}><h2 className="font-semibold"><Link to="/my-applications" className="underline">My applications</Link></h2><CandidateApplications key={refreshMine} userId={userId} /></section>}
   </div>
 }

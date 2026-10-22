@@ -41,6 +41,26 @@
       "requires_auth": true
     },
     {
+      "name": "get_my_workspace",
+      "description": "Resolve one exact authorized organization/brand workspace. Missing and denied IDs both return no rows.",
+      "operation": "query",
+      "sql": "SELECT DISTINCT o.id AS organization_id,o.name AS organization_name,b.id AS brand_id,b.name AS brand_name,m.role,EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=o.id AND p.brand_id=b.id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AS can_manage_templates,EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=o.id AND p.brand_id=b.id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AS can_create_requisition,(o.created_by=:__user_id) AS can_create_brand FROM hiring_effective_access m JOIN hiring_organizations o ON o.id=m.organization_id JOIN hiring_brands b ON b.id=m.brand_id WHERE m.user_id=:__user_id AND o.id=:organization_id AND (:brand_id IS NULL OR b.id=:brand_id) AND (:owner_only IS NULL OR :owner_only=0 OR m.role='owner') ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'recruiter' THEN 1 WHEN 'reviewer' THEN 2 ELSE 3 END,b.id LIMIT 1",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string",
+          "optional": true
+        },
+        "owner_only": {
+          "type": "integer",
+          "optional": true
+        }
+      },
+      "requires_auth": true
+    },
+    {
       "name": "create_workspace",
       "description": "Create an organization or add a brand and draft requisition to an organization created by the authenticated user",
       "operation": "batch",
@@ -924,14 +944,16 @@
           "type": "string"
         },
         "brand_id": {
-          "type": "string"
+          "type": "string",
+          "optional": true
         },
         "organization_id": {
-          "type": "string"
+          "type": "string",
+          "optional": true
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
     },
     {
       "name": "save_my_worker_profile",
@@ -1866,14 +1888,16 @@
           "type": "string"
         },
         "brand_id": {
-          "type": "string"
+          "type": "string",
+          "optional": true
         },
         "organization_id": {
-          "type": "string"
+          "type": "string",
+          "optional": true
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND j.brand_id=:brand_id AND j.organization_id=:organization_id LIMIT 1"
+      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
     },
     {
       "name": "list_vacancy_management",
