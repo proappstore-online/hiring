@@ -1974,7 +1974,7 @@
     },
     {
       "name": "save_org_recruiting_playbook",
-      "description": "Organisation owner (manager) creates an immutable version with optimistic concurrency and atomic organisation audit evidence; returns version and updated_at in the final batch result",
+      "description": "Organisation owner creates an immutable playbook version with optimistic concurrency and atomic organisation audit evidence. Read the saved version with get_org_recruiting_playbook.",
       "operation": "batch",
       "requires_auth": true,
       "params": {
@@ -1992,8 +1992,7 @@
         }
       },
       "statements": [
-        "INSERT INTO hiring_org_playbooks(organization_id,version,payload,actor_user_id,updated_at,operation_id) SELECT :organization_id,:expected_version+1,:payload,:__user_id,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p JOIN hiring_organizations o ON o.id=p.organization_id WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL AND o.created_by=:__user_id) AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0 AND length(trim(:operation_id)) BETWEEN 1 AND 128",
-        "SELECT version,updated_at FROM hiring_org_playbooks WHERE organization_id=:organization_id AND operation_id=:operation_id AND actor_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_effective_access p JOIN hiring_organizations o ON o.id=p.organization_id WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL AND o.created_by=:__user_id)"
+        "INSERT INTO hiring_org_playbooks(organization_id,version,payload,actor_user_id,updated_at,operation_id) SELECT :organization_id,:expected_version+1,:payload,:__user_id,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p JOIN hiring_organizations o ON o.id=p.organization_id WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL AND o.created_by=:__user_id) AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0 AND length(trim(:operation_id)) BETWEEN 1 AND 128"
       ]
     },
     {

@@ -7,7 +7,7 @@ test('playbook tenant, role, scoped grant, revocation and suspended-org boundari
   const { db, get, save } = fixture()
   try {
     for (const user of ['owner-b','outsider','reviewer','auditor','scoped','recruiter','agent']) {
-      assert.deepEqual(save(0,user),[0,[]])
+      assert.deepEqual(save(0,user),[0])
     }
     save()
     for (const user of ['owner-b','outsider','reviewer','auditor','scoped',null]) assert.deepEqual(get(user),[])
@@ -17,7 +17,7 @@ test('playbook tenant, role, scoped grant, revocation and suspended-org boundari
     assert.deepEqual(get('agent'),[])
     db.exec("UPDATE hiring_organizations SET status='suspended' WHERE id='a'")
     assert.deepEqual(get(),[])
-    assert.deepEqual(save(1),[0,[]])
+    assert.deepEqual(save(1),[0])
   } finally { db.close() }
 })
 
@@ -33,8 +33,8 @@ test('authorised absent playbook has a safe fallback; outsiders cannot probe exi
 test('versions and audit are immutable, concurrent writes abort, and audit failures roll back', () => {
   const { db,save,get } = fixture()
   try {
-    assert.deepEqual(save(),[1,[{version:1,updated_at:123}]])
-    assert.deepEqual(save(1,'owner-a','{"intake_channels":["linkedin"]}'),[1,[{version:2,updated_at:123}]])
+    assert.deepEqual(save(),[1])
+    assert.deepEqual(save(1,'owner-a','{"intake_channels":["linkedin"]}'),[1])
     assert.throws(() => save(1,'owner-a','{}','stale'),/version conflict/)
     assert.throws(() => save(2,'owner-a','{}','save-0'),/UNIQUE/)
     assert.equal(get()[0].version,2)
@@ -55,8 +55,8 @@ test('invalid payload and version inputs cannot create a version or audit event'
   const { db,save } = fixture()
   try {
     for (const payload of ['invalid','null','[]','42','"text"']) assert.throws(()=>save(0,'owner-a',payload))
-    for (const version of [-1,0.5,'0']) assert.deepEqual(save(version),[0,[]])
-    assert.deepEqual(save(0,'owner-a','{}',' '),[0,[]])
+    for (const version of [-1,0.5,'0']) assert.deepEqual(save(version),[0])
+    assert.deepEqual(save(0,'owner-a','{}',' '),[0])
     assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_org_playbooks').get().n,0)
     assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_org_playbook_audit').get().n,0)
   } finally { db.close() }

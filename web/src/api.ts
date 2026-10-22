@@ -65,9 +65,9 @@ export function recordWorkingInterviewOutcome(candidateId: string, outcome: Inte
 }
 export const getOrgRecruitingPlaybook = (organization_id: string) => read<Playbook>('get_org_recruiting_playbook', { organization_id })
 export async function saveOrgRecruitingPlaybook(organization_id: string, payload: string, expected_version: number) {
-  // Batch ends with a SELECT, so the generic write() changes check does not apply.
-  const result = await app.actions.call<{ results?: { rows?: { version: number }[] }[] }>('save_org_recruiting_playbook', { organization_id, payload, expected_version, operation_id: id() })
-  if (!result.results?.at(-1)?.rows?.some(row => row.version === expected_version + 1)) throw Error('Save could not be confirmed. Reload and check access or version conflicts.')
+  await write('save_org_recruiting_playbook', { organization_id, payload, expected_version, operation_id: id() })
+  const saved = await getOrgRecruitingPlaybook(organization_id)
+  if (saved[0]?.version !== expected_version + 1) throw Error('Save could not be confirmed. Reload and check access or version conflicts.')
 }
 
 export type Interview = { assignment_id: string | null; id: string; version: number; scheduled_at: number | null; duration_minutes: number | null; location: string | null; format: string; status: string; reviewer_id: string | null }
