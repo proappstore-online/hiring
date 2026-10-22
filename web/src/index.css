@@ -6,15 +6,15 @@
 
 :root {
   color-scheme: light;
-  --paper: #ffffff;
-  --paper-deep: #f7f7f7;
+  --paper: #f9f8f6;
+  --paper-deep: #efede9;
   --ink: #111111;
   --muted: #666666;
   --line: rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.14);
-  --panel: rgba(255, 255, 255, 0.72);
-  --panel-strong: rgba(255, 255, 255, 0.88);
-  --panel-quiet: rgba(255, 255, 255, 0.6);
+  --panel: rgba(242, 240, 236, 0.92);
+  --panel-strong: rgba(235, 232, 227, 0.96);
+  --panel-quiet: rgba(247, 245, 242, 0.8);
   --accent: #d86f4d;
   --accent-soft: #ffd4bf;
   --accent-deep: #9f4427;
@@ -32,9 +32,9 @@
   --cool-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(198, 230, 242, 0.28));
   --mint-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(204, 231, 213, 0.28));
   --card-gradient: linear-gradient(180deg, #ffffff, #f5f5f5);
-  --bg-start: #ffffff;
-  --bg-mid: #fafafa;
-  --bg-end: #f5f5f5;
+  --bg-start: #fbfaf8;
+  --bg-mid: #f4f2ee;
+  --bg-end: #ebe8e2;
   --glow-warm: rgba(216, 111, 77, 0.16);
   --glow-cool: rgba(76, 151, 181, 0.16);
   --bg-blob-1: rgba(216, 111, 77, 0.07);
