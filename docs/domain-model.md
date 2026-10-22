@@ -42,7 +42,7 @@ Public organization sign-up and worker self-registration flows remain implementa
 ## Transitions
 
 - Requisition: `draft → pending_review → published → paused/closed → archived`; review can return to draft. Unpaid, internship and volunteer classifications do not require legal-review approval to publish.
-- Application: `submitted → in_review → interviewing → decision_pending → offered → hired` or `rejected`; `withdrawn` and `deleted` are terminal operational states. Reopening is an audited action; deleted cannot reopen.
+- Application: `submitted → in_review → shortlisted → offered → hired`; rejection is allowed from `in_review`, `shortlisted` and `offered`. Hired and rejected are terminal. Historical `interviewing`, `decision_pending` and `withdrawn` remain readable with no outgoing transitions. Deletion and reopening are not implemented by the stage action.
 - Offer: `draft → pending_approval → approved → sent → accepted/declined/expired`. No email implies approval before approval.
 - Rights request: `received → identity_verification → processing → fulfilled/denied_with_reason`; partial failures remain visible.
 
@@ -53,3 +53,30 @@ Each mutation has operation ID, expected version, permitted prior state, actor a
 **0012:** durable legacy membership revocations and an effective-access view combining active organization/brand/requisition grants with existing memberships. [Server permissions](permissions.md) defines role, assignment and administration behavior.
 
 **0015:** versioned requisition review payloads and immutable compensation classification; publication pause/resume controls gate public reads and submissions without changing legacy CHECK constraints. Owner approval binds staged notice and job content exactly. See [requisition lifecycle](candidate-intake.md#requisition-lifecycle-15). The approved #52 policy continues to supersede the original #15 legal-review criterion.
+
+## Application stage contract v1 (#20)
+
+The current operational flow is:
+`submitted → in_review → shortlisted → offered → hired`, with rejection from
+`in_review`, `shortlisted` or `offered`. Hired and rejected are terminal.
+Historical `interviewing`, `decision_pending` and `withdrawn` records remain
+readable; this contract provides no outgoing transitions for them or reopening.
+No stage change grants publication, review approval or email sending authority.
+
+`web/src/application-stages.json` is the static source for UI choices and the
+registered SQL predicate. Run `node scripts/application-stages.mjs --write`
+after changing it; contract tests check generated SQL and every allowed/denied edge.
+The SQL checks the stored canonical prior stage as well as the supplied prior
+stage, expected version, current owner/recruiter requisition authority, reason
+and unused operation ID. State, attributed stage history and audit commit in one
+batch. Replays and denials change nothing, using the existing zero-change action
+contract (not a new HTTP error mapping).
+
+Migration `0023_application_stage_contract` is additive: the legacy stage CHECK
+cannot accept `shortlisted`, so nullable `stage_extension='shortlisted'` is allowed
+only alongside legacy `stage='in_review'`. Canonical stage is
+`COALESCE(stage_extension,stage)` in every registered application read and stage
+mutation. Other stages clear the extension. Existing rows and applied migrations
+are unchanged. Consumers must use registered read models rather than interpreting
+the legacy column alone. Stage-event UPDATE and DELETE now abort, preserving
+append-only evidence alongside the existing immutable audit.

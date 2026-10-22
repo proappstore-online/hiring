@@ -1,0 +1,22 @@
+{
+  "submitted": [
+    "in_review"
+  ],
+  "in_review": [
+    "shortlisted",
+    "rejected"
+  ],
+  "shortlisted": [
+    "offered",
+    "rejected"
+  ],
+  "offered": [
+    "hired",
+    "rejected"
+  ],
+  "hired": [],
+  "rejected": [],
+  "interviewing": [],
+  "decision_pending": [],
+  "withdrawn": []
+}

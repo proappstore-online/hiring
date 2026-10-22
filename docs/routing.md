@@ -22,10 +22,11 @@ links without scope use the user's default workspace. No candidate name,
 contact information or secret appears in generated URLs.
 
 All authorization remains in the existing registered server actions. The full
-recruiter workspace list returns at most 100 recent records. A direct link
-outside that list uses `gateway_get_application`, which supplies a restricted
-summary only. It does not pretend that the redacted endpoint supplies contact
-or history fields. Missing and unauthorized records share the same 404 UI.
+recruiter workspace list returns at most 100 recent records. Direct links use
+`get_application` for full owner/recruiter detail independent of that limit.
+Assigned reviewers use `gateway_get_application`, which supplies a restricted
+summary without contact or history fields. Missing and unauthorized records
+share the same 404 UI.
 Scope/destination changes remount loaded state; in-flight loads cannot populate
 the next destination. Scoped APIs and intake/attachment gates are unchanged.
 
@@ -51,3 +52,11 @@ canonical shared links retain organization/brand scope. Existing job/application
 routes remain intact. Signed-in navigation includes Vacancies; owner/recruiter
 workspaces include Vacancy Management with lifecycle states and PD editing.
 See [PD contracts and non-executing mapping plan](vacancies-mapping-plan.md).
+
+## Exact recruiter application detail (#20)
+
+`/applications/:applicationId` now loads `get_application` directly, independent
+of the 100-record queue. It returns full details only for current owner/recruiter
+access to the exact organization, brand and requisition. Missing and unauthorized
+IDs both return no rows. Assigned reviewers retain the restricted
+`gateway_get_application` fallback, with no contact or history authority.

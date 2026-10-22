@@ -2,11 +2,11 @@ import { initPro } from '@proappstore/sdk'
 
 export const app = initPro({ appId: 'hiring' })
 
-// Mirrors the CHECK constraints in migrations.json and the stage guards in mcp.json.
-export const STAGES = ['submitted', 'in_review', 'interviewing', 'decision_pending', 'offered', 'hired', 'rejected', 'withdrawn'] as const
-export type Stage = typeof STAGES[number]
-export const TERMINAL_STAGES: readonly Stage[] = ['hired', 'rejected', 'withdrawn']
-export const NEXT_STAGES: readonly Stage[] = STAGES.filter(s => s !== 'submitted')
+import stageTransitions from './application-stages.json'
+export const STAGES = Object.keys(stageTransitions) as Stage[]
+export type Stage = keyof typeof stageTransitions
+export const allowedNextStages = (stage: Stage): readonly Stage[] => stageTransitions[stage] as Stage[]
+export const TERMINAL_STAGES: readonly Stage[] = STAGES.filter(stage => !allowedNextStages(stage).length)
 export const stageLabel = (stage: string) => stage.replaceAll('_', ' ')
 export type Role = 'owner' | 'recruiter' | 'reviewer' | 'auditor'
 

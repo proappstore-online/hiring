@@ -71,3 +71,15 @@ The org-only `get_org_recruiting_playbook` action uses `organization_id` without
 brand argument. Its schema version, grants, secret redaction and fail-closed agent
 behavior are defined in [the agent playbook contract](agent-playbook-contract.md).
 Its raw rows are not the generic gateway envelope described above.
+
+## Application detail and stage contract v1 (#20)
+
+`get_application(organization_id, brand_id, application_id)` is an authenticated,
+read-only full recruiter detail lookup, independent of list limits. Current
+owner/recruiter authority must cover the application's requisition; missing and
+unauthorized records both return no rows. Reviewers use the restricted gateway
+model. No browser interaction is required.
+
+`change_application_stage` retains its existing parameters and zero-change denial
+semantics. The static transition map, additive stage representation and atomic
+history/audit guarantees are documented in [the domain model](domain-model.md#application-stage-contract-v1-20).

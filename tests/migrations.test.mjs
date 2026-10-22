@@ -94,10 +94,10 @@ test('every legacy application child rejects mismatched scope on insert and upda
     const params = columns.map(c => values[c.name] ?? (c.type === 'INTEGER' ? 1 : 'value'))
     const sql = `INSERT INTO ${table} (${columns.map(c => c.name).join(',')}) VALUES (${columns.map(() => '?').join(',')})`
     db.prepare(sql).run(...params)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only/, table)
-    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET application_id='app-b' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only|stage history is append-only/, table)
+    assert.throws(() => db.prepare(`UPDATE ${table} SET brand_id='brand-other' WHERE id=?`).run(table), /scope mismatch|audit is append-only|email archives are append-only|stage history is append-only/, table)
     const bad = [...params]; bad[columns.findIndex(c => c.name === 'id')] += '-bad'; bad[columns.findIndex(c => c.name === 'application_id')] = 'app-b'
-    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch|audit is append-only|email archives are append-only/, table)
+    assert.throws(() => db.prepare(sql).run(...bad), /scope mismatch|audit is append-only|email archives are append-only|stage history is append-only/, table)
   }
   db.close()
 })
@@ -181,7 +181,7 @@ test('generic sources upgrade populated applications without relabelling history
   const before = db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
   db.exec('CREATE TABLE hiring_application_sources (application_id TEXT PRIMARY KEY REFERENCES hiring_applications(id), source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 100), profile_url TEXT CHECK(profile_url IS NULL OR (length(profile_url)<=2000 AND (profile_url LIKE \'https://%\' OR profile_url LIKE \'http://%\'))))')
   apply(db, migrations); db.exec(migrations.find(m => m.name === '0016_generic_application_sources').sql); apply(db, migrations)
-  assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), before)
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), before.map(row => Object.assign(row, {stage_extension:null})))
   assert.equal(db.prepare('SELECT count(*) n FROM hiring_application_sources').get().n, 0)
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   db.close()
