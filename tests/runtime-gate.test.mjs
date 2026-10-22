@@ -39,15 +39,21 @@ test('deploy applies migrations before registering dependent actions', () => {
   assert.ok(workflow.indexOf('Apply D1 migrations') < workflow.indexOf('Register app tools'))
 })
 
-test('registered actions cannot open intake or expose anonymous candidate data', () => {
+test('only the guarded owner action can change intake and no anonymous candidate data is exposed', () => {
   const tools = read('mcp.json').tools
   for (const tool of tools) {
     for (const sql of tool.statements ?? [tool.sql]) {
       if (tool.name === 'get_hiring_runtime_gate') {
         assert.match(sql, /^SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1$/)
       } else {
-        // Opening intake must be a deliberate reviewed release, never a client tool call.
-        assert.doesNotMatch(sql, /(?:UPDATE|INTO|DELETE FROM)\s+hiring_runtime_gate\b/i, tool.name)
+        if (tool.name === 'set_hiring_runtime_gate') {
+          assert.equal(tool.requires_auth, true)
+          assert.equal(tool.step_up, true)
+          if (/UPDATE\s+hiring_runtime_gate/i.test(sql)) {
+            assert.match(sql, /hiring_effective_access/)
+            assert.match(sql, /p\.role='owner'/)
+          }
+        } else assert.doesNotMatch(sql, /(?:UPDATE|INTO|DELETE FROM)\s+hiring_runtime_gate\b/i, tool.name)
         if (['list_public_jobs', 'get_public_job', 'listVacancies', 'getVacancyDetail'].includes(tool.name)) {
           assert.equal(tool.requires_auth, false)
           assert.match(sql, /^SELECT /)

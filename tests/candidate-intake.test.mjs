@@ -58,6 +58,22 @@ test('publication requires exact brand ownership and platform passkey step-up', 
   } finally { db.close() }
 })
 
+test('only a brand owner can open or close the audited intake gate', () => {
+  const { db, call } = fixture({ open: false })
+  try {
+    const change = { ...A, intake_status: 'open', operation_id: 'intake-open' }
+    assert.equal(tool('set_hiring_runtime_gate').step_up, true)
+    assert.deepEqual(call('set_hiring_runtime_gate', 'staff-a', change), [0, 0])
+    assert.deepEqual(call('set_hiring_runtime_gate', 'outsider', change), [0, 0])
+    assert.deepEqual(call('set_hiring_runtime_gate', 'owner', change), [1, 1])
+    assert.equal(db.prepare('SELECT intake_status FROM hiring_runtime_gate WHERE id=1').get().intake_status, 'open')
+    assert.equal(db.prepare("SELECT action FROM hiring_audit_events WHERE operation_id='intake-open'").get().action, 'intake.opened')
+    assert.deepEqual(call('set_hiring_runtime_gate', 'owner', change), [0, 0])
+    assert.deepEqual(call('set_hiring_runtime_gate', 'owner', { ...A, intake_status: 'closed', operation_id: 'intake-close' }), [1, 1])
+    assert.equal(db.prepare('SELECT intake_status FROM hiring_runtime_gate WHERE id=1').get().intake_status, 'closed')
+  } finally { db.close() }
+})
+
 test('public jobs expose only published approved snapshots, exact scope and bounded pagination', () => {
   const { db, call, publish } = fixture()
   try {

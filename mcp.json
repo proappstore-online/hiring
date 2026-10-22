@@ -2,11 +2,28 @@
   "tools": [
     {
       "name": "get_hiring_runtime_gate",
-      "description": "Read the public Hiring intake availability gate",
+      "description": "Read the public Hiring intake availability gate. An authorised brand owner can change it with set_hiring_runtime_gate.",
       "operation": "query",
       "sql": "SELECT intake_status, reason_code, updated_at FROM hiring_runtime_gate WHERE id = 1 LIMIT 1",
       "params": {},
       "requires_auth": false
+    },
+    {
+      "name": "set_hiring_runtime_gate",
+      "description": "Owner-only, audited control for opening or closing authenticated candidate application intake. Opening requires a recent passkey verification.",
+      "operation": "batch",
+      "params": {
+        "organization_id": { "type": "string" },
+        "brand_id": { "type": "string" },
+        "intake_status": { "type": "string" },
+        "operation_id": { "type": "string" }
+      },
+      "requires_auth": true,
+      "step_up": true,
+      "statements": [
+        "UPDATE hiring_runtime_gate SET intake_status=:intake_status,reason_code=CASE WHEN :intake_status='open' THEN 'owner_authorized' ELSE 'owner_closed' END,updated_at=:__now WHERE id=1 AND :intake_status IN ('open','closed') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,NULL,CASE WHEN :intake_status='open' THEN 'intake.opened' ELSE 'intake.closed' END,:__user_id,:operation_id,:__now,'runtime_gate','1',CASE WHEN :intake_status='open' THEN 'Authenticated candidate intake enabled' ELSE 'Candidate intake disabled' END WHERE changes()=1"
+      ]
     },
     {
       "name": "list_my_workspaces",
