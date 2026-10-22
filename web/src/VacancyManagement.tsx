@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from './route-ui'
 import { button, date, field, panel } from './ui'
 
 type ManagedVacancy = { id: string; title: string; state: string; updated_at: number }
-export function VacancyManagement({ scope, requisitions }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[] }) {
+export function VacancyManagement({ scope, requisitions, selectedRequisitionId = '' }: { scope: Scope; role: 'owner' | 'recruiter'; requisitions: Requisition[]; selectedRequisitionId?: string }) {
   const [rows, setRows] = useState<ManagedVacancy[]>([])
   const [selected, setSelected] = useState('')
   const [loading, setLoading] = useState(true)
@@ -16,18 +16,39 @@ export function VacancyManagement({ scope, requisitions }: { scope: Scope; role:
   async function load() {
     const request = ++seq.current
     setLoading(true); setError(false)
-    try { const result = await read<ManagedVacancy>('list_vacancy_management', scope); if (request === seq.current) setRows(result) }
+    try { const result = await read<ManagedVacancy>('list_vacancy_management', scope); if (request === seq.current) { setRows(result); setSelected(current => result.some(row => row.id === selectedRequisitionId) ? selectedRequisitionId : current) } }
     catch { if (request === seq.current) setError(true) }
     finally { if (request === seq.current) setLoading(false) }
   }
-  useEffect(() => { void load(); return () => { ++seq.current } }, [scope.organization_id, scope.brand_id])
+  useEffect(() => { void load(); return () => { ++seq.current } }, [scope.organization_id, scope.brand_id, selectedRequisitionId])
   const vacancy = rows.find(r => r.id === selected)
   return <section className={panel}><h2 className="text-xl font-semibold">Vacancy Management</h2><p className="my-3 text-sm">Draft → in review → published → paused → closed. Showing the most recent 100 requisitions.</p>
     {loading ? <LoadingState>Loading vacancy management…</LoadingState> : error ? <ErrorState retry={() => void load()}>Vacancy states could not be loaded.</ErrorState> : !rows.length ? <EmptyState>No requisitions yet.</EmptyState> : <ul className="space-y-2">{rows.map(r => <li key={r.id}><button aria-pressed={selected === r.id} className={button + ' w-full text-left'} onClick={() => setSelected(r.id)}>{r.title} <span className="rounded border px-2">{r.state}</span><span className="block text-sm">Updated {date(r.updated_at)}</span></button></li>)}</ul>}
-    {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
+    {selectedRequisitionId && !loading && !vacancy && <ErrorState retry={() => void load()}>This vacancy is unavailable in the selected workspace.</ErrorState>}
+    {vacancy && <div className="mt-5 space-y-5"><h3 className="font-semibold">Manage {vacancy.title}</h3><ApprovedJobDescription scope={scope} requisitionId={vacancy.id} /> <PDEditor key={vacancy.id} scope={scope} requisitionId={vacancy.id} locked={['published','paused','closed'].includes(vacancy.state)} onSaved={load} />
       <PublishJob key={'publication:' + vacancy.id} scope={scope} requisitions={requisitions.filter(r => r.id === vacancy.id)} onChanged={load} />
     </div>}
   </section>
+}
+function ApprovedJobDescription({ scope, requisitionId }: { scope: Scope; requisitionId: string }) {
+  const [content, setContent] = useState<Record<string, string> | null>(null)
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let active = true
+    void read<{ payload: string }>('get_requisition_review', { ...scope, requisition_id: requisitionId }).then(rows => {
+      if (!active) return
+      try { setContent(rows[0] ? JSON.parse(rows[0].payload) as Record<string, string> : null) } catch { setError(true) }
+    }).catch(() => { if (active) setError(true) })
+    return () => { active = false }
+  }, [scope.organization_id, scope.brand_id, requisitionId])
+  async function copy() {
+    if (!content) return
+    const text = [content.description, `Working arrangement\n${content.arrangement ?? ''}`, `Compensation\n${content.compensation ?? ''}`, `Contact\n${content.contact ?? ''}`].filter(Boolean).join('\n\n')
+    await navigator.clipboard.writeText(text)
+  }
+  if (error) return <ErrorState retry={() => setError(false)}>Approved job description could not be loaded.</ErrorState>
+  if (!content) return <LoadingState>Loading approved job description…</LoadingState>
+  return <section className={panel}><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">Approved job description</h3><button className={button} onClick={() => void copy()}>Copy job description</button></div><p className="mt-3 whitespace-pre-wrap">{content.description}</p><h4 className="mt-4 font-semibold">Working arrangement</h4><p className="whitespace-pre-wrap">{content.arrangement}</p><h4 className="mt-4 font-semibold">Compensation</h4><p className="whitespace-pre-wrap">{content.compensation}</p></section>
 }
 function PDEditor({ scope, requisitionId, locked, onSaved }: { scope: Scope; requisitionId: string; locked: boolean; onSaved: () => Promise<void> }) {
   const [record, setRecord] = useState<PDRecord | null>(null)
