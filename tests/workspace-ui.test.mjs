@@ -42,6 +42,7 @@ test('candidate and staff routes are separated; job and notice text render as es
   assert.match(jobs, /role="status"/)
   assert.match(jobs, /submittedPayload\.current/)
   assert.match(jobs, /get_my_application_receipt/)
+  assert.match(jobs, /flex flex-col items-start gap-3/)
 })
 
 test('attachments use private uploads, never public URLs or unscanned reviewer downloads', () => {

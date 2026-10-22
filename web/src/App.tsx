@@ -51,7 +51,7 @@ function SignIn() {
   const safeTarget = /^\/(admin|playbook|dashboard|applications|my-applications|apply)(\/|\?|$)/.test(target) ? target : '/dashboard'
   if (loading) return <LoadingState />
   if (user) return <Navigate replace to={safeTarget} />
-  return <section className={panel}><h1 className="text-2xl font-semibold">Sign in to Hiring</h1><p className="my-4">Continue to your application or workspace.</p><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></section>
+  return <section className={panel}><h1 className="text-2xl font-semibold">Sign in to Hiring</h1><p className="my-4">Continue to your application or workspace.</p><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></section>
 }
 function PublicJobs({ mode = 'list' }: { mode?: 'list' | 'detail' | 'apply' }) {
   const { user } = useAuth(app)
