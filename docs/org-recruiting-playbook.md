@@ -96,3 +96,30 @@ itself based on `feat/admin-operations-66`). Target the pipeline branch until it
 stack lands, then retarget/rebase to main. This PR implements #77 under #76;
 workflow UI and the remaining integration are follow-ups. Do not merge or deploy
 as part of this task.
+
+## Recruiter workflow UI (#78)
+
+The authenticated `/playbook` route preserves organisation/brand scope and sign-in
+return destinations. Recruiters have a read-only view. Only the organisation
+creator with owner access receives the JSON replacement editor. Saves use the
+loaded expected version; conflicts require reloading and reviewing the policy.
+Because even owner reads redact secrets, the editor explicitly requires restoring
+required secret references before confirming a complete replacement save.
+
+Candidate detail includes an additive working-interview preview without changing
+the existing generic interview stages. Invitations require a configured HH:mm time
+and IANA timezone, and describe observing the daily stand-up followed by remaining
+for a one-to-one interview. Join details are always a placeholder. Redacted reads
+cannot verify secure join configuration: staff must confirm it privately before
+recording an invitation already sent through the approved mail workflow.
+
+As explicitly scoped for #78, invitation/outcome records are an in-memory prototype,
+keyed by authenticated principal, organisation, brand and application. They are
+lost on reload, are not shared or audited, and do not send mail. The UI states this
+limitation. Version, invitation text, owner, sent time, outcome, exceptions and
+completion time are captured for the current session. Durable workflow evidence
+requires a subsequent schema/action change before operational reliance. Historical
+applications need no new fields and show “No working interview recorded”.
+
+Delivery is stacked on `feat/org-recruiting-playbook-77` (PR #80), references #78
+and parent #76, and preserves the #74 pipeline-filter work. No merge or deployment.

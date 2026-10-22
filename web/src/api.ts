@@ -43,3 +43,29 @@ export type CandidateApplication = Scope & { application_id: string; requisition
 export type IntakeReceipt = Scope & { application_id: string; requisition_id: string; payload_json: string; stage: Stage }
 export type Attachment = { id: string; filename: string; mime_type: string; size_bytes: number; scan_state: 'pending' | 'clean' | 'infected' | 'failed'; uploader_user_id: string }
 export const readPublic = async <T,>(name: string, params: Params = {}) => (await app.actions.callPublic<Rows<T>>(name, params)).rows
+
+// Deliberately ephemeral: no server persistence or email delivery is implied.
+// Scope and principal are mandatory to prevent cross-workspace/account reuse.
+import type { InvitationRecord, InterviewOutcome, Playbook, WorkingInterviewRecord } from './playbook'
+const workingInterviews = new Map<string, WorkingInterviewRecord>()
+export const workingInterviewKey = (scope: Scope, candidateId: string) => JSON.stringify([app.auth.user?.id, scope.organization_id, scope.brand_id, candidateId])
+export const getWorkingInterview = (candidateId: string) => workingInterviews.get(candidateId)
+export function recordWorkingInterviewInvitation(candidateId: string, invitation: InvitationRecord) {
+  if (!invitation.owner.trim() || !invitation.invitationText.trim() || invitation.playbookVersion < 1) throw Error('Invitation requires an owner, text and playbook version.')
+  const record = { invitation: { ...invitation } }
+  workingInterviews.set(candidateId, record)
+  return record
+}
+export function recordWorkingInterviewOutcome(candidateId: string, outcome: InterviewOutcome) {
+  const record = workingInterviews.get(candidateId)
+  if (!record || !outcome.outcome.trim()) throw Error('Record an invitation and outcome first.')
+  const next = { ...record, outcome: { ...outcome } }
+  workingInterviews.set(candidateId, next)
+  return next
+}
+export const getOrgRecruitingPlaybook = (organization_id: string) => read<Playbook>('get_org_recruiting_playbook', { organization_id })
+export async function saveOrgRecruitingPlaybook(organization_id: string, payload: string, expected_version: number) {
+  // Batch ends with a SELECT, so the generic write() changes check does not apply.
+  const result = await app.actions.call<{ results?: { rows?: { version: number }[] }[] }>('save_org_recruiting_playbook', { organization_id, payload, expected_version, operation_id: id() })
+  if (!result.results?.at(-1)?.rows?.some(row => row.version === expected_version + 1)) throw Error('Save could not be confirmed. Reload and check access or version conflicts.')
+}
