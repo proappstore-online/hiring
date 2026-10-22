@@ -1942,6 +1942,42 @@
         }
       },
       "sql": "SELECT x.id,x.agent_instance_id,x.activity_type AS action,x.occurred_at,'unknown' AS outcome FROM hiring_agent_activity x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=x.organization_id AND p.brand_id=x.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter','auditor') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) ORDER BY x.occurred_at DESC,x.id LIMIT 100"
+    },
+    {
+      "name": "get_org_recruiting_playbook",
+      "description": "Return the latest organisation recruiting playbook to authorised owners/recruiters, including agents granted recruiter access; secret_* and meeting_password fields are redacted recursively server-side",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "sql": "WITH RECURSIVE latest AS (SELECT version,payload,updated_at,actor_user_id FROM hiring_org_playbooks WHERE organization_id=:organization_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY version DESC LIMIT 1), secrets AS (SELECT fullkey,ROW_NUMBER() OVER (ORDER BY length(fullkey) DESC,fullkey) AS n FROM latest,json_tree(latest.payload) WHERE typeof(key)='text' AND (substr(lower(key),1,7)='secret_' OR lower(key)='meeting_password')), redacted(n,payload) AS (SELECT 0,payload FROM latest UNION ALL SELECT s.n,json_remove(r.payload,s.fullkey) FROM redacted r JOIN secrets s ON s.n=r.n+1) SELECT l.version,r.payload,l.updated_at,l.actor_user_id,NULL AS message FROM latest l JOIN redacted r ON r.n=(SELECT count(*) FROM secrets) UNION ALL SELECT 0,NULL,NULL,NULL,'No playbook configured' WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND NOT EXISTS (SELECT 1 FROM latest)"
+    },
+    {
+      "name": "save_org_recruiting_playbook",
+      "description": "Organisation owner (manager) creates an immutable version with optimistic concurrency and atomic organisation audit evidence; returns version and updated_at in the final batch result",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_org_playbooks(organization_id,version,payload,actor_user_id,updated_at,operation_id) SELECT :organization_id,:expected_version+1,:payload,:__user_id,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p JOIN hiring_organizations o ON o.id=p.organization_id WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL AND o.created_by=:__user_id) AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0 AND length(trim(:operation_id)) BETWEEN 1 AND 128",
+        "SELECT version,updated_at FROM hiring_org_playbooks WHERE organization_id=:organization_id AND operation_id=:operation_id AND actor_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_effective_access p JOIN hiring_organizations o ON o.id=p.organization_id WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL AND o.created_by=:__user_id)"
+      ]
     }
   ]
 }

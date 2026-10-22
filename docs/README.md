@@ -30,3 +30,6 @@ Server identity, scoped grants, assignment restrictions and revocation: [permiss
 Append-only audit, durable job transitions and retry safety: [audit and outbox contract](audit-outbox.md).
 
 Owner identity editors, scoped member management, and immutable public identity snapshots: [organization and brand administration](permissions.md#organization-and-brand-administration-14).
+
+- [Organisation recruiting playbook](org-recruiting-playbook.md): versioned policy,
+  owner-only saves, tenant guards, audit, redaction and agent fallback (#77/#76).
