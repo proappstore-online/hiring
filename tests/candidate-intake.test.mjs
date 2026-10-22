@@ -348,3 +348,39 @@ test('candidate detail lookup is owned, safe and independent of public availabil
     assert.equal(call('get_my_application','worker',{ application_id:'application-a' }).length,1)
   } finally { db.close() }
 })
+
+test('both brand forms reject unpublished jobs and stale snapshots without partial evidence', () => {
+  for (const scope of [A, B]) {
+    const { db, call } = fixture()
+    try {
+      const params = application(scope, scope.brand_id)
+      const empty = counts(db)
+      assert.deepEqual(call('get_public_job', null, scope), [])
+      assert.ok(call('submit_job_application', 'worker', params).every(n => n === 0))
+      assert.deepEqual(counts(db), empty)
+      call('publish_job_requisition', 'owner', { ...publication(scope), notice_version: `notice-${scope.brand_id}` })
+      const published = counts(db)
+      assert.ok(call('submit_job_application', 'worker', params).every(n => n === 0))
+      assert.deepEqual(counts(db), published)
+      const current = { ...params, notice_version: `notice-${scope.brand_id}` }
+      call('pause_job_requisition', 'owner', { ...scope, expected_version: 1, operation_id: 'pause-form' })
+      assert.ok(call('submit_job_application', 'worker', current).every(n => n === 0))
+      call('resume_job_requisition', 'owner', { ...scope, expected_version: 2, operation_id: 'resume-form' })
+      const resumed = counts(db)
+      assert.ok(call('submit_job_application', 'worker', current).every(n => n === 0))
+      assert.deepEqual(counts(db), resumed)
+      assert.equal(call('submit_job_application', 'worker', { ...current, expected_version: 3 }).at(-1), 1)
+      const receipt = call('get_my_requisition_receipt', 'worker', scope)[0]
+      const payload = JSON.parse(receipt.payload_json)
+      assert.equal(payload.publication_version, 3)
+      assert.equal(payload.notice_version, `notice-${scope.brand_id}`)
+      assert.equal(payload.brand_id, scope.brand_id)
+      const saved = counts(db)
+      assert.ok(call('submit_job_application', 'worker', { ...current, expected_version: 3 }).every(n => n === 0))
+      assert.deepEqual(counts(db), saved)
+      assert.deepEqual(call('get_my_requisition_receipt', 'other-worker', scope), [])
+      assert.deepEqual(call('get_my_requisition_receipt', 'worker', { ...scope, brand_id: scope.brand_id === 'a' ? 'b' : 'a' }), [])
+      assert.deepEqual(call('get_my_requisition_receipt', 'worker', { ...scope, organization_id: 'another-org' }), [])
+    } finally { db.close() }
+  }
+})

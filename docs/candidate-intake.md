@@ -106,3 +106,33 @@ mutation is registered. Private attachment metadata and quarantine remain visibl
 neither the status page nor discovery introduces download capability or opens
 intake/scanning gates. Browser tests use mocked auth/actions; they do not verify
 a live OAuth ceremony, scanner, or file-serving integration.
+
+## Accessible brand-specific application form (#17)
+
+The scoped `/apply/:requisitionId` form shows the published organization, brand,
+role and notice before submission. Native labels, required name/email/notice
+validation, length limits, autocomplete and a keyboard-accessible submit button
+support mobile and keyboard use. Optional consents start unchecked. Invalid
+controls are marked for assistive technology; server errors are described by the
+form fields and receive focus. Submission progress is announced, controls are
+locked during submission, and a verified confirmation receives focus before the
+candidate can tab to their application status link.
+
+Stable in-memory submission identifiers survive uncertain responses. Changed
+retry payloads are blocked; exact payload receipt reconciliation is required for
+success. No form values enter navigation URLs or persistent browser storage.
+Public brand B vacancies remain discoverable to candidates who applied to brand
+A; candidate records and receipt access remain caller-owned and scope-bound.
+
+Browser tests use two brands and mocked platform responses for stale-version
+errors, scope denial, validation, keyboard order, retries and confirmation. SQL
+tests separately verify the registered action rejects unpublished, paused,
+closed, stale-notice and stale-publication submissions without partial records.
+These tests do not verify a live authentication ceremony or scanner.
+
+Current lifecycle clarification: the owner/recruiter publishing simplification
+removed passkey step-up from publication and intake-gate actions. The gate still
+starts closed, is authenticated and audited, and is opened only by the existing
+scoped staff action. Earlier statements above that no action can open it or that
+publication always requires passkey step-up describe the older implementation.
+This form change does not open intake or add attachment-serving capabilities.

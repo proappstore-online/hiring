@@ -1,11 +1,11 @@
 import { mutationError } from './mutation-state'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState, EmptyState, ErrorState, NotFound } from './route-ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { SignInButton } from '@proappstore/sdk'
 import { app, id, read, readPublic, write, type IntakeReceipt, type PublicJob, type Requisition, type Scope } from './api'
 import { CandidateApplications, applicationLink } from './CandidateAccount'
-import { Form, TextField, button, field, panel, val } from './ui'
+import { button, field, panel, val } from './ui'
 import { DiscoveryFilters } from './DiscoveryFilters'
 
 export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; requisitions: Requisition[]; onChanged?: () => Promise<void> }) {
@@ -98,7 +98,15 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
   // Kept for retries of this form, never regenerated after an uncertain response.
   const ids = useRef({ application_id: id(), candidate_id: id(), operation_id: id(), idempotency_key: id() })
   const submittedPayload = useRef<string | null>(null)
+  const feedback = useRef<HTMLParagraphElement>(null)
+  const confirmation = useRef<HTMLParagraphElement>(null)
+  const submitting = useRef(false)
+  const formId = useId()
+  useEffect(() => { if (error) feedback.current?.focus() }, [error])
+  useEffect(() => { if (receipt) confirmation.current?.focus() }, [receipt])
   async function submit(f: FormData) {
+    if (submitting.current) return
+    submitting.current = true
     setBusy(true); setError('')
     const p = { ...ids.current, organization_id: job.organization_id, brand_id: job.brand_id, requisition_id: job.requisition_id, candidate_name: val(f, 'candidate_name'), email: val(f, 'email').toLowerCase(), phone: val(f, 'phone'), statement: val(f, 'statement'), notice_version: job.notice_version, expected_version: job.version, notice_acknowledged: f.has('notice_acknowledged') ? 1 : 0, talent_pool_consent: f.has('talent_pool_consent') ? 1 : 0, communications_consent: f.has('communications_consent') ? 1 : 0, website: val(f, 'website') }
     const payload = { name: p.candidate_name, email: p.email, phone: p.phone, statement: p.statement, notice_version: p.notice_version, publication_version: p.expected_version, notice_acknowledged: p.notice_acknowledged, talent_pool_consent: p.talent_pool_consent, communications_consent: p.communications_consent, requisition_id: p.requisition_id, brand_id: p.brand_id, organization_id: p.organization_id }
@@ -113,8 +121,30 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
       if (!saved) throw failure ?? new Error('Application was not saved. Check that applications are open, then retry. Submissions are limited to ten per day and one per ten seconds.')
       if (JSON.stringify(JSON.parse(saved.payload_json)) !== JSON.stringify(payload)) throw new Error('Submission conflict. The saved application differs from this form.')
       setReceipt(saved); await onSaved()
-    } catch (e) { setError((e instanceof Error ? e.message : 'Application could not be confirmed.') + ' If the result is uncertain, retry with the same form values; your receipt will be checked before success is shown.') } finally { setBusy(false) }
+    } catch (e) { setError((e instanceof Error ? e.message : 'Application could not be confirmed.') + ' If the result is uncertain, retry with the same form values; your receipt will be checked before success is shown.') } finally { submitting.current = false; setBusy(false) }
   }
-  if (receipt) return <div className="mt-4"><p role="status">Application saved for {job.brand_name}. Reference: {receipt.application_id}.</p><Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(receipt.application_id)}>View application status</Link></div>
-  return <div className="mt-5"><h3 className="font-semibold">Apply to {job.brand_name}</h3>{error && <p role="alert">{error}</p>}<p role="status">{busy ? 'Submitting application and checking your receipt…' : 'Complete your details and acknowledge the notice to submit. If confirmation is interrupted, retry with the same values to check your receipt.'}</p><Form busy={busy} submitLabel="Submit application" busyLabel="Submitting…" onSubmit={submit}><fieldset disabled={busy} className="space-y-3"><label className="hidden" aria-hidden="true">Leave empty<input name="website" autoComplete="off" tabIndex={-1} /></label><TextField name="candidate_name" label="Your name" /><TextField name="email" label="Email" type="email" /><TextField name="phone" label="Phone (optional)" required={false} /><label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} /></label><label className="block text-sm"><input name="notice_acknowledged" type="checkbox" required /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label><label className="block text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label><label className="block text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label></fieldset></Form></div>
+  if (receipt) return <div className="mt-4"><p ref={confirmation} tabIndex={-1} role="status" aria-live="polite">Application saved for {job.brand_name}. Reference: {receipt.application_id}.</p><Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(receipt.application_id)}>View application status</Link></div>
+  const description = `${formId}-help${error ? ` ${formId}-error` : ''}`
+  return <div className="mt-5">
+    <h3 id={`${formId}-title`} className="font-semibold">Apply to {job.brand_name}</h3>
+    {error && <p id={`${formId}-error`} ref={feedback} tabIndex={-1} role="alert">{error}</p>}
+    <p id={`${formId}-help`} role="status" aria-live="polite">{busy ? 'Submitting application and checking your receipt…' : 'Complete your details and acknowledge the notice to submit. If confirmation is interrupted, retry with the same values to check your receipt.'}</p>
+    <form className="mt-4 space-y-3" aria-labelledby={`${formId}-title`} aria-describedby={description} aria-busy={busy}
+      onSubmit={e => { e.preventDefault(); void submit(new FormData(e.currentTarget)) }}
+      onInvalid={e => { (e.target as HTMLInputElement).setAttribute('aria-invalid', 'true') }}
+      onInput={e => { (e.target as HTMLInputElement).removeAttribute('aria-invalid') }}>
+      <fieldset disabled={busy} className="space-y-3" aria-describedby={description}>
+        <legend className="sr-only">Application details for {job.brand_name}</legend>
+        <label className="hidden" aria-hidden="true">Leave empty<input name="website" autoComplete="off" tabIndex={-1} /></label>
+        <label className="block text-sm">Your name<input className={field} aria-label="Your name" name="candidate_name" autoComplete="name" required maxLength={200} pattern=".*\S.*" aria-describedby={description} /></label>
+        <label className="block text-sm">Email<input className={field} aria-label="Email" name="email" type="email" autoComplete="email" required maxLength={320} aria-describedby={description} /></label>
+        <label className="block text-sm">Phone (optional)<input className={field} aria-label="Phone (optional)" name="phone" type="tel" autoComplete="tel" maxLength={100} aria-describedby={description} /></label>
+        <label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} aria-describedby={description} /></label>
+        <label className="block min-h-[44px] text-sm"><input name="notice_acknowledged" type="checkbox" required aria-describedby={description} /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label>
+        <label className="block min-h-[44px] text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label>
+        <label className="block min-h-[44px] text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label>
+      </fieldset>
+      <button className={button} aria-label={busy ? 'Submitting…' : 'Submit application'} disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit application'}</button>
+    </form>
+  </div>
 }
