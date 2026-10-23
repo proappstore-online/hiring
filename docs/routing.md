@@ -81,7 +81,15 @@ for an exact authorized requisition lookup even when it is older than the recent
 and recruiters, and an assigned reviewer receives the restricted gateway summary.
 Application detail links to the communications screen, where a selected
 `application_id` is fetched exactly even if it has left the recent list.
-Scope changes on detail routes return to the corresponding list. Navigation retains validated `organization_id` and `brand_id` in staff links.
+Scope changes on application detail routes return to the corresponding list.
+From a vacancy detail, switching to another workspace opens its vacancy list (or
+overview for a role without vacancy access). The tab remembers the selected
+requisition for the signed-in user and workspace. Switching back restores its
+canonical detail URL only after a fresh exact scoped authorization read; a
+removed or inaccessible record returns to the list. A validated `back` list
+context is retained for that return, while copied links contain only the
+canonical ID and scope. Navigation retains validated `organization_id` and
+`brand_id` in staff links.
 
 Legacy `/dashboard`, `/admin`, `/applications`, `/applications/:applicationId`,
 `/playbook`, and `/admin/{communications,operations,compliance,settings}`

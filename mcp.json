@@ -1670,7 +1670,7 @@
     },
     {
       "name": "get_requisition_review",
-      "description": "Owner reads staged public content and review version in exact brand.",
+      "description": "Brand owners and recruiters read staged public content and review version in exact brand.",
       "operation": "query",
       "requires_auth": true,
       "params": {
@@ -1684,7 +1684,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT v.* FROM hiring_requisition_reviews v JOIN hiring_requisitions r ON r.id=v.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL)"
+      "sql": "SELECT v.* FROM hiring_requisition_reviews v JOIN hiring_requisitions r ON r.id=v.requisition_id WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL)"
     },
     {
       "name": "create_application",
@@ -1957,7 +1957,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT r.id,r.title,r.status,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1"
+      "sql": "SELECT r.id,r.title,r.status,EXISTS (SELECT 1 FROM hiring_effective_access publisher WHERE publisher.organization_id=r.organization_id AND publisher.brand_id=r.brand_id AND publisher.user_id=:__user_id AND publisher.role IN ('owner','recruiter') AND publisher.requisition_id IS NULL) AS can_publish,v.state AS review_state,j.version AS publication_version,j.description AS published_description,j.location AS published_location,j.arrangement AS published_arrangement,j.compensation AS published_compensation,j.contact AS published_contact,j.notice_version AS published_notice_version,j.notice_text AS published_notice_text,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1"
     },
     {
       "name": "get_my_application",

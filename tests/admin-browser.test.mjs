@@ -15,6 +15,7 @@ window.calls=[];window.fail=false;window.rows=[];window.conflict=false;window.te
 window.read=async(name,params)=>{window.calls.push({name,params});if(window.fail)throw Error('fixture');switch(name){
 case'list_communication_templates':return window.templates;
 case'list_vacancy_management':return[{id:'req',title:'Engineer',state:'draft',updated_at:1000}];
+case'get_vacancy_management':return params.requisition_id==='req'?[{id:'req',title:'Engineer',status:'draft',state:'draft',updated_at:1000,can_publish:1}]:[];
 case'get_pd_draft':return[];
 case'get_requisition_review':return[{version:1,payload:JSON.stringify({description:'Reviewed content',location:'Remote',arrangement:'Remote volunteer role',compensation:'Unpaid',notice_version:'v1',notice_text:'Applicant privacy notice',contact:'admin@example.test',compensation_type:'volunteer'})}];
 case'list_job_publications':return[{requisition_id:'req',title:'Engineer',version:1,status:'published'}];

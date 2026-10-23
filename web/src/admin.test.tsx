@@ -13,7 +13,7 @@ import { AccessDenied } from './route-ui'
 import type { Role } from './api'
 
 const scope = { organization_id: 'org', brand_id: 'brand' }
-function VacancyFixture() { const { requisitionId } = useParams(); return <VacancyManagement scope={scope} role="owner" requisitions={[{ id:'req', title:'Engineer', status:'draft' }]} selectedRequisitionId={requisitionId} /> }
+function VacancyFixture() { const { requisitionId } = useParams(); return <VacancyManagement scope={scope} role="owner" requisitions={[{ id:'req', title:'Engineer', status:'draft' }]} selectedRequisitionId={requisitionId} selectedVacancy={requisitionId === 'req' ? { id:'req', title:'Engineer', status:'draft', state:'draft', updated_at:1000, can_publish:1 } : undefined} /> }
 export function AdminTest({ scenario, role = 'owner' }: { scenario: string; role?: Role }) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
