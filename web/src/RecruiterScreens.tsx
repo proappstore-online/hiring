@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@proappstore/sdk'
-import { read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
+import { read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
 import { ApplicationFilters } from './ApplicationFilters'
 import { ApplicationDetail } from './ApplicationDetail'
 import { AdminCommunications } from './AdminCommunications'
@@ -63,14 +63,14 @@ function FullApplicationScreen({ application, applicationId, retryApplication }:
   const [copyMessage, setCopyMessage] = useState('')
   const members = useRows<Member>('list_workspace_members', scope)
   const notes = useRows<Note>('list_application_notes', params)
-  const activities = useRows<AgentActivity>('list_application_agent_activity', params); const events = useRows<StageEvent>('list_stage_events', params); const assignments = useRows<AssignmentEvent>('list_assignment_events', params); const audit = useRows<Audit>('list_application_audit', params)
+  const activities = useRows<AgentActivity>('list_application_agent_activity', params); const events = useRows<StageEvent>('list_stage_events', params); const assignments = useRows<AssignmentEvent>('list_assignment_events', params); const audit = useRows<Audit>('list_application_audit', params); const drafts = useRows<Draft>('list_communication_drafts', params); const communications = useRows<Communication>('list_application_communications', params)
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')
   const run: Run = async (name, values) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, values); retryApplication(); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
-  const history = [notes, activities, events, assignments, audit]
-  const retryDetail = () => { notes.retry(); activities.retry(); events.retry(); assignments.retry(); audit.retry() }
+  const history = [notes, activities, events, assignments, audit, drafts, communications]
+  const retryDetail = () => { notes.retry(); activities.retry(); events.retry(); assignments.retry(); audit.retry(); drafts.retry(); communications.retry() }
   if (members.loading) return <LoadingState>Loading application…</LoadingState>
   if (members.error) return <ErrorState retry={members.retry}>Could not load application.</ErrorState>
-  return <Screen title="Application details"><Link className="underline" to={staffBack(query.get('back'), scope, 'applications')}>All applications</Link><button className="ml-3 underline" onClick={() => void navigator.clipboard.writeText(new URL(recruiterApplicationUrl(applicationId, scope), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button><p role="status">{copyMessage}</p>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} busy={busy} run={run} />}</Screen>
+  return <Screen title="Application details"><Link className="underline" to={staffBack(query.get('back'), scope, 'applications')}>All applications</Link><button className="ml-3 underline" onClick={() => void navigator.clipboard.writeText(new URL(recruiterApplicationUrl(applicationId, scope), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button><p role="status">{copyMessage}</p>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} drafts={drafts.rows} communications={communications.rows} busy={busy} run={run} />}</Screen>
 }
 export function CommunicationsScreen() {
   const { space } = useWorkspace(); const scope = scopeOf(space); const { applicationId = '' } = useParams()
