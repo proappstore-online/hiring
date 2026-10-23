@@ -88,3 +88,13 @@ export const interviewActions = { create: 'create_interview', schedule: 'update_
 
 export type ScorecardCriterion = { criterion: string; rating: number; evidence: string }
 export type ScorecardVersion = { assignment_id: string; version: number; status: 'draft' | 'submitted'; criteria_json: string; created_at: number; submitted_at: number | null }
+
+// Uses the existing authenticated registered-action endpoint, not a browser SQL write.
+import { requestErasure } from '../../scripts/erasure.mjs'
+export type { ErasureResult as ErasureStatus } from '../../scripts/erasure.mjs'
+import type { ErasureResult as ErasureStatus } from '../../scripts/erasure.mjs'
+export const getCandidateErasureStatus = (scope: Scope, application_id: string) =>
+  read<ErasureStatus>('get_candidate_erasure_status', { ...scope, application_id })
+export async function requestCandidateErasure(scope: Scope, applicationId: string, operationId: string): Promise<ErasureStatus> {
+  return requestErasure({ actions: (name: string, params: Params) => app.actions.call(name, params), scope, applicationId, operationId, identityVerified: true, holdsReviewed: true })
+}

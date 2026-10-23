@@ -86,3 +86,12 @@ The [audit and outbox contract](audit-outbox.md) supersedes draft-only outbox
 limitations above: scoped queue, exclusive claim and completion actions now exist,
 with atomic attributed audit and a provider-neutral dispatch helper. No scheduled
 sender/provider integration is deployed; uncertain outcomes remain non-retryable.
+
+## Issue #31 constrained implementation
+
+[Scoped core erasure](erasure.md) now supports brand-wide owner authorization,
+identity/hold review attestations, append-only holds, atomic candidate/application
+core redaction, write fences, durable tombstones and blocked MAIL evidence. Existing
+schema/audit/archive protections remain in force. Status is always partial and
+lists retained stores; files, indexes, exports, backups, protected payloads and
+processor deletion still require evidence. This does not complete #31, #28 or #29.

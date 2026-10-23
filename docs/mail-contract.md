@@ -75,3 +75,12 @@ and safe single-attempt adapter helper. This supersedes the earlier draft-only
 outbox description. Sending/provider enablement remains separate. No automatic
 retry, including failed jobs, is enabled; unknown or interrupted attempts require
 reconciliation. `sent` in storage means provider acceptance only.
+
+## Erasure status (#31)
+
+The [scoped erasure workflow](erasure.md) records MAIL propagation as blocked with
+`no_verified_deletion_route`. It does not call a provider API or infer that a
+processor has no copies. The earlier requirement to delete local outbox/body copies
+remains pending where immutable triggers protect those records. This implementation
+never records those copies as deleted or treats a missing provider API as successful
+propagation. Provider scope, retention and deletion evidence remain owner work.

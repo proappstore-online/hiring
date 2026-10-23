@@ -7,7 +7,7 @@ import { ApplicationDetail } from './ApplicationDetail'
 import { AdminCommunications } from './AdminCommunications'
 import { PlaybookEditor } from './PlaybookEditor'
 import { OperationalDiagnostics } from './OperationalDiagnostics'
-import { ComplianceControls } from './ComplianceControls'
+import { ErasureRequest } from './ErasureRequest'
 import { VacancyManagement, type ManagedVacancy } from './VacancyManagement'
 import { Interviews } from './Interviews'
 import { Admin, CreateApplication } from './forms'
@@ -82,7 +82,7 @@ export function CommunicationsScreen() {
 }
 export function PlaybookScreen() { const { space } = useWorkspace(); return <Screen title="Playbook"><PlaybookEditor organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /></Screen> }
 export function OperationsScreen() { const { space } = useWorkspace(); return <OperationalDiagnostics scope={scopeOf(space)} /> }
-export function ComplianceScreen() { const { space } = useWorkspace(); return <ComplianceControls role={space.role} /> }
+export function ComplianceScreen() { const { space } = useWorkspace(); return <ErasureRequest key={space.organization_id + ':' + space.brand_id} scope={scopeOf(space)} role={space.role} /> }
 export function SettingsScreen() {
   const { space, reloadSpaces } = useWorkspace(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')
   const location = useLocation()

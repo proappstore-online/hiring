@@ -34,3 +34,13 @@ Serge approved no external legal review gate on 2026-10-21 in issue #52. The leg
 Every requisition declares paid employment, paid contract, volunteer, internship, work trial or other, with jurisdiction, duties, duration, supervision, benefit, expenses and compensation. Candidate copy must reflect the true terms. Unpaid, internship and volunteer roles have no legal-review approval gate at this stage, consistent with issue #52 and the closure of issue #10. Calling work a trial or internship does not establish lawful nonpayment. Record the candidate-facing disclosure version and changes to the terms.
 
 Before real intake, verify owner/contact identity, published notices and processor arrangements; test rights/deletion and cross-brand denial; complete the threat model and incident runbook. The release owner records the evidence. No external legal review or automatic retention expiry is a release prerequisite.
+
+## Implemented core request boundary (#31)
+
+[Scoped core erasure](erasure.md) is available to brand-wide owners after identity
+and legal-hold review. Recorded active holds block redaction until explicitly
+released. The workflow redacts candidate/application core only, preserves audit,
+and exposes retained stores and blocked MAIL propagation. Its partial result is
+not fulfillment of a complete erasure request or approval to retain all existing
+content. Full rights verification, remaining-store cleanup and processor evidence
+remain outstanding.

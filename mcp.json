@@ -2881,6 +2881,102 @@
         }
       },
       "sql": "SELECT r.* FROM hiring_outbox_authorizations r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.tenant_id AND a.brand_id=r.brand_id WHERE r.operation_id=:operation_id AND r.tenant_id=:tenant_id AND r.brand_id=:brand_id AND r.authorized_by=:__user_id AND r.offer_id=:offer_id AND r.draft_id=:draft_id AND r.lock_version=:expected_version AND (:authorized_by IS NULL OR :authorized_by=:__user_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.tenant_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND EXISTS(SELECT 1 FROM hiring_audit_events e WHERE e.operation_id=r.operation_id AND e.actor_user_id=:__user_id) LIMIT 1"
+    },
+    {
+      "name": "request_candidate_erasure",
+      "description": "Owner confirms identity and hold review; atomically redacts candidate and all applications in this brand, fences future writes and records blocked MAIL propagation. This is partial erasure, never completion. Read get_candidate_erasure_status after any response or timeout.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "identity_verified": {
+          "type": "integer"
+        },
+        "holds_reviewed": {
+          "type": "integer"
+        }
+      },
+      "sql": "INSERT INTO erasure_requests(id,organization_id,brand_id,application_id,candidate_id,operation_id,actor_user_id,identity_verified,holds_reviewed,created_at) SELECT :__uuid,:organization_id,:brand_id,:application_id,a.candidate_id,:operation_id,:__user_id,:identity_verified,:holds_reviewed,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :identity_verified=1 AND :holds_reviewed=1 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM erasure_requests r WHERE r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.candidate_id=a.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)"
+    },
+    {
+      "name": "get_candidate_erasure_status",
+      "description": "Owner-only durable request readback and live counts for every known candidate store. Partial only: files, indexes, exports, backups and immutable content require operator verification. No PII payloads returned.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "WITH r AS (SELECT r.* FROM erasure_requests r JOIN hiring_applications target ON target.candidate_id=r.candidate_id AND target.organization_id=r.organization_id AND target.brand_id=r.brand_id WHERE target.id=:application_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)), stores AS (SELECT 'hiring_notes' AS store,count(*) AS remaining_records FROM hiring_notes x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_outbox' AS store,count(*) AS remaining_records FROM hiring_outbox x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_communication_events' AS store,count(*) AS remaining_records FROM hiring_communication_events x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_worker_communication_events' AS store,count(*) AS remaining_records FROM hiring_worker_communication_events x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_agent_activity' AS store,count(*) AS remaining_records FROM hiring_agent_activity x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_consent_records' AS store,count(*) AS remaining_records FROM hiring_consent_records x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_intake_receipts' AS store,count(*) AS remaining_records FROM hiring_intake_receipts x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_application_sources' AS store,count(*) AS remaining_records FROM hiring_application_sources x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_attachments' AS store,count(*) AS remaining_records FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_stage_events' AS store,count(*) AS remaining_records FROM hiring_stage_events x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_assignment_events' AS store,count(*) AS remaining_records FROM hiring_assignment_events x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'interviews' AS store,count(*) AS remaining_records FROM interviews x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'interview_assignments' AS store,count(*) AS remaining_records FROM interview_assignments x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'interview_assignment_history' AS store,count(*) AS remaining_records FROM interview_assignment_history x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_scorecard_versions' AS store,count(*) AS remaining_records FROM hiring_scorecard_versions x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_decisions' AS store,count(*) AS remaining_records FROM hiring_decisions x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_offers' AS store,count(*) AS remaining_records FROM hiring_offers x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_offer_versions' AS store,count(*) AS remaining_records FROM hiring_offer_versions x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_offer_approval_events' AS store,count(*) AS remaining_records FROM hiring_offer_approval_events x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'hiring_outbox_authorizations' AS store,count(*) AS remaining_records FROM hiring_outbox_authorizations x JOIN hiring_applications a ON a.id=x.application_id JOIN r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id UNION ALL SELECT 'candidate_core' AS store,count(*) AS remaining_records FROM hiring_candidates c JOIN r ON c.id=r.candidate_id WHERE c.name<>'[redacted]' OR c.email IS NOT '[redacted]' OR c.phone IS NOT '[redacted]' OR c.linkedin_url<>'[redacted]' OR c.linkedin_profile_url IS NOT NULL UNION ALL SELECT 'application_core' AS store,count(*) AS remaining_records FROM hiring_applications a JOIN r ON a.candidate_id=r.candidate_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id WHERE a.source_detail<>'[redacted]' OR a.basis_reference<>'[redacted]' OR a.contact_context<>'[redacted]' OR a.submitted_snapshot_json IS NOT NULL UNION ALL SELECT 'worker_profile' AS store,count(*) AS remaining_records FROM hiring_candidates c JOIN r ON c.id=r.candidate_id WHERE c.worker_user_id IS NOT NULL) SELECT r.id AS request_id,r.operation_id,r.application_id,r.created_at,'partial' AS status,(SELECT json_group_array(json_object('store',store,'remaining_records',remaining_records)) FROM stores) AS stores_json,'files_indexes_exports_backups_require_verification' AS verification_code,l.processor,l.status AS processor_status,l.reason_code AS processor_reason FROM r JOIN processor_erasure_log l ON l.request_id=r.id LIMIT 1"
+    },
+    {
+      "name": "record_candidate_erasure_hold",
+      "description": "Brand owner appends a candidate hold/release with reason reference and review date; dates never automatically release a hold. Candidate scope derives from the application. Cannot change after redaction.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "reason_reference": {
+          "type": "string"
+        },
+        "review_at": {
+          "type": "integer"
+        }
+      },
+      "statements": [
+        "INSERT INTO erasure_hold_events(operation_id,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,a.candidate_id,:state,:reason_reference,:review_at,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :state IN ('active','released') AND :review_at>0 AND length(trim(:reason_reference)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM erasure_hold_events WHERE operation_id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'erasure.hold_recorded',:__user_id,:operation_id,:__now WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "get_candidate_erasure_hold",
+      "description": "Brand owner reads current hold metadata only; no candidate contact data. Review dates do not expire holds.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT h.state,h.reason_reference,h.review_at,h.actor_user_id,h.created_at FROM erasure_hold_events h JOIN hiring_applications a ON a.candidate_id=h.candidate_id AND a.organization_id=h.organization_id AND a.brand_id=h.brand_id WHERE a.id=:application_id AND h.organization_id=:organization_id AND h.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY h.sequence DESC LIMIT 1"
     }
   ]
 }

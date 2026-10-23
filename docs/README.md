@@ -33,3 +33,6 @@ Owner identity editors, scoped member management, and immutable public identity 
 
 - [Organisation recruiting playbook](org-recruiting-playbook.md): versioned policy,
   owner-only saves, tenant guards, audit, redaction and agent fallback (#77/#76).
+
+- [Scoped core erasure](erasure.md): owner-only redaction, explicit holds, durable
+  partial status and remaining store/processor blockers (#31, not yet complete).

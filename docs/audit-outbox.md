@@ -162,3 +162,13 @@ Approval/authorization do not mean queued, accepted or delivered. Revocation blo
 an unclaimed job. Once claimed, revocation is rejected rather than representing an
 irreversible provider attempt as recalled. Original sending/unknown states and
 exclusive claims remain durable; no new retry/reclaim capability is added.
+
+## Scoped core erasure (#31)
+
+[Erasure contract](erasure.md) adds owner-only core redaction and an append-only
+`erasure.requested` tombstone. This creates no exception to audit/archive/job
+immutability. Existing audit rows and protected payloads are not modified or
+removed. A tombstoned candidate cannot receive new content writes or dispatch
+claims. Sending/unknown jobs require reconciliation before the request is allowed.
+MAIL propagation remains blocked without a verified deletion route; retained stores
+are exposed in live status. This is partial erasure, not evidence of completion.

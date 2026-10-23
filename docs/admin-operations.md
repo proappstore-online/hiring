@@ -48,11 +48,12 @@ field, so the response truthfully reports `unknown`; no successes are inferred.
 ## Compliance capabilities
 
 The non-dismissible policy notice is **Indefinite retention — no automatic purge**.
-There are no registered actions for subject-rights verification/tracking, candidate
-export, erasure, processor propagation or legal-hold management. The page says so
-and presents no live export/deletion buttons or fabricated counts. Owner-only UI
-hooks for future export/deletion capabilities are tested; deletion uses two review
-steps. Those hooks are not connected to an action in this release.
+Owners can now request [scoped core erasure](erasure.md) after selecting an exact
+application and confirming identity/scope and hold review. The server enforces
+brand-wide ownership and recorded active holds. Two review steps precede irreversible
+core redaction. Live status shows partial progress, retained stores and blocked MAIL
+propagation. This does not complete erasure or the broader identity/rights workflow.
+Export remains unavailable; no automatic purge or fabricated completion is supplied.
 
 ## Consequential actions and validation
 
