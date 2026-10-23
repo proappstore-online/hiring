@@ -13,7 +13,7 @@ import { Interviews } from './Interviews'
 import { Admin, CreateApplication } from './forms'
 import { mutationError } from './mutation-state'
 import { LoadingState, ErrorState, NotFound } from './route-ui'
-import { panel } from './ui'
+import { button, panel } from './ui'
 import { brandSettingsUrl, organizationSettingsUrl, recruiterApplicationUrl, staffBack } from './routes'
 
 type Context = { space: Workspace; userId: string; reloadSpaces: () => Promise<void> }
@@ -40,9 +40,9 @@ export function ApplicationsScreen() {
   const { space, userId } = useWorkspace(); const scope = scopeOf(space)
   const staff = space.role === 'owner' || space.role === 'recruiter'
   const requisitions = useRows<Requisition>(staff ? 'list_requisitions' : null, scope); const members = useRows<Member>(staff ? 'list_workspace_members' : null, scope)
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')
-  const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
-  return <Screen title="Applications"><RowsState loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><div className="space-y-6">{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{(space.role === 'owner' || space.role === 'recruiter') && <CreateApplication key={members.rows.map(row => row.user_id).join()} scope={scope} requisitions={requisitions.rows} members={members.rows} userId={userId} busy={busy} run={run} />}<ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} /></div></RowsState></Screen>
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [showCreate, setShowCreate] = useState(false)
+  const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); setSuccess('Action saved successfully.'); if (name === 'create_application') setShowCreate(false) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
+  return <Screen title="Applications"><RowsState loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><div className="space-y-6">{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[var(--muted)]">Review candidates, narrow the pipeline, then open a profile for the full record.</p>{staff && <button type="button" className={button} aria-expanded={showCreate} aria-controls="create-candidate" onClick={() => setShowCreate(value => !value)}>{showCreate ? 'Close' : 'Add candidate'}</button>}</div><ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} />{staff && showCreate && <div id="create-candidate"><CreateApplication key={members.rows.map(row => row.user_id).join()} scope={scope} requisitions={requisitions.rows} members={members.rows} userId={userId} busy={busy} run={run} /></div>}</div></RowsState></Screen>
 }
 export function ApplicationScreen() {
   const { space } = useWorkspace(); const { applicationId = '' } = useParams(); const scope = scopeOf(space); const params = { ...scope, application_id: applicationId }
