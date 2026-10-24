@@ -173,3 +173,18 @@ do not create a replacement offer/job to bypass an unknown provider outcome.
 Local tests execute registered SQL with PAS-style parameter binding; they do not
 perform live platform authentication ceremonies or provider sends. Existing
 independent mail archive actions record evidence, rather than dispatch messages.
+
+## Candidate acceptance (#98)
+
+`record_acceptance(tenant_id, brand_id, application_id, operation_id,
+expected_version, acceptance_evidence)` requires authentication and platform
+passkey step-up. Tenant means organization. Evidence must be 1–10000 characters
+after trimming and must describe actual candidate acceptance. Owner/recruiter
+requisition grants, offered prior state and approved paid terms are rechecked.
+The mutation commits acceptance, application state, stage history and audit in
+one transaction. `get_acceptance_result` takes the exact same arguments and
+returns the updated application ID, stage, version, evidence and operation ID for
+an exact committed operation; it rechecks current grants and original actor.
+Changed evidence or scope does not match a retry. Accepted is terminal. Existing
+application reads and stage filters expose accepted; only authorized staff receive
+acceptance evidence. Approval and interview booking never imply acceptance.

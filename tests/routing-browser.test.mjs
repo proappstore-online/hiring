@@ -141,7 +141,7 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
   })
   await t.test('full direct detail uses exact lookup, renders legal next stages and denies mixed scope',async()=>{
    await go('/sign-in?returnTo='+encodeURIComponent('/recruiter/applications/full?organization_id=org&brand_id=brand'));await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()});await expect(page.getByRole('heading',{name:'Older full candidate',exact:true})).toBeVisible();await expect(page.getByText('older@example.com',{exact:false}).first()).toBeVisible()
-   assert.deepEqual(await page.getByRole('combobox',{name:'Next stage',exact:true}).locator('option').evaluateAll(options=>options.map(o=>o.value)),['shortlisted','rejected'])
+   assert.deepEqual(await page.getByRole('combobox',{name:'Next stage',exact:true}).locator('option').evaluateAll(options=>options.map(o=>o.value)),['shortlisted','rejected','interviewing'])
    assert.ok(await page.evaluate(()=>window.calls.some(c=>c.name==='get_application'&&c.p.application_id==='full'&&c.p.brand_id==='brand')))
    await go('/sign-in?returnTo='+encodeURIComponent('/recruiter/applications/full?organization_id=other&brand_id=other'));await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()});await expect(page.getByRole('heading',{name:'404 — Not found'})).toBeVisible();await expect(page.getByText('older@example.com',{exact:false})).toHaveCount(0)
   })

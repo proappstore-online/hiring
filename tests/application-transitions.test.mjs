@@ -74,7 +74,7 @@ test('every allowed edge succeeds with canonical stage, one version, attributed 
 test('every invalid edge including terminal, backwards, skipped and unknown stages writes nothing', () => {
   const {db,call}=seeded()
   try {
-    for(const from of Object.keys(transitions)) for(const to of [...Object.keys(transitions),'forged']) {
+    for(const from of Object.keys(transitions).filter(s=>s!=='accepted')) for(const to of [...Object.keys(transitions),'forged']) {
       if(transitions[from].includes(to))continue
       setStage(db,from)
       const before=db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n

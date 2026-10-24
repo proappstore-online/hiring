@@ -187,3 +187,26 @@ reject revoked offers or terminal applications. Authorization alone neither queu
 nor sends. Revocation after a provider attempt has been claimed is rejected: it
 cannot truthfully recall a send. Pending jobs for revoked offers remain durable
 and blocked, with their actual pending state visible for reconciliation.
+
+## Candidate acceptance (#98; migration 0028)
+
+Existing transitions remain available. In review and shortlisted may advance to
+interviewing; interviewing advances to decision_pending, which may advance to
+offered or rejected. Accepted is terminal and is recorded only by
+`record_acceptance`, never by the general stage operation.
+
+Acceptance requires scoped owner/recruiter authority, platform passkey step-up,
+expected application version, offered prior state, approved paid offer terms and
+explicit nonblank evidence that the candidate actually accepted. An immutable
+acceptance record binds actor/time/evidence to the exact offer revision. Its
+trigger updates application version, stage history and redacted audit atomically.
+Exact retries use `get_acceptance_result`; zero changes alone is not success.
+
+SQLite CHECK constraints cannot be widened additively. The nullable
+`accepted_stage` column takes precedence over `stage_extension` and legacy `stage`.
+All registered canonical reads use that precedence. Existing submitted,
+interviewing and decision_pending rows remain untouched; no acceptance is inferred.
+Acceptance evidence is nullable and guarded against uncontrolled updates; full
+recruiter detail returns it, restricted gateway detail returns NULL to reviewers.
+Migration tracking applies 0028 once, like all existing additive ALTER migrations.
+No mail is sent and accepted applications cannot queue or claim dispatches.

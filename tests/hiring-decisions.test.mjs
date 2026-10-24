@@ -169,3 +169,53 @@ test('actual sibling grants, reviewer assignments and suspended organizations co
 test('registered mutation batches contain only deployable write statements',()=>{
  for(const t of tools.filter(t=>t.operation==='batch')) for(const statement of t.statements) assert.match(statement,/^(INSERT|UPDATE|DELETE)\s/i,t.name)
 })
+
+const acceptanceArgs={...base,expected_version:1,operation_id:'acceptance',acceptance_evidence:'Candidate explicitly accepted paid terms by signed response'}
+function acceptanceReady(){const f=ready();step(f,'submit_offer_for_approval');step(f,'approve_offer');f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'");return f}
+test('acceptance commits explicit evidence, canonical reads, filtering and exact replay once',()=>{
+ const f=acceptanceReady();try{
+ assert.equal(action('record_acceptance').step_up,true)
+ assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],1)
+ const row=f.call('get_acceptance_result','staff-a',acceptanceArgs)[0];assert.equal(row.stage,'accepted');assert.equal(row.version,2)
+ assert.ok(f.call('record_acceptance','staff-a',acceptanceArgs).every(n=>n===0))
+ assert.deepEqual(f.call('get_acceptance_result','staff-a',acceptanceArgs)[0],row)
+ assert.equal(f.call('get_acceptance_result','staff-a',{...acceptanceArgs,acceptance_evidence:'different'}).length,0)
+ for(const name of ['list_applications','gateway_list_applications']){assert.equal(f.call(name,'staff-a',{...scope,stage:'accepted'})[0].stage,'accepted');assert.equal(f.call(name,'staff-a',{...scope,stage:'offered'}).length,0)}
+ for(const name of ['get_application','gateway_get_application'])assert.equal(f.call(name,'staff-a',{...scope,application_id:'app-a'})[0].acceptance_evidence,acceptanceArgs.acceptance_evidence)
+ const event=f.db.prepare("SELECT * FROM hiring_stage_events WHERE id='acceptance'").get();assert.equal(event.from_stage,'offered');assert.equal(event.to_stage,'accepted');assert.equal(event.actor_user_id,'staff-a');assert.equal(event.reason,acceptanceArgs.acceptance_evidence)
+ assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id='acceptance'").get().n,1)
+ assert.throws(()=>f.db.exec("UPDATE hiring_applications SET acceptance_evidence='forged'"),/controlled/)
+ assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'deferred',expected_version:2,operation_id:'after-accept'}),/terminal/)
+ }finally{f.db.close()}
+})
+test('acceptance denies unauthorized, cross-brand, stale, blank, unapproved and non-offered requests',()=>{
+ const f=acceptanceReady();try{
+ for(const patch of [{expected_version:0},{brand_id:'brand-b'},{tenant_id:'other'},{acceptance_evidence:' '},{operation_id:' '}])assert.equal(f.call('record_acceptance','staff-a',{...acceptanceArgs,...patch})[0],0)
+ f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'reviewer',role:'reviewer',requisition_id:'req-a',grant_id:'reviewer',operation_id:'review-grant'})
+ f.call('create_workspace','staff-a',{...bootstrap,brand_id:'brand-b',requisition_id:'req-b',operation_id:'sibling-bootstrap'});f.call('add_workspace_member','staff-a',{...scope,brand_id:'brand-b',member_user_id:'sibling',role:'recruiter',operation_id:'sibling-member'});
+ for(const user of ['reviewer','outsider','system:worker','sibling'])assert.equal(f.call('record_acceptance',user,acceptanceArgs)[0],0)
+ for(const stage of ['submitted','interviewing','decision_pending']){f.db.prepare('UPDATE hiring_applications SET stage=?').run(stage);assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],0)}
+ f.db.exec("UPDATE hiring_applications SET stage='offered'");step(f,'revoke_offer');assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],0)
+ }finally{f.db.close()}
+})
+test('acceptance audit failure rolls back evidence, history and version',()=>{
+ const f=acceptanceReady();try{
+ f.db.exec("CREATE TRIGGER fail_acceptance BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.accepted' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+ assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/audit unavailable/)
+ assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,0)
+ const a=f.call('get_application','staff-a',{...scope,application_id:'app-a'})[0];assert.equal(a.stage,'offered');assert.equal(a.version,1);assert.equal(a.acceptance_evidence,null)
+ }finally{f.db.close()}
+})
+test('additive acceptance upgrade preserves existing submitted and interview states without inferred evidence',()=>{
+ const db=new DatabaseSync(':memory:');try{
+ for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ // Seed via old-schema registered actions that do not reference new columns.
+ db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1)")
+ db.exec("INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1)")
+ db.exec("INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req','org','brand','Role','draft',1)")
+ db.exec("INSERT INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at) VALUES('candidate','org','brand','Person','','','','owner',1)")
+ for(const stage of ['submitted','interviewing','decision_pending'])db.prepare("INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,created_by,created_at,updated_at) VALUES(?,'org','brand','req','candidate','linkedin','source','basis','context','owner',?,'owner',1,1)").run(stage,stage)
+ db.exec(migrations.migrations.at(-1).sql)
+ for(const row of db.prepare('SELECT * FROM hiring_applications').all()){assert.equal(row.stage,row.id);assert.equal(row.accepted_stage,null);assert.equal(row.acceptance_evidence,null);assert.equal(row.version,1)}
+ }finally{db.close()}
+})

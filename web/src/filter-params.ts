@@ -1,4 +1,4 @@
-export const FILTER_STAGES = ['submitted', 'in_review', 'shortlisted', 'interviewing', 'decision_pending', 'offered', 'hired', 'rejected', 'withdrawn'] as const
+export const FILTER_STAGES = ['submitted', 'in_review', 'shortlisted', 'interviewing', 'decision_pending', 'offered', 'accepted', 'hired', 'rejected', 'withdrawn'] as const
 export const FILTER_KEYS = ['requisition', 'stage', 'source', 'assignee', 'date_from', 'date_to'] as const
 export type FilterKey = typeof FILTER_KEYS[number]
 export type Filters = Record<FilterKey, string>

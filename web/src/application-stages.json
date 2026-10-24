@@ -4,11 +4,13 @@
   ],
   "in_review": [
     "shortlisted",
-    "rejected"
+    "rejected",
+    "interviewing"
   ],
   "shortlisted": [
     "offered",
-    "rejected"
+    "rejected",
+    "interviewing"
   ],
   "offered": [
     "hired",
@@ -16,7 +18,13 @@
   ],
   "hired": [],
   "rejected": [],
-  "interviewing": [],
-  "decision_pending": [],
-  "withdrawn": []
+  "interviewing": [
+    "decision_pending"
+  ],
+  "decision_pending": [
+    "offered",
+    "rejected"
+  ],
+  "withdrawn": [],
+  "accepted": []
 }

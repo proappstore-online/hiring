@@ -14,7 +14,7 @@ export type Scope = { organization_id: string; brand_id: string }
 export type Workspace = Scope & { organization_name: string; brand_name: string; role: Role; can_create_brand: number; can_manage_templates?: number; can_create_requisition?: number }
 export type Requisition = { id: string; title: string; status: string }
 export type Member = { user_id: string; role: Role }
-export type Application = { requisition_id?: string; created_at?: string; id: string; stage: Stage; version: number; candidate_name: string; email: string | null; phone: string | null; linkedin_url: string | null; profile_url: string | null; source: string; requisition_title: string; source_detail: string; basis_reference: string; contact_context: string; assignee_user_id: string; updated_at: number }
+export type Application = { acceptance_evidence?: string | null; requisition_id?: string; created_at?: string; id: string; stage: Stage; version: number; candidate_name: string; email: string | null; phone: string | null; linkedin_url: string | null; profile_url: string | null; source: string; requisition_title: string; source_detail: string; basis_reference: string; contact_context: string; assignee_user_id: string; updated_at: number }
 export type Note = { id: string; body: string; actor_user_id: string; created_at: number }
 export type EmailStatusEvent = { id: string; logical_email_id: string; status: string; timestamp: number; actor: string; attempt_number: number | null; provider_reference: string | null }
 export type Draft = { logical_email_id?: string | null; current_status?: string | null; latest_activity_at?: number | null; linked_archive_id?: string | null; id: string; recipient_email: string; subject: string; body: string; status: 'draft'; delivery_state: 'draft' | 'pending' | 'sending' | 'sent' | 'failed' | 'unknown' | 'cancelled'; attempt_count: number; actor_user_id: string; created_at: number }
@@ -32,7 +32,7 @@ type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: numbe
 
 export const id = () => crypto.randomUUID()
 export const read = async <T,>(name: string, params: Params = {}) => (await app.actions.call<Rows<T>>(name, params)).rows
-const mutationReadbacks: Record<string, string> = {"record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
+const mutationReadbacks: Record<string, string> = {"record_acceptance": "get_acceptance_result","record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
 export const write = async (name: string, params: Params) => {
   const result = await app.actions.call<Write>(name, params)
   const changes = result.results?.at(-1)?.meta?.changes ?? result.meta?.changes ?? 0

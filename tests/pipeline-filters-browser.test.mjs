@@ -14,7 +14,7 @@ const web = new URL('../web/', import.meta.url).pathname
 const fixture = `import React from 'react';import{createRoot}from'react-dom/client';import{BrowserRouter}from'react-router-dom';import{ApplicationFilters}from'/src/ApplicationFilters.tsx';import'/src/index.css';
 window.calls=[];window.fail=false;window.hold=false;window.pending=[];
 const row={id:'app',candidate_name:'Alice',stage:'submitted',requisition_id:'req',requisition_title:'Engineer',source:'linkedin',source_detail:'Recruiter referral',assignee_user_id:'staff',created_at:1792454400000};
-window.read=async(name,params)=>{window.calls.push({name,params});if(window.hold)await new Promise(resolve=>window.pending.push(resolve));if(window.fail)throw Error('fixture');return params.stage==='hired'||params.requisition_id==='missing'?[]:[row]};
+window.read=async(name,params)=>{window.calls.push({name,params});if(window.hold)await new Promise(resolve=>window.pending.push(resolve));if(window.fail)throw Error('fixture');return params.stage==='hired'||params.requisition_id==='missing'?[]:[{...row,stage:params.stage||row.stage}]};
 createRoot(document.getElementById('root')).render(<BrowserRouter><ApplicationFilters space={{organization_id:'org',brand_id:'brand',role:'recruiter'}} requisitions={[{id:'req',title:'Engineer'}]} members={[{user_id:'staff',role:'recruiter'}]}/></BrowserRouter>);`
 test('pipeline filters restore URLs, keep search local, expose unavailable states and support mobile retry',async()=>{
  const cacheDir=mkdtempSync(join(tmpdir(),'hiring-filters-'))
@@ -35,7 +35,7 @@ test('pipeline filters restore URLs, keep search local, expose unavailable state
  const search=page.getByRole('searchbox');await search.fill('referral');await expect(page.getByText('1 matching applications',{exact:true})).toBeVisible();assert.ok(!page.url().includes('referral'))
  await search.fill('Nobody');await expect(page.getByText('No applications match these filters.')).toBeVisible()
  await page.getByRole('button',{name:'Clear search',exact:true}).click()
- await page.getByLabel('Stage',{exact:true}).selectOption('hired');await expect(page.getByText('No applications match these filters.')).toBeVisible();await expect(page).toHaveURL(/stage=hired/)
+ await page.getByLabel('Stage',{exact:true}).selectOption('accepted');await expect(page.getByText('Engineer · accepted · linkedin')).toBeVisible();await expect(page).toHaveURL(/stage=accepted/);await page.getByLabel('Stage',{exact:true}).selectOption('hired');await expect(page.getByText('No applications match these filters.')).toBeVisible();await expect(page).toHaveURL(/stage=hired/)
  await page.reload();await page.getByRole('button',{name:'Filters',exact:true}).click();await expect(page.getByLabel('Stage',{exact:true})).toHaveValue('hired')
  await page.getByRole('button',{name:'Clear filters',exact:true}).last().click();await expect(page.getByText('1 matching applications',{exact:true})).toBeVisible();assert.ok(page.url().includes('brand_id=brand'));assert.ok(!page.url().includes('stage='))
  await page.getByLabel('Stage',{exact:true}).selectOption('offered');await page.goBack();await expect(page.getByLabel('Stage',{exact:true})).toHaveValue('');await page.goForward();await expect(page.getByLabel('Stage',{exact:true})).toHaveValue('offered')
