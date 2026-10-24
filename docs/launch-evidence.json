@@ -398,6 +398,28 @@
       "environment": null
     },
     {
+      "id": "backup-restore",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Restore to isolation preserves deletion tombstones, owner holds and revocations; RPO and RTO are within defined bounds; owner signs restore drill record.",
+      "status": "blocked",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null,
+      "repository_evidence": [
+        "scripts/backup-restore.mjs",
+        "tests/backup-restore.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Backup/restore procedure is documented and tested; live drill on actual infrastructure with real snapshots is required.",
+        "next_action": "Execute restore drill on isolated environment using production snapshot; verify tombstone and hold preservation; record evidence in #38."
+      },
+      "revision": null,
+      "environment": null
+    },
+    {
       "id": "launch-decision",
       "gate": "launch",
       "owner": "Serge (serge-ivo)",

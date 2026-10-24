@@ -138,3 +138,26 @@ contacts and exercises; #38 live scenarios/restore/owner decision. The #54 matri
 is now documented, but other checks remain pending. See
 [operations and recovery](release-operations.md). Existing runtime intake stays
 closed; no new tool opens it.
+
+
+## Procedural backup/restore and owner signature checks (#38)
+
+`scripts/backup-restore.mjs` documents database/object export and isolated restore.
+`verifyRestoreIntegrity` compares explicit `expected` and `restored` arrays of
+scoped immutable record IDs under `tombstones`, `holds`, and `revocations`.
+Use the independent latest ledger as expected input, including post-backup
+changes. Supply measured `rpoMs`/`rtoMs` and owner-defined
+`maxRPOMs`/`maxRTOMs`; missing, invalid or exceeded bounds fail closed.
+This checks supplied observations only, not infrastructure, erased bytes or
+artifact authenticity. No default recovery objectives are invented.
+
+The `backup-restore` check lives in the existing `checks` array and remains blocked
+until the actual isolated drill and owner review. The live scenarios also remain
+blocked. These procedural additions do not constitute deployed E2E evidence.
+
+Run `node scripts/launch-gate.mjs [evidence.json]` for the separate owner-signature
+check. Exactly one `launch-decision` must have status `approved`, a reviewer and
+a valid non-future timestamp with timezone. The full readiness validator now also
+uses `approved` for this decision; all other successful checks use `pass`.
+The signature check does not authenticate the reviewer or replace full readiness
+validation, and is not wired to authorize deployment or open intake.

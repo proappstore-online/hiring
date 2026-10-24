@@ -6,7 +6,7 @@ export const REQUIRED_CHECKS = Object.freeze([
   'identity-policies', 'intake-files', 'intake-authorization', 'security',
   'accessibility', 'monitoring', 'incident-response', 'privacy', 'ci-deploy',
   'recovery', ...Array.from({ length: 7 }, (_, i) => `scenario-${i + 1}`),
-  'launch-decision',
+  'backup-restore', 'launch-decision',
 ])
 const text = value => typeof value === 'string' && value.trim().length > 0
 const https = value => {
@@ -24,8 +24,8 @@ export function checkLaunchRegister(record) {
     const check = entries[0]
     if (!text(check.owner) || !text(check.criterion) || !/^#\d+$/.test(check.issue ?? '') || !['intake', 'launch'].includes(check.gate)) errors.push(`${id}: owner, criterion, issue and gate required`)
     if (!Array.isArray(check.repository_evidence) || !check.repository_evidence.length || !check.repository_evidence.every(text)) errors.push(`${id}: repository evidence required`)
-    if (!['pass', 'pending', 'failed', 'blocked'].includes(check.status)) errors.push(`${id}: invalid status`)
-    if (check.status !== 'pass' && (!['owner_action', 'infrastructure', 'implementation_dependency'].includes(check.blocker?.kind) || !text(check.blocker?.reason) || !text(check.blocker?.next_action))) errors.push(`${id}: unresolved check needs blocker kind, reason and next action`)
+    if (!(id === 'launch-decision' ? ['approved', 'pending', 'failed', 'blocked'] : ['pass', 'pending', 'failed', 'blocked']).includes(check.status)) errors.push(`${id}: invalid status`)
+    if (check.status !== (id === 'launch-decision' ? 'approved' : 'pass') && (!['owner_action', 'infrastructure', 'implementation_dependency'].includes(check.blocker?.kind) || !text(check.blocker?.reason) || !text(check.blocker?.next_action))) errors.push(`${id}: unresolved check needs blocker kind, reason and next action`)
   }
   if (checks.some(check => !REQUIRED_CHECKS.includes(check?.id))) errors.push('Unknown check IDs')
   return { valid: errors.length === 0, errors }
@@ -41,7 +41,7 @@ export function checkLaunchEvidence(record, revision, now = Date.now()) {
     const entries = checks.filter(check => check?.id === id)
     if (entries.length !== 1) { blockers.push(`${id}: exactly one check required`); continue }
     const check = entries[0]
-    if (check.status !== 'pass') blockers.push(`${id}: not passed`)
+    if (check.status !== (id === 'launch-decision' ? 'approved' : 'pass')) blockers.push(`${id}: not passed`)
     if (!text(check.owner) || !text(check.reviewer)) blockers.push(`${id}: owner and reviewer required`)
     if (!https(check.evidence)) blockers.push(`${id}: HTTPS evidence reference required`)
     if (check.revision !== revision || check.environment !== record.environment) blockers.push(`${id}: evidence must match candidate revision and environment`)

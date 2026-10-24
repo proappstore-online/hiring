@@ -7,7 +7,7 @@ import { checkLaunchEvidence, checkLaunchRegister, REQUIRED_CHECKS } from '../sc
 const revision = 'a'.repeat(40)
 const now = Date.parse('2026-10-24T10:00:00Z')
 const environment = 'https://hiring.proappstore.online'
-const fixture = () => ({ version: 1, revision, environment, checks: REQUIRED_CHECKS.map(id => ({ id, revision, environment, owner: 'Owner', reviewer: 'Reviewer', status: 'pass', evidence: 'https://example.com/restricted-evidence', reviewed_at: '2026-10-24T09:00:00Z' })) })
+const fixture = () => ({ version: 1, revision, environment, checks: REQUIRED_CHECKS.map(id => ({ id, revision, environment, owner: 'Owner', reviewer: 'Reviewer', status: id === 'launch-decision' ? 'approved' : 'pass', evidence: 'https://example.com/restricted-evidence', reviewed_at: '2026-10-24T09:00:00Z' })) })
 
 test('release evidence requires every scenario and signed review for the exact live revision', () => {
   assert.equal(checkLaunchEvidence(fixture(), revision, now).ready, true)
@@ -56,4 +56,22 @@ test('repository evidence and CLI hold launch until real artifacts and reviews e
   const missing = spawnSync(process.execPath, ['scripts/launch-readiness.mjs', '/nonexistent/evidence.json', revision], { encoding: 'utf8' })
   assert.equal(missing.status, 1)
   assert.match(missing.stderr, /Launch held/)
+})
+
+
+test('backup-restore evidence has required fields and remains blocked pending a live drill', () => {
+  const record = JSON.parse(readFileSync(new URL('../docs/launch-evidence.json', import.meta.url)))
+  const entries = record.checks.filter(check => check.id === 'backup-restore')
+  assert.equal(entries.length, 1)
+  const check = entries[0]
+  assert.equal(check.gate, 'launch')
+  assert.equal(check.issue, '#38')
+  assert.equal(check.owner, 'Serge (serge-ivo)')
+  assert.equal(check.status, 'blocked')
+  for (const field of ['evidence', 'reviewer', 'reviewed_at', 'revision', 'environment']) assert.equal(check[field], null)
+  assert.deepEqual(check.repository_evidence, ['scripts/backup-restore.mjs', 'tests/backup-restore.test.mjs'])
+  for (const phrase of ['tombstones', 'holds', 'revocations', 'RPO', 'RTO', 'owner signs']) assert.ok(check.criterion.includes(phrase))
+  assert.equal(check.blocker.kind, 'infrastructure')
+  assert.ok(check.blocker.reason)
+  assert.ok(check.blocker.next_action)
 })
