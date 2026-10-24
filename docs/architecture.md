@@ -115,3 +115,16 @@ the trusted execution boundary; actual scoped R2/index/gate bindings still requi
 host integration. Immutable local archives and unavailable services remain visible
 blockers. See [retention contract](retention.md); no live worker or recovery drill
 is asserted.
+
+## Grant-scoped search revision (#46)
+
+Search now runs as authenticated atomic SQL batches over canonical D1 candidate
+and application rows. Live grants, scheduled interview assignments and scoped
+deletion tombstones govern every page and exact minimal result read; no search
+index is introduced. Migration 0041 provides a shared per-user SQL budget of
+30 requests per server minute. The manifest annotation is descriptive; enforcement
+is independent of platform annotation support. The action transport currently
+returns HTTP 200 for SQL batches: over-budget data is suppressed server-side,
+and the response status row maps to a client error with status 429. Raw HTTP 429
+still requires platform routing support. See [search permissions](permissions.md#grant-scoped-search-46)
+for projection, pagination, logging and remaining transport limits.

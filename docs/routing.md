@@ -94,3 +94,11 @@ canonical ID and scope. Navigation retains validated `organization_id` and
 Legacy `/dashboard`, `/admin`, `/applications`, `/applications/:applicationId`,
 `/playbook`, and `/admin/{communications,operations,compliance,settings}`
 redirect to their canonical `/recruiter/` equivalents while preserving query scope and application IDs. Legacy `application_id` on communications redirects to `/recruiter/communications/:applicationId`.
+
+### Workspace record search (#46)
+
+Applications includes explicit-submit candidate/application search with bounded
+server pages. Search text and pagination tokens stay in component memory; neither
+is added to route parameters, back links or storage. Result application links use
+the canonical scoped detail URL, whose server read independently rechecks grants.
+Candidate results open a freshly authorized minimal record within the screen.

@@ -118,8 +118,8 @@ export function mutationResult(changes, requestId = null) {
   return ok({ applied: true }, requestId)
 }
 
-// Fixed-window limiter for a future trusted worker. D1 SQL tools cannot throttle
-// per user, so this is not enforced by the deployed SQL actions.
+// In-memory limiter for a future trusted gateway. Legacy gateway reads do not
+// enforce it. Search uses its own durable atomic SQL budget (search-tools.mjs).
 export function createRateLimiter({ limit, windowMs, now = Date.now }) {
   const buckets = new Map()
   return key => {

@@ -84,3 +84,83 @@ Caller-supplied actor IDs/roles are checked against the platform identity/curren
 grant; no system/automation/API-key role can produce human evidence. Human actions
 also require platform passkey step-up, following publication's existing boundary.
 Every history/retry read recomputes grants, including organization suspension.
+
+## Grant-scoped search (#46)
+
+`search_candidates` and `search_applications` accept the selected organization and
+brand, optional requisition, `q` (required, at most 200 characters), `limit`
+(default 20, range 1–50), and an optional opaque `cursor`. Application search also
+accepts `stage`. SQL treats these IDs as selectors, never as authority: every
+matching application must independently pass current `hiring_effective_access`
+organization/brand/requisition checks for platform `:__user_id`. Owner/recruiter
+access includes only granted requisitions. The interviewer role is named
+`reviewer` in this schema; it requires a current scoped reviewer grant AND an
+active assignment on a scheduled interview for the matching application.
+Application assignee alone is insufficient for this search surface. Auditors and
+unassigned reviewers receive no records. Revocation and organization suspension
+take effect on the next query, including continuation pages and direct fetches.
+
+Search uses `hiring_candidates.name` only, exposed as `full_name` in candidate
+results. `%`, `_` and backslash are literal characters, not caller-controlled LIKE
+operators. Email is neither searchable nor returned: candidate `email` is always
+null, following the existing restricted-contact policy. Application results
+contain only ID, candidate ID, requisition ID, canonical stage and creation time.
+No counts, snippets, source text or contact values are returned. Candidates with
+multiple authorized applications are deduplicated. Candidates without an
+authorized application are excluded. Same-email applicants in different brands
+remain independent records.
+
+`get_search_candidate` and `get_search_application` take `id`, the same explicit
+scope and optional requisition (plus optional application stage), and return the
+same minimal projection after fresh authorization. Missing, forged, erased and
+unauthorized IDs all produce empty rows. Existing full `get_application` remains
+owner/recruiter-only; interview packet reads retain their separate assignment
+checks. Search visibility never authorizes full contact/history retrieval.
+
+Pages order by creation time descending, ID ascending. `next_cursor` on the last
+row is the continuation token; null marks the end. Tokens encode tool, principal,
+organization, brand, optional requisition/stage and anchor ID, without query text
+or contact information. They are opaque scope-bound tokens, **not signatures or
+bearer credentials**. SQL resolves anchors only among currently authorized
+matches. Forged, cross-principal, cross-brand or filter-mismatched anchors return
+no rows. Changing search text starts a new page in the UI. Removed/revoked anchors
+invalidate continuation; restart the search. Pages are live reads, not snapshots.
+Every page rechecks authority even if a caller constructs a token itself.
+
+Migration `0041_grant_scoped_search` adds one bounded counter row per principal.
+All four search actions atomically increment the same authenticated-user budget
+and read within a D1 batch. Each batch contains one upsert with `RETURNING`;
+its response row contains `status`, `retry_after` and `rows_json`. The client
+decodes `rows_json` into the documented record projection. No result payload or
+query text is persisted in the budget table. This fits the platform requirement
+that registered batch members be write statements. At most 30 requests per server-clock minute are
+admitted across tools, brands and cursors; request 31 onward returns empty data
+and a status row with `status=429` and `retry_after`. The next minute resets the
+counter. Denied/invalid searches also consume budget. Counter storage contains
+only identity, window and count; it never contains query text. The `x-rate-limit`
+manifest extension documents this policy; SQL enforces it independently.
+
+**Transport boundary:** the current PAS action endpoint wraps successful SQL
+batches in HTTP 200 and does not implement authenticated per-tool HTTP status
+mapping. `scripts/search.mjs` maps the server status row to `SearchError.status=429`
+and the UI displays a retry message. A literal HTTP 429 on the raw action endpoint
+requires a platform change; no enabled custom worker route is assumed. This is a
+remaining transport limitation, not a claimed platform capability.
+
+Search reads canonical D1 rows, never index payloads, with live grants and
+scoped erasure/deletion/restore tombstone suppression. There is no new FTS or
+external index. A future index may supply IDs only; canonical joins and these
+checks must remain authoritative, preventing stale references from revealing
+removed data. Query text travels only in authenticated POST bodies. The app does
+not log requests, results or upstream error text, and stores no search text in
+URLs, analytics, local storage or cursors. The checked platform operation logger
+explicitly excludes request bodies and SQL parameters; production logging changes
+must preserve that boundary.
+
+The Applications screen adds an explicit-submit workspace search for both record
+types, with next-page loading and fresh direct fetch before opening a result.
+Its existing recent-pipeline filters remain available. Query edits, record-type,
+workspace and account changes clear results; stale asynchronous responses are
+discarded. `tests/search-scoping.test.mjs` executes the deployed SQL across two
+brands and covers role/scope denial, current assignments, revocation, forged
+cursors, rate enforcement, stale references, tombstones and input bounds.

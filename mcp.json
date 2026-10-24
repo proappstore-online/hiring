@@ -5144,6 +5144,154 @@
       },
       "sql": "INSERT INTO hiring_rectification_attempts SELECT :operation_id,c.id,t.processor_id,:expected_version+1,:state,:evidence_reference,:__user_id,:__now FROM hiring_corrections c JOIN hiring_rectification_targets t ON t.correction_id=c.id WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.application_id=:application_id AND c.request_id=:request_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND t.processor_id=:processor_id AND NOT EXISTS (SELECT 1 FROM erasure_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND :state IN ('complete','failed','unknown') AND length(trim(:evidence_reference)) BETWEEN 1 AND 128 AND :expected_version=COALESCE((SELECT MAX(version) FROM hiring_rectification_attempts WHERE correction_id=c.id AND processor_id=t.processor_id),0) AND NOT EXISTS (SELECT 1 FROM hiring_rectification_attempts WHERE correction_id=c.id AND processor_id=t.processor_id AND (state='complete' OR id=:operation_id)) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=c.request_id AND e.version=(SELECT MAX(version) FROM hiring_rights_events WHERE request_id=c.request_id) AND e.status='processing') AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_candidates subject ON subject.id=a.candidate_id AND subject.organization_id=a.organization_id AND subject.brand_id=a.brand_id WHERE a.id=c.application_id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id AND a.candidate_id=c.candidate_id AND subject.merged_into IS NULL AND CASE c.field WHEN 'name' THEN subject.name WHEN 'email' THEN subject.email WHEN 'phone' THEN subject.phone WHEN 'contact_context' THEN a.contact_context END=c.new_value)",
       "step_up": true
+    },
+    {
+      "name": "search_candidates",
+      "description": "Bounded search within current grants and assignments.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "q": {
+          "type": "string",
+          "max": 200
+        },
+        "limit": {
+          "type": "integer",
+          "optional": true,
+          "default": 20
+        },
+        "cursor": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true,
+      "x-rate-limit": {
+        "requests": 30,
+        "window_seconds": 60,
+        "scope": "authenticated_user",
+        "shared": "hiring_search"
+      },
+      "statements": [
+        "INSERT INTO hiring_search_budget(user_id,window_start,requests) VALUES (:__user_id,CAST(:__now/60000 AS INTEGER),1) ON CONFLICT(user_id) DO UPDATE SET window_start=excluded.window_start,requests=CASE WHEN hiring_search_budget.window_start<>excluded.window_start THEN 1 ELSE min(hiring_search_budget.requests+1,31) END RETURNING CASE WHEN requests<=30 THEN 200 ELSE 429 END AS status,CASE WHEN requests<=30 THEN 0 ELSE 60-CAST((:__now%60000)/1000 AS INTEGER) END AS retry_after,CASE WHEN requests<=30 THEN (SELECT json_group_array(json(json_object('id',id,'full_name',full_name,'email',email,'created_at',created_at,'next_cursor',next_cursor))) FROM (WITH authorized AS (SELECT DISTINCT c.id,c.name AS full_name,NULL AS email,c.created_at,hex(json_array('search_candidates',:__user_id,:organization_id,:brand_id,:requisition_id,NULL,c.id)) AS token FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role IN ('owner','recruiter') OR (p.role='reviewer' AND EXISTS (SELECT 1 FROM interviews i JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.tenant_id=i.tenant_id AND ia.brand_id=i.brand_id AND ia.requisition_id=i.requisition_id AND ia.application_id=i.application_id WHERE i.application_id=a.id AND i.tenant_id=a.organization_id AND i.brand_id=a.brand_id AND i.requisition_id=a.requisition_id AND i.status='scheduled' AND ia.reviewer_id=:__user_id AND ia.revoked_at IS NULL)))) AND NOT EXISTS (SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND typeof(:q)='text' AND length(:q)<=200 AND instr(:q,char(0))=0 AND c.name LIKE '%' || replace(replace(replace(:q,'\\','\\\\'),'%','\\%'),'_','\\_') || '%' ESCAPE '\\' AND (:limit IS NULL OR (typeof(:limit) IN ('integer','real') AND :limit=CAST(:limit AS INTEGER) AND :limit BETWEEN 1 AND 50)) AND (:cursor IS NULL OR length(:cursor)<=4096)), anchor AS (SELECT created_at,id FROM authorized WHERE token=:cursor), page AS (SELECT * FROM authorized WHERE :cursor IS NULL OR EXISTS (SELECT 1 FROM anchor x WHERE authorized.created_at<x.created_at OR (authorized.created_at=x.created_at AND authorized.id>x.id)) ORDER BY created_at DESC,id ASC LIMIT CASE WHEN :limit IS NULL THEN 20 WHEN typeof(:limit) IN ('integer','real') AND :limit=CAST(:limit AS INTEGER) AND :limit BETWEEN 1 AND 50 THEN CAST(:limit AS INTEGER) ELSE 0 END) SELECT id,full_name,email,created_at,CASE WHEN EXISTS (SELECT 1 FROM authorized n WHERE n.created_at<page.created_at OR (n.created_at=page.created_at AND n.id>page.id)) THEN token ELSE NULL END AS next_cursor FROM page ORDER BY created_at DESC,id ASC LIMIT 50)) ELSE '[]' END AS rows_json"
+      ]
+    },
+    {
+      "name": "get_search_candidate",
+      "description": "Fetch one currently authorized search record.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "x-rate-limit": {
+        "requests": 30,
+        "window_seconds": 60,
+        "scope": "authenticated_user",
+        "shared": "hiring_search"
+      },
+      "statements": [
+        "INSERT INTO hiring_search_budget(user_id,window_start,requests) VALUES (:__user_id,CAST(:__now/60000 AS INTEGER),1) ON CONFLICT(user_id) DO UPDATE SET window_start=excluded.window_start,requests=CASE WHEN hiring_search_budget.window_start<>excluded.window_start THEN 1 ELSE min(hiring_search_budget.requests+1,31) END RETURNING CASE WHEN requests<=30 THEN 200 ELSE 429 END AS status,CASE WHEN requests<=30 THEN 0 ELSE 60-CAST((:__now%60000)/1000 AS INTEGER) END AS retry_after,CASE WHEN requests<=30 THEN (SELECT json_group_array(json(json_object('id',id,'full_name',full_name,'email',email,'created_at',created_at))) FROM (SELECT DISTINCT c.id,c.name AS full_name,NULL AS email,c.created_at FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role IN ('owner','recruiter') OR (p.role='reviewer' AND EXISTS (SELECT 1 FROM interviews i JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.tenant_id=i.tenant_id AND ia.brand_id=i.brand_id AND ia.requisition_id=i.requisition_id AND ia.application_id=i.application_id WHERE i.application_id=a.id AND i.tenant_id=a.organization_id AND i.brand_id=a.brand_id AND i.requisition_id=a.requisition_id AND i.status='scheduled' AND ia.reviewer_id=:__user_id AND ia.revoked_at IS NULL)))) AND NOT EXISTS (SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND c.id=:id LIMIT 1)) ELSE '[]' END AS rows_json"
+      ]
+    },
+    {
+      "name": "search_applications",
+      "description": "Bounded search within current grants and assignments.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "q": {
+          "type": "string",
+          "max": 200
+        },
+        "limit": {
+          "type": "integer",
+          "optional": true,
+          "default": 20
+        },
+        "cursor": {
+          "type": "string",
+          "optional": true
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true,
+      "x-rate-limit": {
+        "requests": 30,
+        "window_seconds": 60,
+        "scope": "authenticated_user",
+        "shared": "hiring_search"
+      },
+      "statements": [
+        "INSERT INTO hiring_search_budget(user_id,window_start,requests) VALUES (:__user_id,CAST(:__now/60000 AS INTEGER),1) ON CONFLICT(user_id) DO UPDATE SET window_start=excluded.window_start,requests=CASE WHEN hiring_search_budget.window_start<>excluded.window_start THEN 1 ELSE min(hiring_search_budget.requests+1,31) END RETURNING CASE WHEN requests<=30 THEN 200 ELSE 429 END AS status,CASE WHEN requests<=30 THEN 0 ELSE 60-CAST((:__now%60000)/1000 AS INTEGER) END AS retry_after,CASE WHEN requests<=30 THEN (SELECT json_group_array(json(json_object('id',id,'candidate_id',candidate_id,'requisition_id',requisition_id,'stage',stage,'created_at',created_at,'next_cursor',next_cursor))) FROM (WITH authorized AS (SELECT DISTINCT a.id,a.candidate_id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.created_at,hex(json_array('search_applications',:__user_id,:organization_id,:brand_id,:requisition_id,:stage,a.id)) AS token FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role IN ('owner','recruiter') OR (p.role='reviewer' AND EXISTS (SELECT 1 FROM interviews i JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.tenant_id=i.tenant_id AND ia.brand_id=i.brand_id AND ia.requisition_id=i.requisition_id AND ia.application_id=i.application_id WHERE i.application_id=a.id AND i.tenant_id=a.organization_id AND i.brand_id=a.brand_id AND i.requisition_id=a.requisition_id AND i.status='scheduled' AND ia.reviewer_id=:__user_id AND ia.revoked_at IS NULL)))) AND NOT EXISTS (SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND typeof(:q)='text' AND length(:q)<=200 AND instr(:q,char(0))=0 AND c.name LIKE '%' || replace(replace(replace(:q,'\\','\\\\'),'%','\\%'),'_','\\_') || '%' ESCAPE '\\' AND (:limit IS NULL OR (typeof(:limit) IN ('integer','real') AND :limit=CAST(:limit AS INTEGER) AND :limit BETWEEN 1 AND 50)) AND (:cursor IS NULL OR length(:cursor)<=4096)), anchor AS (SELECT created_at,id FROM authorized WHERE token=:cursor), page AS (SELECT * FROM authorized WHERE :cursor IS NULL OR EXISTS (SELECT 1 FROM anchor x WHERE authorized.created_at<x.created_at OR (authorized.created_at=x.created_at AND authorized.id>x.id)) ORDER BY created_at DESC,id ASC LIMIT CASE WHEN :limit IS NULL THEN 20 WHEN typeof(:limit) IN ('integer','real') AND :limit=CAST(:limit AS INTEGER) AND :limit BETWEEN 1 AND 50 THEN CAST(:limit AS INTEGER) ELSE 0 END) SELECT id,candidate_id,requisition_id,stage,created_at,CASE WHEN EXISTS (SELECT 1 FROM authorized n WHERE n.created_at<page.created_at OR (n.created_at=page.created_at AND n.id>page.id)) THEN token ELSE NULL END AS next_cursor FROM page ORDER BY created_at DESC,id ASC LIMIT 50)) ELSE '[]' END AS rows_json"
+      ]
+    },
+    {
+      "name": "get_search_application",
+      "description": "Fetch one currently authorized search record.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "id": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true,
+      "x-rate-limit": {
+        "requests": 30,
+        "window_seconds": 60,
+        "scope": "authenticated_user",
+        "shared": "hiring_search"
+      },
+      "statements": [
+        "INSERT INTO hiring_search_budget(user_id,window_start,requests) VALUES (:__user_id,CAST(:__now/60000 AS INTEGER),1) ON CONFLICT(user_id) DO UPDATE SET window_start=excluded.window_start,requests=CASE WHEN hiring_search_budget.window_start<>excluded.window_start THEN 1 ELSE min(hiring_search_budget.requests+1,31) END RETURNING CASE WHEN requests<=30 THEN 200 ELSE 429 END AS status,CASE WHEN requests<=30 THEN 0 ELSE 60-CAST((:__now%60000)/1000 AS INTEGER) END AS retry_after,CASE WHEN requests<=30 THEN (SELECT json_group_array(json(json_object('id',id,'candidate_id',candidate_id,'requisition_id',requisition_id,'stage',stage,'created_at',created_at))) FROM (SELECT DISTINCT a.id,a.candidate_id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.created_at FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role IN ('owner','recruiter') OR (p.role='reviewer' AND EXISTS (SELECT 1 FROM interviews i JOIN interview_assignments ia ON ia.interview_id=i.id AND ia.tenant_id=i.tenant_id AND ia.brand_id=i.brand_id AND ia.requisition_id=i.requisition_id AND ia.application_id=i.application_id WHERE i.application_id=a.id AND i.tenant_id=a.organization_id AND i.brand_id=a.brand_id AND i.requisition_id=a.requisition_id AND i.status='scheduled' AND ia.reviewer_id=:__user_id AND ia.revoked_at IS NULL)))) AND NOT EXISTS (SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND a.id=:id LIMIT 1)) ELSE '[]' END AS rows_json"
+      ]
     }
   ]
 }
