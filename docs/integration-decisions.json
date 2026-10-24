@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "assessed_on": "2026-10-25",
+  "owner": "Serge",
+  "issue": 41,
+  "implementation_authorized": false,
+  "gates": [
+    { "id": "calendar", "status": "blocked", "approved_contract": null, "candidate_transfer_authorized": false },
+    { "id": "job_listing", "status": "blocked", "approved_contract": null, "candidate_transfer_authorized": false },
+    { "id": "job_candidate_transfer", "status": "blocked", "approved_contract": null, "candidate_transfer_authorized": false }
+  ]
+}

@@ -62,3 +62,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 - [Separately consented talent pool](talent-pool.md): brand-only future contact, fixed expiry and candidate withdrawal.
 
 - [Privacy-safe funnel analytics](funnel-analytics.md): brand grants, milestone definitions, and server-side small-cell suppression.
+
+[Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.

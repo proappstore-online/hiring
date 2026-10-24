@@ -40,3 +40,5 @@ Hiring is not payroll, HRIS, contract signing, immigration advice or an automate
 Launch requires two distinct brands to run end-to-end without cross-brand access, resilient messaging, working subject rights, accessibility/security evidence and approved public legal identity and copy; no separate legal review is required. Until then marketing and legal pages remain placeholders.
 
 Brand-scoped talent pools support separate opt-in, a 180-day participation expiry and candidate withdrawal; see [talent pool](talent-pool.md).
+
+[Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.

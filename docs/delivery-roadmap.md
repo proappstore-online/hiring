@@ -42,3 +42,5 @@ The [#53 ADR review](architecture.md#affected-backlog-dependencies) records reso
 Issue #3 progress: publication and authenticated intake actions/UI have been added with regression tests; intake remains closed pending trusted file scanning and assigned-reviewer byte serving. See [intake contract](candidate-intake.md). This progress does not complete Phase 2 or authorize closing the epic.
 
 [Compliance and policy verification matrix (#54)](compliance-verification.md) maps approved policy clauses and every release-register requirement to gates, owner, pass criteria, evidence, existing workflow checks and backlog handoffs.
+
+[Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.
