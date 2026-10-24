@@ -358,3 +358,20 @@ exact-installation/brand approval records are empty by default; neither ordinary
 MCP callers nor register edits can approve these capabilities. No candidate
 source format or candidate webhook payload is supported. See
 [the input schema](../contracts/requisition-import.v1.schema.json).
+
+### Worker correspondence replay integrity (#59)
+
+Migration `0046_worker_email_conflicting_replay` adds a conflict guard for both
+unlinked correspondence and linked outbox evidence. Reusing a worker archive ID,
+operation ID, or scoped message/receipt/event identity with different content,
+provider metadata, actor or agent aborts the transaction. Exact retries remain
+no-ops and require exact authorized readback. Gmail actions and existing migrations
+are unchanged; candidate contacts are never rewritten.
+
+Regression evidence lives in `tests/internal-workspace.test.mjs` (cross-owner,
+scope, candidate/mailbox matching, provider union, opaque identifiers, immutable
+storage, unlinked conflict/readback and contact preservation) and
+`tests/email-history.test.mjs` (linked evidence and replay integrity). Tests execute
+the manifest SQL against all canonical migrations and use synthetic correspondence;
+no real candidate mail is sent. Local SQL readback is not proof of live provider
+delivery. Push-triggered `Deploy to R2` supplies migration/action deployment evidence.

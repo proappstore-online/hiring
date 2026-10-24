@@ -359,12 +359,12 @@ test('Cloudflare replay and conflicting IDs never claim a newly archived record'
   const { db, call } = workerFixture()
   assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [1, 1])
   assert.deepEqual(call('record_worker_candidate_email', 'staff-a', workerMail), [0, 0])
-  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, body: 'Conflicting body' }), [0, 0])
+  assert.throws(() => call('record_worker_candidate_email', 'staff-a', { ...workerMail, body: 'Conflicting body' }), /conflicting email replay/)
   assert.equal(call('get_worker_candidate_email', 'staff-a', workerMail)[0].body, workerMail.body)
   const retry = { ...workerMail, communication_id: 'worker-new-id', operation_id: 'worker-new-op' }
   assert.deepEqual(call('record_worker_candidate_email', 'staff-a', retry), [0, 0])
   assert.deepEqual(call('get_worker_candidate_email', 'staff-a', retry), [])
-  assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...retry, provider_message_id: 'different-bridge-id-same-receipt' }), [0, 0])
+  assert.throws(() => call('record_worker_candidate_email', 'staff-a', { ...retry, provider_message_id: 'different-bridge-id-same-receipt' }), /conflicting email replay/)
   assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_worker_communication_events').get().n, 1)
   assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='communication.email_sent'").get().n, 1)
   db.close()
@@ -395,5 +395,19 @@ test('worker provider dedupe respects separate mailbox and bridge namespaces', (
   assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, communication_id: 'another-bridge', provider_connection_id: 'second-bridge', operation_id: 'another-bridge-op' }), [1, 1])
   assert.deepEqual(call('record_worker_candidate_email', 'staff-a', { ...workerMail, communication_id: 'another-mailbox', mailbox_address: 'hiring@freeappstore.online', from_email: 'hiring@freeappstore.online', operation_id: 'another-mailbox-op' }), [1, 1])
   assert.equal(call('list_application_communications', 'staff-a', workerMail).length, 3)
+  db.close()
+})
+
+ test('unlinked worker conflicts abort atomically without changing contacts or evidence', () => {
+  const { db, call } = workerFixture()
+  const contacts = db.prepare('SELECT * FROM hiring_candidates').all()
+  call('record_worker_candidate_email', 'staff-a', workerMail)
+  const before = call('get_worker_candidate_email', 'staff-a', workerMail)
+  for (const patch of [{ subject: 'Changed' }, { provider_thread_id: 'Changed' }, { agent_instance_id: 'Changed' }, { provider_event_id: 'Changed' }]) {
+    assert.throws(() => call('record_worker_candidate_email', 'staff-a', { ...workerMail, ...patch }), /conflicting email replay/)
+    assert.deepEqual(call('get_worker_candidate_email', 'staff-a', workerMail), before)
+  }
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_candidates').all(), contacts)
+  assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id=?").get(workerMail.operation_id).n, 1)
   db.close()
 })

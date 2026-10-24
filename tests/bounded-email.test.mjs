@@ -228,7 +228,7 @@ test('candidate mismatch and conflicting retry do not advance checkpoint', async
   const neverCheckpoint = async () => assert.fail('checkpoint called')
   assert.equal((await processor(f, { readMessage: async () => ({ ...mail, from_email: 'other@example.test' }), checkpoint: neverCheckpoint })(processArgs)).reason, 'archive_mismatch')
   await processor(f)(processArgs)
-  assert.equal((await processor(f, { readMessage: async () => ({ ...mail, body: 'changed' }), checkpoint: neverCheckpoint })(processArgs)).reason, 'archive_mismatch')
+  assert.equal((await processor(f, { readMessage: async () => ({ ...mail, body: 'changed' }), checkpoint: neverCheckpoint })(processArgs)).reason, 'archive_failed')
   assert.equal(f.db.prepare('SELECT body FROM hiring_worker_communication_events').get().body, mail.body)
 })
 
