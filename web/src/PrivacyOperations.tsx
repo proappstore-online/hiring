@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { app, id, read, type Scope } from './api'
-import { retrieveCandidateExport } from '../../scripts/privacy.mjs'
+import { requestAsyncCandidateExport, downloadAsyncCandidateExport } from '../../scripts/privacy.mjs'
 import { registerPublicationPasskey, verifyPublicationPasskey } from './passkey'
 import { button, field, panel } from './ui'
 
@@ -45,13 +45,17 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
   async function download() {
     await verifyPublicationPasskey()
     handle.current ??= id()
-    const row=await retrieveCandidateExport((name,values)=>app.actions.call(name,values),{...params,rights_request_id:request.trim(),request_id:handle.current})
+    const values={...params,rights_request_id:request.trim(),request_id:handle.current}
+    const actions=(name: string, p: Record<string, unknown>)=>app.actions.call(name,p)
+    const status=await requestAsyncCandidateExport(actions,values)
+    if (status.state!=='ready') { setMessage('Export queued. Check again after assembly completes. Authorization expires in 15 minutes.'); return }
+    const row=await downloadAsyncCandidateExport(actions,values)
     if (!active.current) return
     const blob=new Blob([JSON.stringify(row,null,2)],{type:'application/json'})
     const url=URL.createObjectURL(blob)
-    const link=document.createElement('a');link.href=url;link.download='candidate-core-export.json';link.click()
+    const link=document.createElement('a');link.href=url;link.download='candidate-subject-export.json';link.click()
     setTimeout(()=>URL.revokeObjectURL(url),1000)
-    setMessage('Core export downloaded. File bytes and confidential review material are excluded. Full rights fulfillment still requires review.')
+    setMessage('Private subject export downloaded. Review the included exclusions before recording fulfillment.')
   }
   return <section className={panel} aria-label="Subject rights requests"><h2 className="text-xl font-semibold">Subject rights requests and export</h2>
     <p>Record receipt, assigned owner, deadline and identity-review evidence. Use opaque case references; never enter identity documents. Completion is a human attestation: first review execution and processor evidence. A partial core erasure is not complete deletion.</p>
@@ -70,7 +74,7 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
       {latest && <p>State: {latest.status} · version {latest.version} · owner {latest.owner_user_id} · deadline {new Date(latest.deadline_at).toLocaleString()}</p>}
       {latest?.status==='received' && <button className={button} onClick={()=>void run(()=>record('identity_verification'))}>Begin identity review</button>}
       {latest?.status==='identity_verification' && <button className={button} disabled={!proof.trim()} onClick={()=>void run(()=>record('processing'))}>Confirm verified identity with passkey</button>}
-      {latest?.status==='processing' && ['access','export'].includes(latest.request_type) && <><button className={button} onClick={()=>void run(download)}>Download private core export</button><button className={button} onClick={()=>{handle.current=null;setMessage('Next download will request a new 15-minute authorization.')}}>Request fresh export authorization</button><button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Record reviewed fulfillment</button></>}
+      {latest?.status==='processing' && ['access','export'].includes(latest.request_type) && <><button className={button} onClick={()=>void run(download)}>Prepare or download private export</button><button className={button} onClick={()=>{handle.current=null;setMessage('Next download will request a new 15-minute authorization.')}}>Request fresh export authorization</button><button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Record reviewed fulfillment</button></>}
       {latest?.status==='processing' && ['correction','withdrawal','deletion'].includes(latest.request_type) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Attest reviewed execution completion</button>}
       {latest && !['fulfilled','denied_with_reason'].includes(latest.status) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('denied_with_reason'))}>Record denial with passkey</button>}
     </fieldset><p role="status" className="break-words">{message}</p>

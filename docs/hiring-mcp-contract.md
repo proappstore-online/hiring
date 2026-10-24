@@ -204,8 +204,9 @@ workflow, private 15-minute core export and `authorize_gateway_*` /
 pairs. Authorization records server-derived denial/missing outcomes before retrieval;
 caller-reported read uncertainty has separate durable evidence. Direct legacy reads,
 platform-preexecution failures and broader mutation failures remain audit gaps.
-The core export excludes confidential review material and file bytes and does not
-satisfy the full async subject export contract. Full erasure/processor limitations
+The legacy core query remains compatible. The asynchronous subject export contract
+uses a durable scoped JSON snapshot with explicit confidential and file-byte exclusions;
+see [privacy operations](privacy-operations.md#private-asynchronous-subject-export-30). Full erasure/processor limitations
 remain unchanged; issue #5 still has acceptance gaps.
 
 Ordinary `change_application_stage` pipeline updates require current scoped staff
@@ -262,3 +263,18 @@ human-reviewed and scoped; private evidence references never appear in candidate
 status. `attest_candidate_rights_completion` records owner/passkey-reviewed
 completion of correction, withdrawal or deletion after processing; it performs no
 data mutation beyond lifecycle/audit evidence. See [privacy operations](privacy-operations.md).
+
+### Secure asynchronous exports (#30)
+
+`queue_candidate_export` creates an idempotent principal-bound job from a verified
+`request_candidate_export` receipt. `get_candidate_export_status` returns only state
+and expiry. `prepare_candidate_export` is passkey-gated owner-only assembly;
+`list_candidate_export_queue` and `assemble_candidate_export` are worker-only
+alternatives. Both assembly paths use the same explicit SQL projection and atomic
+content-free readiness audit. No arbitrary payload or storage key is accepted.
+
+Before every download call `authorize_candidate_export_download` with a fresh
+`access_id`, then `download_candidate_export`. Read authorization, current grants,
+latest identity review, erasure and absolute expiry are checked again on retrieval.
+Artifacts are private JSON, never public links. Coverage, exclusions, retention and
+operational scheduling are specified in the privacy operations contract.

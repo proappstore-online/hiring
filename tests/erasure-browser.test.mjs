@@ -11,11 +11,13 @@ const { default: react } = await import(require.resolve('@vitejs/plugin-react'))
 const { default: tailwind } = await import(require.resolve('@tailwindcss/vite'))
 const web = new URL('../web/', import.meta.url).pathname
 const fixture = `import React from 'react';import{createRoot}from'react-dom/client';import{MemoryRouter}from'react-router-dom';import{RecruiterContext,ComplianceScreen}from'/src/RecruiterScreens.tsx';import'/src/index.css';
-window.calls=[];window.result=null;window.fail=false;window.rights=[];
+window.calls=[];window.result=null;window.fail=false;window.rights=[];window.exportReady=false;
 window.action=async(name,params)=>{window.calls.push({name,params});if(window.fail)throw Error('synthetic');
 if(name==='record_candidate_rights_event'){window.rights.push({...params,id:params.operation_id,version:params.expected_version+1});return{meta:{changes:1}};}
 if(name==='list_candidate_rights_events')return{rows:window.rights};
-if(name==='get_candidate_export')return{rows:[{candidate_id:'candidate',name:'Test',coverage:'scoped_core_export'}]};
+if(name==='get_candidate_export_status')return{rows:[{state:window.exportReady?'ready':'queued',expires_at:Date.now()+900000}]};
+if(name==='prepare_candidate_export'){window.exportReady=true;return{meta:{changes:1}};}
+if(name==='download_candidate_export')return{rows:[{payload_json:JSON.stringify({candidate:{id:'candidate',name:'Test'},coverage:'brand_subject_export',exclusions:['confidential review material','file bytes']})}]};
 if(name==='request_candidate_erasure'){window.result={request_id:'request-1',operation_id:params.operation_id,application_id:params.application_id,created_at:1000,status:'partial',stores_json:JSON.stringify([{store:'candidate_core',remaining_records:0},{store:'hiring_outbox',remaining_records:1}]),verification_code:'files_indexes_exports_backups_require_verification',processor:'MAIL',processor_status:'blocked',processor_reason:'no_verified_deletion_route'};return{meta:{changes:1}};}
 return{rows:name==='get_candidate_erasure_status'&&window.result?[window.result]:[]};};
 const root=createRoot(document.getElementById('root'));let revision=0;
@@ -43,10 +45,16 @@ test('owner compliance screen wires real erasure API with confirmations, scoped 
     await page.getByLabel('Identity verification case reference',{exact:true}).fill('opaque-case')
     await page.getByRole('button',{name:'Confirm verified identity with passkey',exact:true}).click()
     await expect(page.getByText(/State: processing/)).toBeVisible()
+    await page.getByRole('button',{name:'Prepare or download private export',exact:true}).click()
+    await expect(page.getByText(/Export queued/)).toBeVisible()
     const download=page.waitForEvent('download')
-    await page.getByRole('button',{name:'Download private core export',exact:true}).click()
-    assert.equal((await download).suggestedFilename(),'candidate-core-export.json')
-    await expect(page.getByText(/Core export downloaded/)).toBeVisible()
+    await page.getByRole('button',{name:'Prepare or download private export',exact:true}).click()
+    assert.equal((await download).suggestedFilename(),'candidate-subject-export.json')
+    await expect(page.getByText(/Private subject export downloaded/)).toBeVisible()
+    const exportCalls=await page.evaluate(()=>window.calls.filter(c=>['queue_candidate_export','prepare_candidate_export','authorize_candidate_export_download','download_candidate_export'].includes(c.name)))
+    assert.deepEqual(exportCalls.map(c=>c.name),['queue_candidate_export','prepare_candidate_export','queue_candidate_export','authorize_candidate_export_download','download_candidate_export'])
+    assert.ok(exportCalls.every(c=>c.params.organization_id==='org' && c.params.brand_id==='brand' && c.params.application_id==='app'))
+    assert.equal(exportCalls.at(-1).params.access_id,exportCalls.at(-2).params.access_id)
 
     await page.getByLabel('Application ID',{exact:true}).fill('app')
     await page.getByLabel("I have verified the candidate's identity and request scope.").check()

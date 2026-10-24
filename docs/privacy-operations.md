@@ -33,32 +33,47 @@ registered action can assign another current brand-wide owner. Changing role or
 workspace clears the UI state. Candidate intake is described below. Evidence upload, rectification execution
 and legally complete erasure remain separate execution work.
 
-## Private scoped core export
+## Private asynchronous subject export (#30)
 
-1. Record an access/export request and finish identity review into processing.
-2. Call passkey-gated `request_candidate_export` with exact scope, application,
-   rights request and a fresh `request_id`. It derives authorization on the server
-   and commits authorized/not_found evidence before data retrieval.
-3. Call `get_candidate_export` with the identical parameters. The handle is private,
-   bound to the requesting principal, brand and application, and expires after
-   900000 milliseconds (15 minutes) using server time. It grants no public URL.
-   Repeating the authorization does not extend expiry. Use a new handle for a
-   deliberately renewed authorization.
+After identity review reaches processing, use the Compliance screen's “Prepare or
+download private export” control. It calls passkey-gated `request_candidate_export`
+and `queue_candidate_export` with exact organization, brand, application, rights
+request and a stable request ID. Queueing returns no subject content. Repeating a
+request never extends its server-derived 15-minute authorization.
 
-Every retrieval rechecks current owner access, verified processing status, scope,
-expiry and erasure tombstones. Another principal cannot redeem the handle. An
-erasure request immediately invalidates outstanding export access. No export
-payload is persisted in the database or sent to MAIL. The UI downloads an ephemeral
-JSON Blob and releases its object URL. Downloaded copies are outside server control.
+Assembly is a separate resumable transaction. `prepare_candidate_export` allows
+only the requesting current brand-wide owner with passkey step-up. A trusted
+worker may instead poll `list_candidate_export_queue` and run
+`assemble_candidate_export` through `worker/exports.mjs`. No worker deployment or
+scheduler is required for the interactive path; no automatic worker scheduling is
+claimed. The first UI action prepares the job; the next checks readiness and
+downloads. Lost responses reconcile through `get_candidate_export_status`.
 
-The explicit projection includes candidate core contact/profile fields, the
-candidate's application summaries in this brand, and consent/notice metadata.
-It excludes confidential notes, sourcing context, review/scorecard/decision text,
-mail archives, internal staff details, storage keys, file bytes and the independent
-worker account. This is labeled `scoped_core_export`, **not a complete subject
-access export**. Async assembly, secure file-byte export and review of other
-subject data remain #30 work; the new action must not be used as evidence that
-#30's whole export contract has been delivered.
+SQL assembles a durable private JSON snapshot from explicit fields: candidate
+contact/profile data, same-brand application summaries, consent/notice metadata,
+submitted statements and attachment metadata. It excludes confidential sourcing,
+notes, reviews, decisions, internal correspondence, independent worker account
+data, private storage keys and file bytes. The artifact includes its coverage and
+exclusions; it is not an attestation that every possible subject-access disclosure
+has been reviewed or delivered. File bytes continue through separately authorized
+private file retrieval, not this JSON artifact. Review exclusions and any additional
+required disclosures before recording fulfillment.
+
+Each download calls passkey-gated `authorize_candidate_export_download` with a
+fresh access ID, recording authorized/not_found evidence before
+`download_candidate_export`. Its principal-bound read receipt lasts at most one
+minute and never extends the artifact's 15-minute expiry. Every status, assembly
+and retrieval rechecks current owner grants, latest verified processing status,
+exact scope, expiry and erasure. Missing and denied return identical empty rows.
+There is no public URL or bearer token. Audit failure rolls back authorization or
+readiness. Failed/uncertain reads record `record_privacy_read_failure` where
+available; evidence records attempts, not proof that a human saved a file.
+
+Snapshots remain private under indefinite retention; expiry revokes access rather
+than scheduling a purge. Explicit erasure deletes the snapshot in the same
+transaction as its tombstone and prevents reassembly. Downloaded copies remain
+outside server control. The legacy core-query actions remain compatible but the
+Compliance UI uses the asynchronous snapshot and per-download audit path.
 
 ## Audited restricted MCP reads
 
@@ -100,7 +115,7 @@ application ledger.
 
 Issue #5 is not fully resolved by this change. Complete deletion still lacks cleanup
 of protected content, file bytes, indexes, backups and verified processor propagation
-([erasure contract](erasure.md)). Complete export/async retrieval, complete rights execution and comprehensive legacy-action failure/denial auditing also
+([erasure contract](erasure.md)). Complete rights execution and comprehensive legacy-action failure/denial auditing also
 remain. Changing a checkbox cannot supply these missing capabilities. The current
 owner-approved retention policy intentionally requires no scheduler.
 
@@ -154,7 +169,7 @@ It requires decision/execution evidence and preserves the version/audit guards.
 Review all applicable stores and processor outcomes first; core erasure, a held
 request or a pending processor step is not complete deletion. This action records
 reviewed completion and does not execute correction, withdrawal or erasure.
-Access/export still use the earlier completion action and scoped export limits.
+Access/export retain human completion attestation after the asynchronous export and exclusion review.
 The candidate sees completion status, not private evidence or identity documents.
-Indefinite retention and legal holds remain unchanged. Complete export assembly
-and erasure execution continue under their separate contracts (#30/#31).
+Indefinite retention and legal holds remain unchanged. Additional subject-access disclosure review
+and erasure execution continue under privacy operations and erasure contracts (#31).

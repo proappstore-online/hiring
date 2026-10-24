@@ -4543,6 +4543,167 @@
       },
       "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND :status='fulfilled' AND :request_type IN ('correction','withdrawal','deletion')",
       "step_up": true
+    },
+    {
+      "name": "queue_candidate_export",
+      "description": "Queue private asynchronous subject export using an existing verified, principal-bound authorization. Retries never extend expiry.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_export_jobs(id,organization_id,brand_id,application_id,candidate_id,rights_request_id,actor_user_id,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:application_id,c.id,:rights_request_id,:__user_id,:__now,(SELECT expires_at FROM hiring_privacy_access WHERE id=:request_id) FROM hiring_candidates c JOIN hiring_applications target ON target.candidate_id=c.id AND target.organization_id=c.organization_id AND target.brand_id=c.brand_id WHERE target.id=:application_id AND c.organization_id=:organization_id AND c.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:rights_request_id ORDER BY e.version DESC LIMIT 1) e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.application_id=:application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128) AND EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.actor_user_id=:__user_id AND x.action='candidate_export' AND x.context_id=:rights_request_id AND x.target_id=:application_id AND x.outcome='authorized' AND x.expires_at>:__now) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.candidate_id=c.id AND er.organization_id=c.organization_id AND er.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_export_jobs WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.candidate_id=c.id AND d.organization_id=c.organization_id AND d.brand_id=c.brand_id)",
+      "step_up": true
+    },
+    {
+      "name": "get_candidate_export_status",
+      "description": "Private current authorization and expiry checked job status. Missing and denied are identical.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT j.state,j.expires_at FROM hiring_export_jobs j WHERE j.id=:request_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.application_id=:application_id AND j.rights_request_id=:rights_request_id AND j.actor_user_id=:__user_id AND j.expires_at>:__now AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=j.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=j.rights_request_id AND e.organization_id=j.organization_id AND e.brand_id=j.brand_id AND e.application_id=j.application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128 AND e.version=(SELECT max(version) FROM hiring_rights_events WHERE request_id=e.request_id)) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=j.organization_id AND er.brand_id=j.brand_id AND er.candidate_id=j.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=j.organization_id AND d.brand_id=j.brand_id AND d.candidate_id=j.candidate_id) LIMIT 1"
+    },
+    {
+      "name": "list_candidate_export_queue",
+      "description": "Trusted worker polls pending exports; no PII or artifact returned.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {},
+      "sql": "SELECT id AS request_id,organization_id,brand_id FROM hiring_export_jobs WHERE state='queued' AND expires_at>:__now AND :__user_id=('system'||char(58)||'worker') ORDER BY created_at,id LIMIT 25",
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "assemble_candidate_export",
+      "description": "Worker assembles a durable private JSON snapshot from an explicit server projection; excludes confidential fields. Atomic readiness and content-free audit.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "UPDATE hiring_export_jobs AS j SET payload_json=(SELECT json_object('format_version',1,'coverage','brand_subject_export','candidate',json_object('id',candidate_id,'name',name,'email',email,'phone',phone,'profile_url',profile_url),'applications',json(applications_json),'consents',json(consent_json),'submissions',json((SELECT json_group_array(json_object('application_id',r.application_id,'statement',json_extract(r.payload_json,'$.statement'),'notice_acknowledged',json_extract(r.payload_json,'$.notice_acknowledged'),'created_at',r.created_at)) FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id WHERE a.candidate_id=j.candidate_id AND a.organization_id=j.organization_id AND a.brand_id=j.brand_id)),'attachments',json((SELECT json_group_array(json_object('application_id',f.application_id,'filename',f.filename,'mime_type',f.mime_type,'size_bytes',f.size_bytes,'scan_state',f.scan_state)) FROM hiring_attachments f JOIN hiring_applications a ON a.id=f.application_id AND a.organization_id=f.organization_id AND a.brand_id=f.brand_id WHERE a.candidate_id=j.candidate_id AND a.organization_id=j.organization_id AND a.brand_id=j.brand_id AND f.deleted_at IS NULL AND f.scan_state<>'deleted')),'exclusions',json_array('confidential sourcing, notes, reviews, decisions and internal correspondence','independent worker account','file bytes - available through separately authorized private file retrieval')) FROM (SELECT c.id AS candidate_id,c.name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,(SELECT json_group_array(json_object('application_id',a.id,'requisition_title',r.title,'stage',COALESCE(a.accepted_stage,a.stage_extension,a.stage),'created_at',a.created_at,'notice_version',a.notice_version)) FROM hiring_applications a JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS applications_json,(SELECT json_group_array(json_object('application_id',cr.application_id,'purpose',cr.purpose,'legal_basis',cr.legal_basis,'notice_version',cr.notice_version,'recorded_at',cr.recorded_at,'withdrawn_at',cr.withdrawn_at)) FROM hiring_consent_records cr JOIN hiring_applications a ON a.id=cr.application_id AND a.organization_id=cr.organization_id AND a.brand_id=cr.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS consent_json FROM hiring_candidates c WHERE c.id=j.candidate_id AND c.organization_id=j.organization_id AND c.brand_id=j.brand_id)),state='ready',assembled_at=:__now WHERE j.id=:request_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') AND j.state='queued' AND j.expires_at>:__now AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=j.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=j.rights_request_id AND e.organization_id=j.organization_id AND e.brand_id=j.brand_id AND e.application_id=j.application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128 AND e.version=(SELECT max(version) FROM hiring_rights_events WHERE request_id=e.request_id)) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=j.organization_id AND er.brand_id=j.brand_id AND er.candidate_id=j.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=j.organization_id AND d.brand_id=j.brand_id AND d.candidate_id=j.candidate_id)",
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "authorize_candidate_export_download",
+      "description": "Log each private artifact access attempt before retrieval, including denied/expired attempts. A fresh access_id is required for each download.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "access_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,context_id,outcome,created_at,expires_at) SELECT :access_id,:organization_id,:brand_id,:__user_id,'candidate_export_download',:application_id,:request_id,CASE WHEN EXISTS (SELECT 1 FROM hiring_export_jobs j WHERE j.id=:request_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.application_id=:application_id AND j.rights_request_id=:rights_request_id AND j.actor_user_id=:__user_id AND j.expires_at>:__now AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=j.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=j.rights_request_id AND e.organization_id=j.organization_id AND e.brand_id=j.brand_id AND e.application_id=j.application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128 AND e.version=(SELECT max(version) FROM hiring_rights_events WHERE request_id=e.request_id)) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=j.organization_id AND er.brand_id=j.brand_id AND er.candidate_id=j.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=j.organization_id AND d.brand_id=j.brand_id AND d.candidate_id=j.candidate_id) AND j.state='ready') THEN 'authorized' ELSE 'not_found' END,:__now,:__now+60000 WHERE length(trim(:access_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:access_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:access_id OR operation_id=:access_id)",
+      "step_up": true
+    },
+    {
+      "name": "download_candidate_export",
+      "description": "Authenticated expiring private JSON artifact; fresh logged download receipt and all current rights checks required. Never a public bearer URL.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "access_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT j.payload_json,j.expires_at FROM hiring_export_jobs j WHERE j.id=:request_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.application_id=:application_id AND j.rights_request_id=:rights_request_id AND j.actor_user_id=:__user_id AND j.expires_at>:__now AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=j.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=j.rights_request_id AND e.organization_id=j.organization_id AND e.brand_id=j.brand_id AND e.application_id=j.application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128 AND e.version=(SELECT max(version) FROM hiring_rights_events WHERE request_id=e.request_id)) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=j.organization_id AND er.brand_id=j.brand_id AND er.candidate_id=j.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=j.organization_id AND d.brand_id=j.brand_id AND d.candidate_id=j.candidate_id) AND j.state='ready' AND EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:access_id AND x.organization_id=j.organization_id AND x.brand_id=j.brand_id AND x.actor_user_id=:__user_id AND x.action='candidate_export_download' AND x.target_id=j.application_id AND x.context_id=j.id AND x.outcome='authorized' AND x.expires_at>:__now) LIMIT 1"
+    },
+    {
+      "name": "prepare_candidate_export",
+      "description": "Authenticated owner executes a queued export as a separate resumable assembly transaction. Same server projection and readiness audit as the worker. Interactive fallback requires no privileged browser identity.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "UPDATE hiring_export_jobs AS j SET payload_json=(SELECT json_object('format_version',1,'coverage','brand_subject_export','candidate',json_object('id',candidate_id,'name',name,'email',email,'phone',phone,'profile_url',profile_url),'applications',json(applications_json),'consents',json(consent_json),'submissions',json((SELECT json_group_array(json_object('application_id',r.application_id,'statement',json_extract(r.payload_json,'$.statement'),'notice_acknowledged',json_extract(r.payload_json,'$.notice_acknowledged'),'created_at',r.created_at)) FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id WHERE a.candidate_id=j.candidate_id AND a.organization_id=j.organization_id AND a.brand_id=j.brand_id)),'attachments',json((SELECT json_group_array(json_object('application_id',f.application_id,'filename',f.filename,'mime_type',f.mime_type,'size_bytes',f.size_bytes,'scan_state',f.scan_state)) FROM hiring_attachments f JOIN hiring_applications a ON a.id=f.application_id AND a.organization_id=f.organization_id AND a.brand_id=f.brand_id WHERE a.candidate_id=j.candidate_id AND a.organization_id=j.organization_id AND a.brand_id=j.brand_id AND f.deleted_at IS NULL AND f.scan_state<>'deleted')),'exclusions',json_array('confidential sourcing, notes, reviews, decisions and internal correspondence','independent worker account','file bytes - available through separately authorized private file retrieval')) FROM (SELECT c.id AS candidate_id,c.name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,(SELECT json_group_array(json_object('application_id',a.id,'requisition_title',r.title,'stage',COALESCE(a.accepted_stage,a.stage_extension,a.stage),'created_at',a.created_at,'notice_version',a.notice_version)) FROM hiring_applications a JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS applications_json,(SELECT json_group_array(json_object('application_id',cr.application_id,'purpose',cr.purpose,'legal_basis',cr.legal_basis,'notice_version',cr.notice_version,'recorded_at',cr.recorded_at,'withdrawn_at',cr.withdrawn_at)) FROM hiring_consent_records cr JOIN hiring_applications a ON a.id=cr.application_id AND a.organization_id=cr.organization_id AND a.brand_id=cr.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS consent_json FROM hiring_candidates c WHERE c.id=j.candidate_id AND c.organization_id=j.organization_id AND c.brand_id=j.brand_id)),state='ready',assembled_at=:__now WHERE j.id=:request_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.actor_user_id=:__user_id AND j.application_id=:application_id AND j.rights_request_id=:rights_request_id AND j.state='queued' AND j.expires_at>:__now AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=j.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=j.rights_request_id AND e.organization_id=j.organization_id AND e.brand_id=j.brand_id AND e.application_id=j.application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128 AND e.version=(SELECT max(version) FROM hiring_rights_events WHERE request_id=e.request_id)) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=j.organization_id AND er.brand_id=j.brand_id AND er.candidate_id=j.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=j.organization_id AND d.brand_id=j.brand_id AND d.candidate_id=j.candidate_id)",
+      "step_up": true
     }
   ]
 }
