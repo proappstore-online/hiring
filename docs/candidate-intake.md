@@ -1,5 +1,7 @@
 # Requisitions and authenticated candidate intake — issue #3
 
+Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles are unlisted, reject generic candidate intake, and do not use new interview workflows. This policy takes precedence over general intake/interview guidance below.
+
 ## Issue #16 — candidate-facing protected intake
 
 The owner clarified that “without recruiter app authentication” means a signed-in

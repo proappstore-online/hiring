@@ -24,13 +24,13 @@ export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; r
       const details = { ...scope, requisition_id: requisition.id, description: content.description, location: content.location, arrangement: content.arrangement, compensation: content.compensation, notice_version: content.notice_version, notice_text: content.notice_text, contact: content.contact, compensation_type: content.compensation_type }
       await write('save_requisition_review', { ...details, state: 'pending_review', expected_version: review.version, operation_id: id() })
       await write('publish_job_requisition', { ...details, operation_id: id() })
-      await write('set_hiring_runtime_gate', { ...scope, intake_status: 'open', operation_id: id() })
+      if (content.compensation_type !== 'internship') await write('set_hiring_runtime_gate', { ...scope, intake_status: 'open', operation_id: id() })
       await onChanged?.()
-      setMessage('Published and accepting applications.')
+      setMessage(content.compensation_type === 'internship' ? 'Published as an unlisted internship. Use controlled sourcing and direct Interns onboarding.' : 'Published and accepting applications.')
     } catch (e) { setFailed(true); setMessage(mutationError(e)) }
     finally { setBusy(false) }
   }
-  return <section className={panel}><h2 className="font-semibold">Publish vacancy</h2><p className="mt-2 text-sm">Owners and recruiters can publish this prepared vacancy and open applications.</p><button className={button + ' mt-3'} disabled={busy || !requisition} onClick={() => void publishAndOpen()}>{busy ? 'Publishing…' : 'Publish & open applications'}</button><p role={failed ? 'alert' : 'status'} className="mt-3 text-sm">{message || (!requisition ? 'Select a vacancy first.' : '')}</p></section>
+  return <section className={panel}><h2 className="font-semibold">Publish vacancy</h2><p className="mt-2 text-sm">Owners and recruiters can publish this prepared vacancy and open applications. Internships stay unlisted and use controlled recruiter sourcing; publishing an internship does not open public intake.</p><button className={button + ' mt-3'} disabled={busy || !requisition} onClick={() => void publishAndOpen()}>{busy ? 'Publishing…' : 'Publish & open applications'}</button><p role={failed ? 'alert' : 'status'} className="mt-3 text-sm">{message || (!requisition ? 'Select a vacancy first.' : '')}</p></section>
 }
 
 export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list' | 'detail' | 'apply' }) {

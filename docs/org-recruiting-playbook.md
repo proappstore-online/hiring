@@ -1,5 +1,7 @@
 # Organisation recruiting playbook
 
+Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles are unlisted, reject generic candidate intake, and do not use new interview workflows. This policy takes precedence over general intake/interview guidance below.
+
 Hiring is the source of truth for the versioned organisation recruiting policy
 (#77, parent #76). No application or interview schema or historical record changes.
 
