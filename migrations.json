@@ -131,6 +131,10 @@
     {
       "name": "0033_candidate_duplicates",
       "sql": "ALTER TABLE hiring_candidates ADD COLUMN merged_into TEXT REFERENCES hiring_candidates(id); CREATE TABLE hiring_candidate_merges (operation_id TEXT PRIMARY KEY,organization_id TEXT NOT NULL,brand_id TEXT NOT NULL,source_id TEXT NOT NULL UNIQUE REFERENCES hiring_candidates(id),target_id TEXT NOT NULL REFERENCES hiring_candidates(id),actor_user_id TEXT NOT NULL,reason TEXT NOT NULL,field_sources_json TEXT NOT NULL,created_at INTEGER NOT NULL); CREATE TRIGGER hiring_candidate_merges_no_update BEFORE UPDATE ON hiring_candidate_merges BEGIN SELECT RAISE(ABORT,'merge provenance is immutable'); END; CREATE TRIGGER hiring_candidate_merges_no_delete BEFORE DELETE ON hiring_candidate_merges BEGIN SELECT RAISE(ABORT,'merge provenance is immutable'); END; CREATE TRIGGER hiring_candidate_merges_commit AFTER INSERT ON hiring_candidate_merges BEGIN UPDATE hiring_candidates SET merged_into=NEW.target_id WHERE id=NEW.source_id; INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) VALUES(NEW.operation_id,NEW.organization_id,NEW.brand_id,'candidate.merged',NEW.actor_user_id,NEW.operation_id,NEW.created_at,'candidate',NEW.target_id,'Human confirmed candidate merge; original records retained'); END;"
+    },
+    {
+      "name": "0034_mail_delivery_reason",
+      "sql": "ALTER TABLE hiring_outbox ADD COLUMN delivery_reason TEXT CHECK(delivery_reason IS NULL OR delivery_reason IN ('accepted','quota','unavailable','forbidden','provider_rejected','approval_unavailable','approval_required','scope_mismatch','invalid_payload','reconcile_required'));"
     }
   ]
 }

@@ -243,3 +243,37 @@ test('stale recovery cannot alter non-sending jobs or downgrade recorded provide
   db.close()
  }
 })
+
+test('MAIL quota persists actionable failure without rolling back application state or resending',async()=>{
+ const {db,call}=seeded()
+ call('queue_communication','owner',{...input,operation_id:'queue'})
+ const before=db.prepare("SELECT * FROM hiring_applications WHERE id='app'").get()
+ let sends=0
+ const actions=async(name,params)=>{const value=call(name,'owner',params);return action(name).operation==='query'?{rows:value}:{results:value.map(changes=>({meta:{changes}}))}}
+ const args={actions,scope,draftId:'draft',send:async()=>{sends++;return {outcome:'not_accepted',reason:'quota'}}}
+ assert.equal(await dispatchCommunication(args),'failed')
+ assert.equal(row(db).delivery_reason,'quota')
+ assert.equal(call('list_communication_drafts','owner',scope)[0].delivery_reason,'quota')
+ assert.deepEqual(db.prepare("SELECT * FROM hiring_applications WHERE id='app'").get(),before)
+ assert.equal(await dispatchCommunication(args),'not_claimed');assert.equal(sends,1)
+ db.close()
+})
+
+test('approved MAIL adapter and durable dispatcher reconcile timeout retries without duplicates',async()=>{
+ const {createMailAdapter}=await import('../scripts/mail.mjs')
+ for(const outcome of ['accepted','quota','timeout']) {
+  const {db,call}=seeded()
+  call('queue_communication','owner',{...input,operation_id:'queue'})
+  const actions=async(name,params)=>{const value=call(name,'owner',params);return action(name).operation==='query'?{rows:value}:{results:value.map(changes=>({meta:{changes}}))}}
+  let sends=0
+  const send=createMailAdapter({
+   authorize:async()=>({...scope,draft_id:'draft',operation_id:'draft-op',approved:true,suppressed:false,template_id:'approved',template_version:1,recipient_email:'private@example.com',subject:'Private subject',body:'Secret body',reply_to:'brand@example.test'}),
+   transport:async payload=>{sends++;assert.equal(payload.operation_id,'draft-op');if(outcome==='timeout')throw Error('timeout');return outcome==='quota'?{outcome:'not_accepted',reason:'quota'}:{outcome:'accepted'}}
+  })
+  const args={actions,send,scope,draftId:'draft'}
+  assert.equal(await dispatchCommunication(args),{accepted:'sent',quota:'failed',timeout:'unknown'}[outcome])
+  assert.equal(await dispatchCommunication(args),'not_claimed');assert.equal(sends,1)
+  assert.equal(row(db).delivery_reason,{accepted:'accepted',quota:'quota',timeout:'reconcile_required'}[outcome])
+  db.close()
+ }
+})

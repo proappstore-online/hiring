@@ -92,3 +92,42 @@ adds scoped, passkey-gated reconciliation and a single evidence-backed unsent
 replacement for definite non-acceptance. Provider acceptance and original attempts
 remain preserved. This is local recovery functionality, not provider provisioning
 or evidence that the remaining #25/#26/#58 live integration gates have passed.
+
+## MAIL adapter and dispatcher (#25)
+
+`scripts/mail.mjs` exports `createMailAdapter({ authorize, transport })`, consumed as
+`send` by `dispatchCommunication` in `scripts/outbox.mjs`. These are trusted
+server-side integration dependencies, never browser-supplied callbacks. Bind
+`actions` to the current authenticated actor. Bind `transport` exclusively to the
+approved connector; this change installs no scheduled sender and provisions no
+provider credentials. Do not substitute PAS email for the FAS route.
+
+Before each external attempt, `authorize` must read current template approval,
+suppression, sender verification and provider enablement for the exact scoped
+claimed draft. It returns `approved: true`, `suppressed: false`, organization,
+brand, application and draft IDs, stable `operation_id`, template ID and positive
+integer version, exact rendered `recipient_email`, `subject`, `body`, and verified
+`reply_to`. Missing approval or changed payload fails closed. This interface is a
+trusted approval resolver, not an assertion accepted from an agent or browser.
+Existing editable templates alone are not approval evidence.
+
+The transport receives only scoped operation/template references, one recipient,
+reply identity, subject and escaped HTML. Subject is at most 200 characters; escaped
+HTML is bounded to 50,000 UTF-8 bytes. It must return `{ outcome: 'accepted' }`
+only on definitive acceptance, or `{ outcome: 'not_accepted', reason }` only on
+proven non-acceptance (`quota`, `unavailable`, `forbidden`, or generic rejection).
+Thrown errors, malformed responses and timeouts are unknown. No automatic retries
+are installed: use existing evidence-backed reconciliation and replacement drafts.
+A stable operation ID is forwarded but provider idempotency is never assumed.
+
+Migration 0034 adds a bounded `delivery_reason`, committed atomically with
+completion and audit, exposed by scoped draft reads. Reasons contain no recipient,
+payload or raw provider error. Quota means check the connector's quota/reset and
+then reconcile before creating a replacement; unavailable means check approved
+connector setup; forbidden means review connector access. Approval failures require
+current approval/suppression/sender review. Unknown means investigate provider
+acceptance before any resend. ATS business state stays committed on mail failure.
+
+Local tests verify the adapter and SQL dispatcher; they do not establish live
+connector configuration, approved sender readiness or a successful roundtrip.
+Those existing #58 deployment gates remain in force.

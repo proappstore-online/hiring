@@ -234,3 +234,11 @@ before requesting a replacement. The earlier no-expiry rule still prohibits
 automatic claim expiry/resend; this explicit operator path resolves stranded state
 without granting permission to send again. Zero changes is not confirmation of a
 new transition; refresh the scoped draft and status/audit history after uncertainty.
+
+## MAIL adapter integration (#25)
+
+The dispatcher accepts legacy string outcomes and the MAIL adapter's structured
+outcomes. It forwards the exact scoped claim and stored operation identity, saves
+only an allowlisted delivery reason during completion, and emits redacted outcome
+and reason diagnostics. `list_communication_drafts` exposes `delivery_reason` for
+operator action. See [MAIL adapter contract](mail-contract.md#mail-adapter-and-dispatcher-25).

@@ -42,3 +42,13 @@ test('failed, unknown and draft-only cards keep truthful states and unavailable 
  assert.match(source('Communications.tsx'),/cursor_at: last\?\.timestamp/)
  assert.match(render([],[]),/No communications recorded yet/)
 })
+
+test('failed mail exposes actionable quota and access guidance without raw provider errors',()=>{
+ const quota=render([draft({delivery_state:'failed',delivery_reason:'quota'})],[])
+ assert.match(quota,/Mail quota reached/);assert.match(quota,/reconcile before preparing a replacement/)
+ const access=render([draft({delivery_state:'failed',delivery_reason:'forbidden'})],[])
+ assert.match(access,/Review connector permissions/)
+ const unknown=render([draft({delivery_state:'unknown',delivery_reason:'private provider error'})],[])
+ assert.ok(!unknown.includes('private provider error'))
+ assert.match(unknown,/Check provider acceptance evidence/)
+})
