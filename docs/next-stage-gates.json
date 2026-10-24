@@ -187,11 +187,13 @@
       "id": "import",
       "issue": 49,
       "owner": "Serge",
-      "delivery_status": "blocked",
+      "delivery_status": "repository_implemented",
       "production_activation_authorized": false,
       "candidate_transfer_authorized": false,
-      "contract": "docs/next-stage-gates.md",
-      "repository_tests": [],
+      "contract": "docs/governed-import-webhooks.md",
+      "repository_tests": [
+        "tests/governed-import.test.mjs"
+      ],
       "approval": {
         "status": "pending",
         "evidence": null
@@ -220,11 +222,13 @@
       "id": "outbound_webhooks",
       "issue": 49,
       "owner": "Serge",
-      "delivery_status": "blocked",
+      "delivery_status": "repository_implemented",
       "production_activation_authorized": false,
       "candidate_transfer_authorized": false,
-      "contract": "docs/next-stage-gates.md",
-      "repository_tests": [],
+      "contract": "docs/governed-import-webhooks.md",
+      "repository_tests": [
+        "tests/governed-import.test.mjs"
+      ],
       "approval": {
         "status": "pending",
         "evidence": null

@@ -5390,6 +5390,290 @@
         }
       },
       "requires_auth": true
+    },
+    {
+      "name": "dry_run_requisition_import",
+      "description": "Validate v1 JSON without writes. Fixed row-index/error codes; forbidden is explicit. Commit always revalidates.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "rows_json": {
+          "type": "string"
+        },
+        "source_reference": {
+          "type": "string"
+        },
+        "basis_reference": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT row_index,code FROM (SELECT -1 row_index,'invalid_document' code WHERE json_type(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) IS NOT 'array' OR json_array_length(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) NOT BETWEEN 1 AND 100 OR length(:rows_json)>50000 UNION ALL SELECT CAST(r.key AS INTEGER) row_index,'invalid_row' code FROM json_each(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) r WHERE r.type<>'object' OR CASE WHEN r.type='object' THEN (json_type(r.value,'$.source_id') IS NOT 'text' OR (length(trim(json_extract(r.value,'$.source_id'))) NOT BETWEEN 1 AND 128 OR length(json_extract(r.value,'$.source_id'))>128) OR json_type(r.value,'$.title') IS NOT 'text' OR (length(trim(json_extract(r.value,'$.title'))) NOT BETWEEN 1 AND 200 OR length(json_extract(r.value,'$.title'))>200) OR EXISTS(SELECT 1 FROM json_each(r.value) k WHERE k.key NOT IN ('source_id','title')) OR (SELECT count(*) FROM json_each(r.value))<>2) ELSE 1 END UNION ALL SELECT -1 row_index,'duplicate_source' code FROM json_each(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) r GROUP BY json_extract(CASE WHEN r.type='object' THEN r.value ELSE '{}' END,'$.source_id') HAVING count(*)>1) WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS(SELECT 1 FROM hiring_integration_approvals ap WHERE ap.organization_id=:organization_id AND ap.brand_id=:brand_id AND ap.installation_id=:installation_id AND ap.capability='import' AND ap.source_reference=:source_reference AND ap.basis_reference=:basis_reference AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now) UNION ALL SELECT -1,'forbidden' WHERE NOT (EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS(SELECT 1 FROM hiring_integration_approvals ap WHERE ap.organization_id=:organization_id AND ap.brand_id=:brand_id AND ap.installation_id=:installation_id AND ap.capability='import' AND ap.source_reference=:source_reference AND ap.basis_reference=:basis_reference AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now))"
+    },
+    {
+      "name": "commit_requisition_import",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "basis_reference": {
+          "type": "string"
+        },
+        "batch_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "rows_json": {
+          "type": "string"
+        },
+        "source_reference": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_import_batches(id,organization_id,brand_id,installation_id,source_reference,basis_reference,actor_user_id,state,row_count,created_at) SELECT :batch_id,:organization_id,:brand_id,:installation_id,:source_reference,:basis_reference,:__user_id,'committed',json_array_length(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END),:__now WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS(SELECT 1 FROM hiring_integration_approvals ap WHERE ap.organization_id=:organization_id AND ap.brand_id=:brand_id AND ap.installation_id=:installation_id AND ap.capability='import' AND ap.source_reference=:source_reference AND ap.basis_reference=:basis_reference AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now) AND NOT EXISTS(SELECT -1 row_index,'invalid_document' code WHERE json_type(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) IS NOT 'array' OR json_array_length(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) NOT BETWEEN 1 AND 100 OR length(:rows_json)>50000 UNION ALL SELECT CAST(r.key AS INTEGER) row_index,'invalid_row' code FROM json_each(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) r WHERE r.type<>'object' OR CASE WHEN r.type='object' THEN (json_type(r.value,'$.source_id') IS NOT 'text' OR (length(trim(json_extract(r.value,'$.source_id'))) NOT BETWEEN 1 AND 128 OR length(json_extract(r.value,'$.source_id'))>128) OR json_type(r.value,'$.title') IS NOT 'text' OR (length(trim(json_extract(r.value,'$.title'))) NOT BETWEEN 1 AND 200 OR length(json_extract(r.value,'$.title'))>200) OR EXISTS(SELECT 1 FROM json_each(r.value) k WHERE k.key NOT IN ('source_id','title')) OR (SELECT count(*) FROM json_each(r.value))<>2) ELSE 1 END UNION ALL SELECT -1 row_index,'duplicate_source' code FROM json_each(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) r GROUP BY json_extract(CASE WHEN r.type='object' THEN r.value ELSE '{}' END,'$.source_id') HAVING count(*)>1) AND length(trim(:batch_id)) BETWEEN 1 AND 100 AND length(trim(:source_reference)) BETWEEN 1 AND 200 AND length(trim(:basis_reference)) BETWEEN 1 AND 200 AND NOT EXISTS(SELECT 1 FROM hiring_import_batches WHERE id=:batch_id) AND NOT EXISTS(SELECT 1 FROM hiring_import_batches WHERE organization_id=:organization_id AND brand_id=:brand_id AND installation_id=:installation_id AND source_reference=:source_reference)",
+        "INSERT INTO hiring_import_rows(batch_id,source_id,requisition_id,title) SELECT :batch_id,json_extract(value,'$.source_id'),'import-'||:batch_id||'-'||key,trim(json_extract(value,'$.title')) FROM json_each(CASE WHEN json_valid(:rows_json) THEN :rows_json ELSE 'null' END) WHERE changes()=1 AND EXISTS(SELECT 1 FROM hiring_import_batches b WHERE b.organization_id=:organization_id AND b.brand_id=:brand_id AND b.installation_id=:installation_id AND b.id=:batch_id AND b.actor_user_id=:__user_id AND b.state='committed') AND NOT EXISTS(SELECT 1 FROM hiring_import_rows WHERE batch_id=:batch_id)",
+        "INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,created_at,operation_id) SELECT requisition_id,:organization_id,:brand_id,title,:__now,'import-'||:batch_id FROM hiring_import_rows WHERE batch_id=:batch_id AND changes()>0 AND EXISTS(SELECT 1 FROM hiring_import_batches b WHERE b.organization_id=:organization_id AND b.brand_id=:brand_id AND b.installation_id=:installation_id AND b.id=:batch_id AND b.actor_user_id=:__user_id AND b.state='committed')",
+        "INSERT OR IGNORE INTO hiring_webhook_deliveries(id,subscription_id,batch_id,event_type,next_at) SELECT s.id||'|'||:batch_id||'|import.committed',s.id,:batch_id,'import.committed',:__now FROM hiring_webhook_subscriptions s WHERE s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND changes()>0 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+      ]
+    },
+    {
+      "name": "rollback_requisition_import",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "batch_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_import_batches SET state='rolled_back',rolled_back_at=:__now WHERE organization_id=:organization_id AND brand_id=:brand_id AND installation_id=:installation_id AND id=:batch_id AND actor_user_id=:__user_id AND state='committed' AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS(SELECT 1 FROM hiring_integration_approvals ap WHERE ap.organization_id=:organization_id AND ap.brand_id=:brand_id AND ap.installation_id=:installation_id AND ap.capability='import' AND ap.source_reference=hiring_import_batches.source_reference AND ap.basis_reference=hiring_import_batches.basis_reference AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now) AND NOT EXISTS(SELECT 1 FROM hiring_import_rows r LEFT JOIN hiring_requisitions q ON q.id=r.requisition_id WHERE r.batch_id=:batch_id AND (q.id IS NULL OR NOT (q.title=r.title AND q.operation_id IS NOT NULL AND q.operation_id='import-'||:batch_id AND q.location IS NULL AND q.employment_type IS NULL AND q.compensation_type IS NULL AND q.description_version IS NULL AND q.owner_user_id IS NULL) OR EXISTS(SELECT 1 FROM hiring_applications a WHERE a.requisition_id=q.id) OR EXISTS(SELECT 1 FROM hiring_job_publications p WHERE p.requisition_id=q.id)))",
+        "DELETE FROM hiring_requisitions WHERE organization_id=:organization_id AND brand_id=:brand_id AND id IN (SELECT requisition_id FROM hiring_import_rows WHERE batch_id=:batch_id) AND changes()=1 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)",
+        "INSERT OR IGNORE INTO hiring_webhook_deliveries(id,subscription_id,batch_id,event_type,next_at) SELECT s.id||'|'||:batch_id||'|import.rolled_back',s.id,:batch_id,'import.rolled_back',:__now FROM hiring_webhook_subscriptions s WHERE s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND changes()>0 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+      ]
+    },
+    {
+      "name": "subscribe_import_webhooks",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "approval_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "subscription_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_webhook_subscriptions(id,organization_id,brand_id,installation_id,approval_id,actor_user_id,created_at) SELECT :subscription_id,:organization_id,:brand_id,:installation_id,ap.id,:__user_id,:__now FROM hiring_integration_approvals ap WHERE ap.id=:approval_id AND ap.organization_id=:organization_id AND ap.brand_id=:brand_id AND ap.installation_id=:installation_id AND ap.capability='outbound_webhooks' AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now AND ap.endpoint LIKE 'https://%' AND length(ap.secret_ref)>0 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND NOT EXISTS(SELECT 1 FROM hiring_webhook_subscriptions WHERE id=:subscription_id)"
+      ]
+    },
+    {
+      "name": "revoke_import_webhooks",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "subscription_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_webhook_subscriptions SET revoked_at=:__now,revoked_by=:__user_id WHERE id=:subscription_id AND organization_id=:organization_id AND brand_id=:brand_id AND installation_id=:installation_id AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+      ]
+    },
+    {
+      "name": "claim_import_webhook",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "delivery_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_webhook_deliveries AS d SET state='sending',attempts=attempts+1,claim_id=:claim_id,claimed_at=:__now WHERE d.id=:delivery_id AND attempts<5 AND ((state='pending' AND next_at<=:__now) OR (state='sending' AND claimed_at<:__now-300000)) AND EXISTS(SELECT 1 FROM hiring_webhook_subscriptions s JOIN hiring_integration_approvals ap ON ap.id=s.approval_id WHERE s.id=d.subscription_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND ap.organization_id=s.organization_id AND ap.brand_id=s.brand_id AND ap.installation_id=s.installation_id AND ap.capability='outbound_webhooks' AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=s.organization_id AND p.brand_id=s.brand_id AND p.user_id=s.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND :__user_id='system'||char(58)||'worker'"
+      ],
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "read_import_webhook",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "delivery_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT d.id,d.event_type,d.attempts,b.row_count,s.installation_id,s.organization_id,s.brand_id,ap.endpoint,ap.secret_ref FROM hiring_webhook_deliveries d JOIN hiring_import_batches b ON b.id=d.batch_id JOIN hiring_webhook_subscriptions s ON s.id=d.subscription_id JOIN hiring_integration_approvals ap ON ap.id=s.approval_id WHERE d.id=:delivery_id AND d.claim_id=:claim_id AND d.state='sending' AND EXISTS(SELECT 1 FROM hiring_webhook_subscriptions s JOIN hiring_integration_approvals ap ON ap.id=s.approval_id WHERE s.id=d.subscription_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND ap.organization_id=s.organization_id AND ap.brand_id=s.brand_id AND ap.installation_id=s.installation_id AND ap.capability='outbound_webhooks' AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=s.organization_id AND p.brand_id=s.brand_id AND p.user_id=s.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND :__user_id='system'||char(58)||'worker'",
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "finish_import_webhook",
+      "description": "Governed requisition-import-v1; zero changes is denial or conflict. Approval is provisioned only by trusted operations.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "delivery_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "success": {
+          "type": "integer"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_webhook_deliveries AS d SET state=CASE WHEN :success=1 THEN 'sent' WHEN attempts>=5 THEN 'dead' ELSE 'pending' END,next_at=:__now+60000*(1 << attempts) WHERE d.id=:delivery_id AND d.claim_id=:claim_id AND state='sending' AND :success IN (0,1) AND :__user_id='system'||char(58)||'worker' AND EXISTS(SELECT 1 FROM hiring_webhook_subscriptions s WHERE s.id=d.subscription_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id)"
+      ],
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "get_requisition_import",
+      "description": "Owner-only bounded operational state, without source contents or secrets.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "batch_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT id,state,row_count,created_at,rolled_back_at FROM hiring_import_batches WHERE id=:batch_id AND organization_id=:organization_id AND brand_id=:brand_id AND installation_id=:installation_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+    },
+    {
+      "name": "list_import_webhook_deliveries",
+      "description": "Owner-only bounded operational state, without source contents or secrets.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT d.id,d.event_type,d.state,d.attempts,d.next_at FROM hiring_webhook_deliveries d JOIN hiring_webhook_subscriptions s ON s.id=d.subscription_id WHERE s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY d.next_at,d.id LIMIT 100"
+    },
+    {
+      "name": "list_import_webhook_queue",
+      "description": "Worker-only exact-scope bounded queue; current outbound approval and owner grants required.",
+      "operation": "query",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "installation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT d.id FROM hiring_webhook_deliveries d WHERE d.attempts<5 AND ((d.state='pending' AND d.next_at<=:__now) OR (d.state='sending' AND d.claimed_at<:__now-300000)) AND EXISTS(SELECT 1 FROM hiring_webhook_subscriptions s JOIN hiring_integration_approvals ap ON ap.id=s.approval_id WHERE s.id=d.subscription_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND ap.organization_id=s.organization_id AND ap.brand_id=s.brand_id AND ap.installation_id=s.installation_id AND ap.capability='outbound_webhooks' AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=s.organization_id AND p.brand_id=s.brand_id AND p.user_id=s.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND :__user_id='system'||char(58)||'worker' ORDER BY d.next_at,d.id LIMIT 25"
     }
   ]
 }

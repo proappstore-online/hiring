@@ -74,11 +74,12 @@ test('brand withdrawal covers independently created profiles owned by the same w
 
 test('populated upgrade never enrolls historical talent consent', () => {
   const migrations=JSON.parse(readFileSync(new URL('../migrations.json',import.meta.url))).migrations
+  const poolIndex=migrations.findIndex(m=>m.name==='0043_talent_pool')
   const db=new DatabaseSync(':memory:')
   try {
-    for(const m of migrations.slice(0,-1)) db.exec(m.sql)
+    for(const m of migrations.slice(0,poolIndex)) db.exec(m.sql)
     db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1); INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('a','org','A',1); INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,created_at) VALUES('req','org','a','Role',1); INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES('c','org','a','Candidate','','owner',1); INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at) VALUES('app','org','a','req','c','linkedin','manual','basis','context','owner','submitted',1,'owner',1,1); INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) VALUES('old','org','a','app','talent_pool','consent','old','checkbox','candidate',1)")
-    db.exec(migrations.at(-1).sql)
+    db.exec(migrations[poolIndex].sql)
     assert.equal(db.prepare('SELECT COUNT(*) n FROM hiring_consent_records').get().n,1)
     assert.equal(db.prepare('SELECT COUNT(*) n FROM hiring_talent_pool_terms').get().n,0)
   } finally { db.close() }

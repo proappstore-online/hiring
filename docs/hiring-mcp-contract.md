@@ -348,3 +348,13 @@ access and supports `after_id` pages of 50. `get_my_talent_pool` and
 `withdraw_my_talent_pool` require the signed-in candidate's ownership of the selected
 application and explicit organization/brand scope. Withdrawal uses `operation_id`
 for atomic audit and replay protection. See [talent pool](talent-pool.md).
+
+## Governed import and outbound webhooks v1 (#49)
+
+The [reviewed bounded contract](governed-import-webhooks.md) adds owner-only dry
+run, commit, rollback, subscription/revocation and bounded operational reads.
+Claim/read/finish delivery actions require platform `system:worker`. Trusted,
+exact-installation/brand approval records are empty by default; neither ordinary
+MCP callers nor register edits can approve these capabilities. No candidate
+source format or candidate webhook payload is supported. See
+[the input schema](../contracts/requisition-import.v1.schema.json).

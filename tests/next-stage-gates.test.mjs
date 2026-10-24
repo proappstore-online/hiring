@@ -36,7 +36,7 @@ test('implemented internal features do not open conditional or sibling integrati
   assert.equal(integrations.implementation_authorized, false)
   for (const capability of register.capabilities) {
     const internal = ['talent_pool', 'funnel_analytics'].includes(capability.id)
-    assert.equal(capability.delivery_status, internal ? 'repository_implemented' : 'blocked', capability.id)
+    assert.equal(capability.delivery_status, (internal || capability.issue === 49) ? 'repository_implemented' : 'blocked', capability.id)
     const integration = integrations.gates.find(g => g.id === capability.id)
     if (capability.issue === 41) {
       assert.ok(integration, capability.id)

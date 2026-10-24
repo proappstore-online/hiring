@@ -15,8 +15,8 @@ This epic establishes governance; it authorizes no candidate-data transfer or AI
 | #41 calendar | Assessed, blocked; [assessment](integration-assessment.md) | Provider/processing contract, minimum scheduling fields, scoped OAuth, scheduling choice, revocation and reconciliation evidence. |
 | #41 job listing | Assessed, blocked | Public listing allowlist, partner terms/spend cap, update/expire tests; approval grants no candidate transfer. |
 | #41 candidate transfer | Separately blocked | Explicit transfer contract, recipients/fields, basis/notice and required consent, processor rights propagation and two-brand security evidence. |
-| #49 import | Open; design/implementation deferred | Source format/schema and organization/brand mapping, provenance, consent basis, duplicates, validation, rollback and tenant-isolated dry run. Test forged tenant and partial failure before activation. |
-| #49 outbound webhooks | Open; design/implementation deferred | Installation and permitted-brand subscriptions, minimal payloads, signatures, replay prevention, bounded retries, dedupe and audit. Test duplicate delivery, revocation and rights propagation. |
+| #49 import | Bounded v1 implemented; [contract](governed-import-webhooks.md) | Source format/schema and organization/brand mapping, provenance, consent basis, duplicates, validation, rollback and tenant-isolated dry run. Test forged tenant and partial failure before activation. |
+| #49 outbound webhooks | Bounded v1 implemented; [contract](governed-import-webhooks.md) | Installation and permitted-brand subscriptions, minimal payloads, signatures, replay prevention, bounded retries, dedupe and audit. Test duplicate delivery, revocation and rights propagation. |
 | #50 AI assistance | Open; assessment only | Human attribution, fairness evaluation and model-data controls; no automated ranking, rejection or offers. No candidate training or external model transfer without separately approved basis and controls. |
 | #50 background checks | Open; assessment only | Jurisdiction/basis, processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. Unresolved risks hold this capability. |
 | #50 agency workflows | Open; assessment only | Jurisdiction/basis, agency roles and processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. No broad agency access. |
@@ -61,10 +61,13 @@ Neither #38 nor #44 closure satisfies a capability's approval or opens intake.
 formats or event families into further issues after schema, mapping, authorization
 and processor review. #50 must produce separate go/no-go assessments and follow-on
 implementation backlogs; it must not build or enable those three capabilities.
-They remain unresolved child delivery work, not completed features of this epic.
+The bounded #49 repository implementation is complete; #50 remains assessment
+work. All production activation reviews remain independent.
 
-No conditional connector, import runner, webhook dispatcher, AI call, background
-check or agency access path is enabled by this change. Before adding such a path,
+The #49 SQL actions and server dispatch adapter implement a bounded v1 behind
+empty trusted approval records. No production import runner, webhook dispatcher,
+conditional connector, AI call, background check or agency access path is enabled
+by the governance register. Before activating such a path,
 implement a trusted server-side approval lookup bound to the above scope and
 recheck it before every operation and queued retry. Demonstrate denial for missing,
 expired, revoked and wrong-brand evidence, sibling approvals, forged tenant,

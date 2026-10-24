@@ -65,3 +65,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 - [Privacy-safe funnel analytics](funnel-analytics.md): brand grants, milestone definitions, and server-side small-cell suppression.
 
 [Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.
+
+- [Governed import and outbound webhooks](governed-import-webhooks.md) — bounded requisition JSON import and signed lifecycle delivery (#49), activation pending.
