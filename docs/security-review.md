@@ -124,10 +124,11 @@ requirements. Do not infer missing implementation solely from the older table.
 
 ### Outstanding acceptance evidence
 
-Issue #37 remains open: neither local tests nor an automated review can provide
-an actual screen-reader run or invent live principal/byte-serving/provider evidence.
-Retain the security/accessibility launch holds in `docs/launch-evidence.json`.
-Do not record `closes #37` until both issue acceptance criteria are supported.
+At the initial review, issue #37 was kept open for the operational evidence below.
+The subsequent closing disposition separates this implementation review from
+production verification, as explicitly directed by the Pilot. Retain the
+security/accessibility launch holds in `docs/launch-evidence.json`; closure does
+not assert that an actual screen-reader or live security session occurred.
 
 For each remaining run, record the exact release SHA and environment, date,
 reviewer, browser/OS and assistive-technology versions, viewport, account roles,
@@ -164,3 +165,36 @@ CLAUDE.md length and the copied deploy workflow. `pnpm audit --json` exited 0:
 675 dependencies, zero vulnerabilities at every severity. The launch-register
 validation and `git diff --check` also passed. These results describe the local
 follow-up tree, not a deployed revision or manual accessibility approval.
+
+
+## Closing disposition — 24 October 2026
+
+Issue #37 and its complete comment collection were reread before closure (open,
+zero comments). Under the Pilot's explicit follow-up direction, this direct-to-main
+change closes the repository implementation/review deliverable and treats the
+remaining operational evidence as outside this change's scope. This is a scope
+disposition, not a claim that the issue's original evidence criterion has been
+fully demonstrated in production.
+
+Implemented controls include server-bound identity and tenant/assignment checks,
+revocation and mixed-ID denial, quarantined private attachment metadata,
+application/principal-scoped attachment UI state, named keyboard-operable deletion
+controls, approved MAIL rendering and replay/reconciliation protections, versioned
+MCP mutations with audit and human gates, and scoped expiring audited exports.
+The review's attachment confidentiality and accessibility findings were fixed and
+regression-tested in `bdede3b`; the coverage table above maps the other controls
+to executable evidence. No additional code defect requiring a fix was identified
+in this closing review.
+
+Actual screen-reader sessions, live two-brand UI/URL/MCP authorization exercises,
+provider/passkey verification and production security acceptance remain operational
+follow-ups under the security/accessibility/scenario launch holds in
+`docs/launch-evidence.json` and release acceptance in #38. Scanning/private byte
+serving (#18), corrections (#45), scoped search (#46) and branded receipts (#47)
+remain separate implementation issues requiring review when delivered. Closing
+#37 neither completes those issues nor passes or removes any launch hold. No PR
+or branch is used.
+
+Closing validation: `pnpm test` was rerun after this documentation change and
+exited 0: 343 passed, 0 failed, 0 skipped, including TypeScript compilation.
+Launch-register validation and `git diff --check` also passed.
