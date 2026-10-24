@@ -29,7 +29,9 @@ Platform `app.roles` gates app-level administration. Hiring must also enforce or
 
 **MVP:** public organization sign-up, brand setup and worker account/profile self-registration; membership/grants; requisition drafting and publishing; accessible brand-specific application form; candidate/application records; duplicate suggestions with human-controlled merge; stage pipeline; recruiter review; interview scheduling metadata and scorecards; human decision and offer tracking (no signature); consent, retention and audit; MAIL-mediated transactional messages; constrained MCP tools; export/deletion requests. Each form identifies the organization and brand and displays the approved privacy notice.
 
-**Next:** configurable templates, suppressed-small-cell analytics, calendar integration, structured offer approval, import and webhooks.
+Brand-scoped [funnel analytics](funnel-analytics.md) report lifetime milestone counts with server-side small-cell suppression.
+
+**Next:** configurable templates, calendar integration, structured offer approval, import and webhooks.
 
 **Conditional:** job-board syndication, AI assistance, background checks and agency workflows require their own security, fairness and commercial review; legal review is not currently required.
 

@@ -1,3 +1,4 @@
+import { FunnelAnalytics } from './FunnelAnalytics'
 import { TalentPool } from './TalentPool'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
@@ -31,7 +32,7 @@ function useRows<T>(name: string | null, params: Record<string, string>) {
   return { ...state, retry: () => setRevision(value => value + 1) }
 }
 function RowsState({ loading, error, retry, children }: { loading: boolean; error: boolean; retry: () => void; children: ReactNode }) { return loading ? <LoadingState /> : error ? <ErrorState retry={retry} /> : <>{children}</> }
-export function OverviewScreen() { const { space } = useWorkspace(); return <Screen title="Overview"><section className={panel}><h2 className="text-xl font-semibold">Overview</h2><p className="mt-2">{space.organization_name} / {space.brand_name}</p><p className="mt-2">Your role: {space.role}</p></section></Screen> }
+export function OverviewScreen() { const { space } = useWorkspace(); return <Screen title="Overview"><section className={panel}><h2 className="text-xl font-semibold">Overview</h2><p className="mt-2">{space.organization_name} / {space.brand_name}</p><p className="mt-2">Your role: {space.role}</p></section><FunnelAnalytics key={JSON.stringify(space)} scope={scopeOf(space)} /></Screen> }
 export function VacanciesScreen() {
   const { space } = useWorkspace(); const { requisitionId = '' } = useParams(); const scope = scopeOf(space)
   const detail = useRows<ManagedVacancy>(requisitionId ? 'get_vacancy_management' : null, { ...scope, requisition_id: requisitionId })

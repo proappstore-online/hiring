@@ -60,3 +60,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 [Compliance and policy verification matrix (#54)](compliance-verification.md) maps approved policy clauses and every release-register requirement to gates, owner, pass criteria, evidence, existing workflow checks and backlog handoffs.
 
 - [Separately consented talent pool](talent-pool.md): brand-only future contact, fixed expiry and candidate withdrawal.
+
+- [Privacy-safe funnel analytics](funnel-analytics.md): brand grants, milestone definitions, and server-side small-cell suppression.
