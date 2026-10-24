@@ -10,7 +10,7 @@ import { field, panel } from './ui'
 import { CandidateAccountPage } from './CandidateAccount'
 import { Jobs } from './Jobs'
 import { VacanciesIndexPage, VacancyDetailPage } from './Vacancies'
-import { OverviewScreen, VacanciesScreen, ApplicationsScreen, ApplicationScreen, CommunicationsScreen, PlaybookScreen, OperationsScreen, ComplianceScreen, SettingsScreen, RecruiterContext } from './RecruiterScreens'
+import { CreateCandidateScreen, CreateVacancyScreen, SearchScreen, TalentPoolScreen, OverviewScreen, VacanciesScreen, ApplicationsScreen, ApplicationScreen, CommunicationsScreen, PlaybookScreen, OperationsScreen, ComplianceScreen, SettingsScreen, RecruiterContext } from './RecruiterScreens'
 import { brandSettingsUrl, safeBack, vacancyUrl, applyUrl, withBack, recruiterVacancyUrl, staffBack } from './routes'
 
 const decodePathId = (value: string | undefined) => { try { return value ? decodeURIComponent(value) : null } catch { return null } }
@@ -191,6 +191,10 @@ export function AppRoutes() {
       <Route path="recruiter/vacancies" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/vacancies/:requisitionId" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/applications" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationsScreen /></Allowed>} />
+      <Route path="recruiter/applications/new" element={<Allowed roles={['owner','recruiter']}><CreateCandidateScreen /></Allowed>} />
+      <Route path="recruiter/vacancies/new" element={<Allowed roles={['owner','recruiter']}><CreateVacancyScreen /></Allowed>} />
+      <Route path="recruiter/search" element={<Allowed roles={['owner','recruiter','reviewer']}><SearchScreen /></Allowed>} />
+      <Route path="recruiter/talent-pool" element={<Allowed roles={['owner','recruiter']}><TalentPoolScreen /></Allowed>} />
       <Route path="recruiter/applications/:applicationId" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationScreen /></Allowed>} />
       <Route path="recruiter/communications" element={<Allowed roles={['owner','recruiter']}><CommunicationsRoute /></Allowed>} />
       <Route path="recruiter/communications/:applicationId" element={<Allowed roles={['owner','recruiter']}><CommunicationsScreen /></Allowed>} />

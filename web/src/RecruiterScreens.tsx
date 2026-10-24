@@ -2,9 +2,9 @@ import { CurrentPipeline } from './CurrentPipeline'
 import { FunnelAnalytics } from './FunnelAnalytics'
 import { TalentPool } from './TalentPool'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@proappstore/sdk'
-import { read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
+import { id, read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
 import { ApplicationFilters } from './ApplicationFilters'
 import { WorkspaceSearch } from './WorkspaceSearch'
 import { ApplicationDetail } from './ApplicationDetail'
@@ -17,7 +17,7 @@ import { Interviews } from './Interviews'
 import { Admin, CreateApplication } from './forms'
 import { mutationError } from './mutation-state'
 import { LoadingState, ErrorState, NotFound } from './route-ui'
-import { button, panel } from './ui'
+import { Form, TextField, val, button, panel } from './ui'
 import { brandSettingsUrl, organizationSettingsUrl, recruiterApplicationUrl, staffBack } from './routes'
 
 type Context = { space: Workspace; userId: string; reloadSpaces: () => Promise<void> }
@@ -38,15 +38,29 @@ export function VacanciesScreen() {
   const { space } = useWorkspace(); const { requisitionId = '' } = useParams(); const scope = scopeOf(space)
   const detail = useRows<ManagedVacancy>(requisitionId ? 'get_vacancy_management' : null, { ...scope, requisition_id: requisitionId })
   if (requisitionId && !detail.loading && !detail.error && !detail.rows.length) return <NotFound />
-  return <Screen title="Vacancies"><RowsState {...detail}><VacancyManagement key={space.brand_id + requisitionId} scope={scope} role={space.role as 'owner' | 'recruiter'} requisitions={detail.rows.map(({ id, title, status }) => ({ id, title, status }))} selectedRequisitionId={requisitionId} selectedVacancy={detail.rows[0]} /></RowsState></Screen>
+  return <Screen title="Vacancies">{!requisitionId && Boolean(space.can_create_requisition) && <Link className={button + ' mb-5 inline-block'} to={'/recruiter/vacancies/new?' + new URLSearchParams(scope)}>Add requisition</Link>}<RowsState {...detail}><VacancyManagement key={space.brand_id + requisitionId} scope={scope} role={space.role as 'owner' | 'recruiter'} requisitions={detail.rows.map(({ id, title, status }) => ({ id, title, status }))} selectedRequisitionId={requisitionId} selectedVacancy={detail.rows[0]} /></RowsState></Screen>
 }
 export function ApplicationsScreen() {
-  const { space, userId } = useWorkspace(); const scope = scopeOf(space)
+  const { space } = useWorkspace(); const scope = scopeOf(space)
   const staff = space.role === 'owner' || space.role === 'recruiter'
   const requisitions = useRows<Requisition>(staff ? 'list_requisitions' : null, scope); const members = useRows<Member>(staff ? 'list_workspace_members' : null, scope)
-  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [showCreate, setShowCreate] = useState(false)
-  const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); setSuccess('Action saved successfully.'); if (name === 'create_application') setShowCreate(false) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
-  return <Screen title="Applications"><RowsState loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><div className="space-y-6">{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-[var(--muted)]">Review candidates, narrow the pipeline, then open a profile for the full record.</p>{staff && <button type="button" className={button} aria-expanded={showCreate} aria-controls="create-candidate" onClick={() => setShowCreate(value => !value)}>{showCreate ? 'Close' : 'Add candidate'}</button>}</div>{staff && <TalentPool key={"pool:" + JSON.stringify([userId,scope])} scope={scope} />}<WorkspaceSearch key={JSON.stringify([userId,space.organization_id,space.brand_id,space.role])} scope={scope} reviewer={!staff} /><ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} />{staff && showCreate && <div id="create-candidate"><CreateApplication key={members.rows.map(row => row.user_id).join()} scope={scope} requisitions={requisitions.rows} members={members.rows} userId={userId} busy={busy} run={run} /></div>}</div></RowsState></Screen>
+  const query = '?' + new URLSearchParams(scope)
+  return <Screen title="Applications"><div className="mb-5 flex flex-wrap items-center gap-4">{staff && <Link className={button} to={'/recruiter/applications/new' + query}>Add candidate</Link>}<Link className={staff ? 'underline' : button} to={'/recruiter/search' + query}>Search records</Link>{staff && <Link className="underline" to={'/recruiter/talent-pool' + query}>Talent pool</Link>}</div><RowsState key={JSON.stringify(scope)} loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} /></RowsState></Screen>
+}
+export function CreateCandidateScreen() {
+  const { space, userId } = useWorkspace(); const scope = scopeOf(space); const navigate = useNavigate()
+  const requisitions = useRows<Requisition>('list_requisitions', scope); const members = useRows<Member>('list_workspace_members', scope)
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  const run: Run = async (name, params) => { setBusy(true); setError(''); try { await write(name, params); navigate(recruiterApplicationUrl(String(params.application_id), scope)) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
+  return <Screen title="Add candidate"><Link className="underline" to={'/recruiter/applications?' + new URLSearchParams(scope)}>All applications</Link>{error && <p role="alert">{error}</p>}<RowsState key={JSON.stringify(scope)} loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><CreateApplication key={members.rows.map(row => row.user_id).join()} scope={scope} requisitions={requisitions.rows} members={members.rows} userId={userId} busy={busy} run={run} /></RowsState></Screen>
+}
+export function SearchScreen() { const { space, userId } = useWorkspace(); return <Screen title="Search records"><WorkspaceSearch key={JSON.stringify([userId, space])} scope={scopeOf(space)} reviewer={space.role === 'reviewer'} /></Screen> }
+export function TalentPoolScreen() { const { space } = useWorkspace(); return <Screen title="Talent pool"><TalentPool key={JSON.stringify(space)} scope={scopeOf(space)} /></Screen> }
+export function CreateVacancyScreen() {
+  const { space } = useWorkspace(); const scope = scopeOf(space); const navigate = useNavigate()
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  if (!space.can_create_requisition) return <NotFound />
+  return <Screen title="Add requisition"><Link className="underline" to={'/recruiter/vacancies?' + new URLSearchParams(scope)}>All managed vacancies</Link>{error && <p role="alert">{error}</p>}<Form busy={busy} submitLabel="Create requisition" onSubmit={async f => { setBusy(true); setError(''); const requisitionId = id(); try { await write('create_requisition', { ...scope, requisition_id: requisitionId, title: val(f, 'title'), operation_id: id() }); navigate('/recruiter/vacancies/' + encodeURIComponent(requisitionId) + '?' + new URLSearchParams(scope)) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }}><TextField name="title" label="Role title" /></Form></Screen>
 }
 export function ApplicationScreen() {
   const { space } = useWorkspace(); const { applicationId = '' } = useParams(); const scope = scopeOf(space); const params = { ...scope, application_id: applicationId }
@@ -93,5 +107,5 @@ export function SettingsScreen() {
   const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); await reloadSpaces(); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
   const brandPath = brandSettingsUrl(space), organizationPath = organizationSettingsUrl(space.organization_id)
   if (location.pathname === organizationPath && !space.can_create_brand) return <NotFound />
-  return <Screen title="Settings"><nav aria-label="Management scope" className="mb-4 flex gap-4"><Link className="underline" aria-current={location.pathname === brandPath ? 'page' : undefined} to={brandPath}>Brand management</Link>{Boolean(space.can_create_brand) && <Link className="underline" aria-current={location.pathname === organizationPath ? 'page' : undefined} to={organizationPath}>Organisation management</Link>}</nav>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} canCreateRequisition={Boolean(space.can_create_requisition)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
+  return <Screen title="Settings"><nav aria-label="Management scope" className="mb-4 flex gap-4"><Link className="underline" aria-current={location.pathname === brandPath ? 'page' : undefined} to={brandPath}>Brand management</Link>{Boolean(space.can_create_brand) && <Link className="underline" aria-current={location.pathname === organizationPath ? 'page' : undefined} to={organizationPath}>Organisation management</Link>}</nav>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
 }

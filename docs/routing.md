@@ -102,3 +102,21 @@ server pages. Search text and pagination tokens stay in component memory; neithe
 is added to route parameters, back links or storage. Result application links use
 the canonical scoped detail URL, whose server read independently rechecks grants.
 Candidate results open a freshly authorized minimal record within the screen.
+
+
+## Task-focused recruiter workspace (issue #83)
+
+Applications renders the pipeline and its filters. Its primary staff action,
+**Add candidate**, opens `/recruiter/applications/new`; saving opens the new
+application record. Candidate entry never renders beside the pipeline.
+Search records and Talent pool are secondary links to `/recruiter/search` and
+`/recruiter/talent-pool`, so their independent lists do not compete with the pipeline.
+Reviewers can search permitted records but cannot open candidate entry or talent pool.
+
+Vacancies contains requisitions and publication controls. Users with requisition
+creation authority can open `/recruiter/vacancies/new`; creation opens the new
+requisition. A vacancy detail renders its record without the sibling vacancy list.
+Settings contains organization/brand administration and grants; requisition creation
+is no longer part of workspace setup. Playbook has one page title and policy only.
+All new routes retain the validated workspace scope and use the existing guarded
+actions. Navigation highlights Applications for its entry, search and pool tasks.

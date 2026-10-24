@@ -24,7 +24,7 @@ export function PrimaryNav({ role, scope, currentPath }: { role: Role; scope: Sc
   const items = primarySections(role)
   const active = (section: typeof sections[number]) => path === section.path ||
     (section.path === '/recruiter/settings' && path.startsWith('/recruiter/organizations/')) ||
-    (section.path === '/recruiter/applications' && path.startsWith('/recruiter/applications/')) ||
+    (section.path === '/recruiter/applications' && (path.startsWith('/recruiter/applications/') || path === '/recruiter/search' || path === '/recruiter/talent-pool')) ||
     (section.path === '/recruiter/vacancies' && path.startsWith('/recruiter/vacancies/'))
   const links = <>{items.map(section => <Link key={section.path} to={section.path === '/recruiter/settings' ? brandSettingsUrl(scope) : section.path + '?' + new URLSearchParams(scope)} aria-current={active(section) ? 'page' : undefined} onClick={() => setOpen(false)} className={'inline-flex min-h-11 items-center rounded px-3 text-sm hover:bg-[var(--line)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ' + (active(section) ? 'bg-[var(--line)] font-bold underline' : '')}>{section.label}</Link>)}<Link to="/vacancies" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center rounded border border-[var(--line)] px-3 text-sm hover:bg-[var(--line)]">Switch to Public Vacancies</Link></>
   return <nav aria-label="Primary navigation" className="relative min-w-0" onKeyDown={event => { if (event.key === 'Escape') setOpen(false) }}>

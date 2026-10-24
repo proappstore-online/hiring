@@ -22,7 +22,7 @@ export function PlaybookEditor({ organizationId, role, isCreator }: { organizati
     return () => { live = false }
   }, [organizationId, reload])
   const timing = book ? meetingTiming(parsePlaybook(book.payload)) : null
-  return <section className={panel + ' min-w-0'} aria-labelledby="playbook-title"><h1 id="playbook-title" className="text-2xl font-semibold">Recruiting playbook</h1>
+  return <section className={panel + ' min-w-0'} aria-labelledby="playbook-title"><h2 id="playbook-title" className="text-2xl font-semibold">Recruiting playbook</h2>
     {error && <p role="alert">{error}</p>}{status && <p role="status">{status}</p>}
     <button className={button} disabled={busy} onClick={() => setReload(n => n + 1)}>Reload playbook</button>
     {!book ? !error && <p role="status">Loading playbook…</p> : <>
