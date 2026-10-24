@@ -221,3 +221,12 @@ and audit in one batch. `get_my_application` and `list_my_job_applications` expo
 the current version for optimistic concurrency and durable retry readback. No
 candidate token, staff membership or passkey ceremony is required for this own-
 account action. It does not fulfill an erasure request or recall in-flight mail.
+
+## Duplicate review (#21)
+
+`suggest_candidate_duplicates` checks current owner/recruiter access to each candidate
+inside one exact brand. `merge_candidates` is a human owner operation with mandatory PAS
+step-up, not a general agent merge tool. `list_candidate_merges` is brand-owner-only and
+returns canonical fields and immutable source-field references. See
+[candidate duplicates](candidate-duplicates.md) for preserved ownership, pair-only merge
+limits, audit atomicity and erasure behavior.

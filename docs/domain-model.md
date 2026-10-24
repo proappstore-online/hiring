@@ -217,3 +217,13 @@ Acceptance evidence is nullable and guarded against uncontrolled updates; full
 recruiter detail returns it, restricted gateway detail returns NULL to reviewers.
 Migration tracking applies 0028 once, like all existing additive ALTER migrations.
 No mail is sent and accepted applications cannot queue or claim dispatches.
+
+## Candidate duplicate provenance (#21)
+
+A candidate may have one `merged_into` canonical candidate within the same brand.
+The merge is logical: application-to-candidate relationships remain original so that
+account ownership, consent and access never transfer. Disjoint pairs only; neither
+member can participate in a subsequent merge. `hiring_candidate_merges` retains the
+human actor, operation, reason and selected source ID for each canonical profile field.
+Owner history resolves those fields without copying private values; later erasure
+redacts the source records normally. See [duplicate review](candidate-duplicates.md).

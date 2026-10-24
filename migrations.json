@@ -127,6 +127,10 @@
     {
       "name": "0032_candidate_access_tokens",
       "sql": "CREATE TABLE hiring_candidate_access_tokens (token TEXT PRIMARY KEY CHECK(length(token)=64 AND token NOT GLOB '*[^0-9a-f]*'),application_id TEXT NOT NULL REFERENCES hiring_applications(id),worker_user_id TEXT NOT NULL,purpose TEXT NOT NULL CHECK(purpose IN ('status','withdraw')),created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL CHECK(expires_at=created_at+900000),consumed_at INTEGER); CREATE INDEX hiring_candidate_tokens_owner ON hiring_candidate_access_tokens(worker_user_id,application_id,created_at);"
+    },
+    {
+      "name": "0033_candidate_duplicates",
+      "sql": "ALTER TABLE hiring_candidates ADD COLUMN merged_into TEXT REFERENCES hiring_candidates(id); CREATE TABLE hiring_candidate_merges (operation_id TEXT PRIMARY KEY,organization_id TEXT NOT NULL,brand_id TEXT NOT NULL,source_id TEXT NOT NULL UNIQUE REFERENCES hiring_candidates(id),target_id TEXT NOT NULL REFERENCES hiring_candidates(id),actor_user_id TEXT NOT NULL,reason TEXT NOT NULL,field_sources_json TEXT NOT NULL,created_at INTEGER NOT NULL); CREATE TRIGGER hiring_candidate_merges_no_update BEFORE UPDATE ON hiring_candidate_merges BEGIN SELECT RAISE(ABORT,'merge provenance is immutable'); END; CREATE TRIGGER hiring_candidate_merges_no_delete BEFORE DELETE ON hiring_candidate_merges BEGIN SELECT RAISE(ABORT,'merge provenance is immutable'); END; CREATE TRIGGER hiring_candidate_merges_commit AFTER INSERT ON hiring_candidate_merges BEGIN UPDATE hiring_candidates SET merged_into=NEW.target_id WHERE id=NEW.source_id; INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) VALUES(NEW.operation_id,NEW.organization_id,NEW.brand_id,'candidate.merged',NEW.actor_user_id,NEW.operation_id,NEW.created_at,'candidate',NEW.target_id,'Human confirmed candidate merge; original records retained'); END;"
     }
   ]
 }

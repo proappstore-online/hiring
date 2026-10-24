@@ -184,7 +184,7 @@
       "name": "list_applications",
       "description": "list applications",
       "operation": "query",
-      "sql": "SELECT a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC LIMIT 100",
+      "sql": "SELECT a.candidate_id,a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC LIMIT 100",
       "params": {
         "organization_id": {
           "type": "string"
@@ -2076,7 +2076,7 @@
       "name": "get_application",
       "description": "Full scoped owner/recruiter application detail by ID, independent of queue limits. Missing and unauthorized IDs return no rows.",
       "operation": "query",
-      "sql": "SELECT a.acceptance_evidence,a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND a.id=:application_id LIMIT 1",
+      "sql": "SELECT a.acceptance_evidence,a.candidate_id,a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.source_detail,a.basis_reference,a.contact_context,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS linkedin_url,COALESCE((SELECT s.profile_url FROM hiring_application_sources s WHERE s.application_id=a.id),c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND a.id=:application_id LIMIT 1",
       "params": {
         "organization_id": {
           "type": "string"
@@ -3643,6 +3643,82 @@
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,a.organization_id,a.brand_id,a.id,'application.withdrawn',:__user_id,:operation_id,:__now,'application',a.id,'Candidate withdrew application' FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND changes()=1 AND a.stage='withdrawn' AND a.version=:expected_version+1 AND EXISTS (SELECT 1 FROM hiring_stage_events e WHERE e.id=:operation_id AND e.application_id=a.id AND e.actor_user_id=:__user_id)",
         "UPDATE hiring_candidate_access_tokens SET consumed_at=:__now WHERE token=:token AND application_id=:application_id AND worker_user_id=:__user_id AND purpose='withdraw' AND consumed_at IS NULL AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_audit_events e WHERE e.id=:operation_id AND e.application_id=:application_id AND e.actor_user_id=:__user_id AND e.action='application.withdrawn')"
       ]
+    },
+    {
+      "name": "suggest_candidate_duplicates",
+      "description": "suggest candidate duplicates",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT DISTINCT d.id,d.name,d.email,d.phone,COALESCE(d.linkedin_profile_url,NULLIF(d.linkedin_url,'')) AS linkedin_url,'email_match' AS match_reason FROM hiring_candidates c JOIN hiring_candidates d ON d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.id<>c.id WHERE c.id=:candidate_id AND c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.merged_into IS NULL AND d.merged_into IS NULL AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.candidate_id=c.id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.candidate_id=d.id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND length(trim(c.email))>0 AND lower(trim(c.email))=lower(trim(d.email)) AND NOT EXISTS (SELECT 1 FROM erasure_requests e WHERE e.candidate_id IN (c.id,d.id) AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS (SELECT 1 FROM hiring_candidate_merges x WHERE x.source_id IN (c.id,d.id) OR x.target_id IN (c.id,d.id)) ORDER BY d.id LIMIT 50"
+    },
+    {
+      "name": "merge_candidates",
+      "description": "merge candidates",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "name_source": {
+          "type": "string"
+        },
+        "email_source": {
+          "type": "string"
+        },
+        "phone_source": {
+          "type": "string"
+        },
+        "linkedin_url_source": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_candidate_merges(operation_id,organization_id,brand_id,source_id,target_id,actor_user_id,reason,field_sources_json,created_at) SELECT :operation_id,:organization_id,:brand_id,c.id,d.id,:__user_id,:reason,json_object('name',:name_source,'email',:email_source,'phone',:phone_source,'linkedin_url',:linkedin_url_source),:__now FROM hiring_candidates c JOIN hiring_candidates d ON d.organization_id=c.organization_id AND d.brand_id=c.brand_id WHERE c.id=:source_id AND d.id=:target_id AND c.id<>d.id AND c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.merged_into IS NULL AND d.merged_into IS NULL AND EXISTS (SELECT 1 FROM hiring_effective_access g WHERE g.organization_id=:organization_id AND g.brand_id=:brand_id AND g.user_id=:__user_id AND g.role='owner' AND g.requisition_id IS NULL) AND :name_source IN (c.id,d.id) AND :email_source IN (c.id,d.id) AND :phone_source IN (c.id,d.id) AND :linkedin_url_source IN (c.id,d.id) AND length(trim(:reason)) BETWEEN 1 AND 2000 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_candidate_merges WHERE source_id=c.id OR target_id=c.id OR target_id=d.id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM erasure_requests WHERE candidate_id IN (c.id,d.id) AND organization_id=:organization_id AND brand_id=:brand_id)",
+      "step_up": true
+    },
+    {
+      "name": "list_candidate_merges",
+      "description": "list candidate merges",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT x.*,f0.name AS name,f1.email AS email,f2.phone AS phone,COALESCE(f3.linkedin_profile_url,NULLIF(f3.linkedin_url,'')) AS linkedin_url FROM hiring_candidate_merges x JOIN hiring_candidates f0 ON f0.id=json_extract(x.field_sources_json,'$.name') AND f0.organization_id=x.organization_id AND f0.brand_id=x.brand_id JOIN hiring_candidates f1 ON f1.id=json_extract(x.field_sources_json,'$.email') AND f1.organization_id=x.organization_id AND f1.brand_id=x.brand_id JOIN hiring_candidates f2 ON f2.id=json_extract(x.field_sources_json,'$.phone') AND f2.organization_id=x.organization_id AND f2.brand_id=x.brand_id JOIN hiring_candidates f3 ON f3.id=json_extract(x.field_sources_json,'$.linkedin_url') AND f3.organization_id=x.organization_id AND f3.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND (x.source_id=:candidate_id OR x.target_id=:candidate_id) AND EXISTS (SELECT 1 FROM hiring_effective_access g WHERE g.organization_id=:organization_id AND g.brand_id=:brand_id AND g.user_id=:__user_id AND g.role='owner' AND g.requisition_id IS NULL) ORDER BY x.created_at DESC LIMIT 50"
     }
   ]
 }

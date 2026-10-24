@@ -42,3 +42,6 @@ Owner identity editors, scoped member management, and immutable public identity 
 
 - [Privacy operations](privacy-operations.md): versioned subject rights requests,
   private core exports, audited restricted MCP access and remaining #5 gaps.
+
+- [Duplicate review and merge](candidate-duplicates.md): scoped suggestions, owner/passkey
+  confirmation, canonical field provenance and preserved application ownership (#21).
