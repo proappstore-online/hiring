@@ -4,7 +4,7 @@ import { EmptyState, ErrorState, LoadingState } from './route-ui'
 import { button, date, panel } from './ui'
 
 export type Diagnostic = { id: string; agent_instance_id: string; action: string; occurred_at: number; outcome: 'success' | 'error' | 'unknown' }
-type Health = { pending_count: number; sending_count: number; failed_count: number; unknown_count: number; oldest_pending_draft_age_ms: number | null; oldest_sending_age_ms: number | null; denied_or_missing_24h: number | null; unconfirmed_reads_24h: number | null; observed_at: number }
+type Health = { retention_failed_count: number | null; retention_blocked_count: number | null; retention_unknown_count: number | null; quota_count: number | null; outage_count: number | null; pending_count: number; sending_count: number; failed_count: number; unknown_count: number; oldest_pending_draft_age_ms: number | null; oldest_sending_age_ms: number | null; denied_or_missing_24h: number | null; unconfirmed_reads_24h: number | null; observed_at: number }
 const age = (ms: number | null) => ms === null ? 'No recorded age' : `${Math.floor(ms / 60000)} minutes`
 export function sourceDomain(source: string) {
   try { const url = new URL(source); return ['https:', 'http:'].includes(url.protocol) ? url.hostname : 'Redacted' } catch { return 'Redacted' }
@@ -28,6 +28,13 @@ export function OperationalDiagnostics({ scope }: { scope: Scope }) {
     {healthError ? <p role="alert">Queue health could not be loaded. Refresh operations to retry.</p> : health && <section aria-label="Queue health" className="my-4 space-y-2">
       <h2 className="text-xl font-semibold">Queue health</h2><p>Current authorized records at {date(health.observed_at)}. Failed and unknown counts exclude reconciled attempts. Provider acceptance does not prove delivery.</p>
       <dl><dt>Pending</dt><dd>{health.pending_count}</dd><dt>Sending</dt><dd>{health.sending_count}</dd><dt>Unreconciled failed</dt><dd>{health.failed_count}</dd><dt>Unreconciled unknown</dt><dd>{health.unknown_count}</dd><dt>Oldest pending draft age (since creation)</dt><dd>{age(health.oldest_pending_draft_age_ms)}</dd><dt>Oldest sending attempt</dt><dd>{age(health.oldest_sending_age_ms)}</dd><dt>Recorded denied or missing reads (24 hours)</dt><dd>{health.denied_or_missing_24h ?? 'Restricted to brand-wide owners/auditors'}</dd><dt>Recorded unconfirmed reads (24 hours)</dt><dd>{health.unconfirmed_reads_24h ?? 'Restricted to brand-wide owners/auditors'}</dd></dl>
+      <dl>{([
+        ['Retention failures', health.retention_failed_count],
+        ['Retention blocked', health.retention_blocked_count],
+        ['Retention unknown', health.retention_unknown_count],
+        ['Quota failures', health.quota_count],
+        ['Provider outages', health.outage_count],
+      ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? 'Restricted to brand-wide owners/auditors'}</dd></div>)}</dl>
       {(health.failed_count > 0 || health.unknown_count > 0) && <p role="status">Manual reconciliation required. Inspect provider evidence and application communication history before retrying. Unknown outcomes must never be automatically resent.</p>}
       <p>Counts cover recorded outbox and gateway/export activity only. No automatic alert delivery or retention purge is configured.</p>
     </section>}

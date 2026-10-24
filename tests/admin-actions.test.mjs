@@ -70,7 +70,7 @@ test('operational health aggregates exact permitted requisitions and never retur
  const reconciled=attempt('brand','req-brand','reconciled','unknown')
  call('reconcile_communication','owner',{...reconciled,operation_id:'reconcile',outcome:'accepted',evidence:'Provider test receipt'},4000)
  const [row]=call('get_operational_health','narrow',scope,62000)
- assert.deepEqual(row,{pending_count:1,sending_count:1,failed_count:1,unknown_count:1,oldest_pending_draft_age_ms:61000,oldest_sending_age_ms:60000,denied_or_missing_24h:null,unconfirmed_reads_24h:null,observed_at:62000})
+ assert.deepEqual(row,{pending_count:1,sending_count:1,failed_count:1,unknown_count:1,oldest_pending_draft_age_ms:61000,oldest_sending_age_ms:60000,denied_or_missing_24h:null,unconfirmed_reads_24h:null,retention_failed_count:null,retention_blocked_count:null,retention_unknown_count:null,quota_count:null,outage_count:null,observed_at:62000})
  assert.equal(call('get_operational_health','owner',scope)[0].unknown_count,2)
  assert.equal(call('get_operational_health','auditor',scope)[0].unknown_count,1)
  assert.doesNotMatch(JSON.stringify(row),/SECRET|private|candidate|recipient|application_id|subject|body/)

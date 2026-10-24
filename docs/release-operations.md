@@ -12,11 +12,12 @@ Check `/admin/operations` under the exact organization/brand grant. Its latest
 100 activity records omit candidate content and have unknown outcomes. The
 `get_operational_health` snapshot adds permitted pending/sending counts and ages,
 unreconciled failed/unknown counts and restricted recorded privacy counters.
-It is not a complete API error or retention-failure monitor. Pending draft age is
-since creation; sending age is since last attempt. Inspect application communication
-history and `list_communication_drafts` for delivery state. No alerting service is
-claimed. #35 still needs an operator-approved alert transport/recipient and
-exercised alert delivery; agree an operational response target before launch.
+Brand-wide owners/auditors also see retention failure/blocked/unknown and
+unresolved quota/outage counts. Use `inspect_operational_jobs` for paged,
+content-free failure inspection. [Monitoring and replay](operational-monitoring.md)
+defines executable alert evaluation, trusted callback observation, deployment
+bindings and runbooks. Live transport/recipient configuration and an exercised
+alert delivery remain launch evidence requirements.
 
 | Observation | Operator action | Evidence before continuing |
 | --- | --- | --- |

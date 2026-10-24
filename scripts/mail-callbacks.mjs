@@ -3,10 +3,10 @@
  * never tenant IDs, sender-verification claims or application IDs from the body.
  * db provides query(sql, params) and atomic batch([{sql, params}]).
  */
-export function createMailCallbackHandler({ secret, connectorId, resolve, db, now = Date.now }) {
+export function createMailCallbackHandler({ secret, connectorId, resolve, db, now = Date.now, observe = () => {} }) {
   if (typeof secret !== 'string' || secret.length < 32 || typeof connectorId !== 'string' || !connectorId || typeof resolve !== 'function' || !db?.batch) throw new TypeError('Trusted MAIL callback dependencies required')
   const id = value => typeof value === 'string' && /^[A-Za-z0-9_.:@/-]{1,128}$/.test(value)
-  return async ({ body, timestamp, signature }) => {
+  const handle = async ({ body, timestamp, signature }) => {
     const reject = () => ({ outcome: 'rejected' })
     if (typeof body !== 'string' || new TextEncoder().encode(body).length > 100000 || !Number.isSafeInteger(timestamp) || Math.abs(now() - timestamp) > 300000 || !/^[a-f0-9]{64}$/.test(signature ?? '')) return reject()
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
@@ -28,5 +28,18 @@ export function createMailCallbackHandler({ secret, connectorId, resolve, db, no
     // Projection and receipt are committed by the same database statement/trigger.
     const result = await db.batch([{ sql: `INSERT INTO hiring_mail_receipts (connector_id,event_id,organization_id,brand_id,application_id,draft_id,operation_id,message_id,event_type,occurred_at,delivery_rank,classification,reply_text,quarantined_attachments_json,received_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM hiring_outbox WHERE id=? AND organization_id=? AND brand_id=? AND application_id=? AND idempotency_key=?) ON CONFLICT(connector_id,event_id) DO NOTHING`, params: [...params, mapping.draft_id, mapping.organization_id, mapping.brand_id, mapping.application_id, event.operation_id] }])
     return { outcome: result[0]?.meta?.changes === 1 ? (triage ? 'quarantined' : 'recorded') : 'ignored' }
+  }
+  const report = outcome => {
+    try { observe({ event: 'mail.callback', outcome }) } catch { /* Diagnostics cannot change receipt semantics. */ }
+  }
+  return async input => {
+    try {
+      const result = await handle(input)
+      report(result.outcome)
+      return result
+    } catch {
+      report('unavailable')
+      throw new Error('MAIL callback unavailable')
+    }
   }
 }

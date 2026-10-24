@@ -49,3 +49,6 @@ Owner identity editors, scoped member management, and immutable public identity 
 - [Explicit deletion, legal holds and restore replay](retention.md): worker-only
   per-store progress, scoped holds, signed private ledgers and closed-gate replay;
   indefinite retention, with no automatic expiry (#28).
+
+- [Operational monitoring and replay](operational-monitoring.md): scoped failure
+  inspection, content-free alerts, trusted callback observation and safe recovery.

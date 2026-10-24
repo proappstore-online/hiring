@@ -99,7 +99,7 @@ test('ambiguous sender or attachment replies quarantine; every reply preserves d
 test('receipt and projection roll back together and provider can safely redeliver',async()=>{
  const f=callbackFixture()
  f.db.exec("CREATE TRIGGER fail_projection BEFORE INSERT ON hiring_mail_delivery BEGIN SELECT RAISE(ABORT,'offline'); END")
- await assert.rejects(f.send({event_id:'retry'}),/offline/)
+ await assert.rejects(f.send({event_id:'retry'}),/MAIL callback unavailable/)
  assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_mail_receipts').get().n,0)
  f.db.exec('DROP TRIGGER fail_projection')
  assert.equal((await f.send({event_id:'retry'})).outcome,'recorded')

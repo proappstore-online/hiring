@@ -332,3 +332,13 @@ platform gate registration, but do not simulate or claim a live passkey ceremony
 The authenticated rate-limit, typed error and failure-path audit limitations
 listed above remain platform gaps. No arbitrary SQL, export, deletion, hold
 override, automatic rejection or automatic offer tool is added by this contract.
+
+## Operational monitoring (#35)
+
+`get_operational_health` adds owner/auditor brand-wide retention failed, blocked
+and unknown counts plus unresolved quota/outage counts. These fields are null for
+restricted grants. `inspect_operational_jobs` is a content-free brand-wide
+owner/auditor keyset inspection of unresolved mail and retention jobs (100/page).
+It grants no dispatch or worker capability. Recovery uses existing passkey human
+reconciliation and hold-aware retention claims; see
+[monitoring, alert bindings and runbooks](operational-monitoring.md).
