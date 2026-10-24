@@ -64,6 +64,32 @@ Preserve desired Gmail forwarding when provisioning the bridge. Historical forwa
 requires a separately explicit backfill with provider-side original-recipient filtering.
 Never silently fall back to another Gmail account.
 
+## Latest connection inspection (25 October 2026)
+
+Read-only checks through the Google PAGS account `serge.the.dev@gmail.com` found
+canonical instance `4c295181-8886-46a2-9272-f4abb159a595` still active.
+`get_instance_gmail_identity` now reports the receiving mailbox
+`serge.the.dev@gmail.com`, verified send-as alias `admin@freeappstore.online`,
+`inboundScope: ["admin@freeappstore.online"]`, `previewChars: 4000`, no blockers,
+and `readyToRead: true` / `readyToSend: true`. Gmail write consent reports `always`.
+These observations supersede the older disconnected-Gmail observations below;
+they establish configured identity readiness, not delivery, isolation or archive acceptance.
+
+`get_instance_email_worker` still reports `state: absent`, no connections,
+`no_connection`, and both readiness flags false. Its write consent now reports
+`always`; that consent does not supply a bridge or establish sender approval.
+The discovered instance capabilities still omit `email_worker_mark_handled`.
+No mail search, message read, send, reply, checkpoint or application write was performed
+in this inspection. No live roundtrip is claimed.
+
+Issue #58 remains open: provision and verify the dedicated bridge, verify hardened
+connector/bridge deployment, obtain the exact owner-controlled test recipient,
+labeled subject and intended message approval, and execute both paths' acceptance
+checks below. The issue comments require actual independent receipt, isolation,
+reply identity, deduplication and truthful archive/readback before completion.
+Historical implementation and deployment observations below retain their original
+scope and must not be treated as freshly verified release status.
+
 ## Verified live state
 
 - PAS Hiring MCP is connected. Workspace and application reads succeeded for FreeAppStore.
