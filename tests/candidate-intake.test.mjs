@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -77,12 +78,14 @@ test('withdrawal prevents new queue or claim attempts without pretending to reca
   const {db,call,submit}=fixture();submit()
   const p={...A,application_id:'application-a',draft_id:'draft'}
   call('create_communication_draft','staff-a',{...p,recipient_email:'candidate@example.com',subject:'Hello',body:'Test',operation_id:'draft'})
+  seedApprovedTemplates(db)
   call('queue_communication','staff-a',{...p,operation_id:'queue'})
   call('withdraw_my_application','worker',{...A,application_id:'application-a',expected_version:1,operation_id:'withdraw'})
   assert.throws(()=>call('claim_communication','staff-a',{...p,operation_id:'claim'}),/withdrawn application/)
   assert.equal(db.prepare("SELECT delivery_state FROM hiring_outbox WHERE id='draft'").get().delivery_state,'pending')
   const q={...p,draft_id:'later'}
   call('create_communication_draft','staff-a',{...q,recipient_email:'candidate@example.com',subject:'Hello',body:'Test',operation_id:'later'})
+  seedApprovedTemplates(db)
   assert.throws(()=>call('queue_communication','staff-a',{...q,operation_id:'later-queue'}),/withdrawn application/)
   db.close()
 })

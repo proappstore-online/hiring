@@ -175,3 +175,31 @@ never fetches them or marks them clean. Triage cannot change disposition; any
 subsequent decision uses the existing authorized decision workflow. Retention is
 indefinite until explicit deletion; this table adds a local store that erasure
 operators must account for, without claiming processor deletion.
+
+## Approved templates and explicit dispatch (#27)
+
+Brand-wide owners approve an exact current template version through
+`approve_communication_template` with passkey verification. Approval records retain
+actor, operation, timestamp and the reviewed text and are immutable. Recruiters
+can edit templates, but edits create a new version requiring owner approval.
+`list_approved_communication_templates` checks the caller's current application
+and requisition access. Templates contain literal text; no variable interpolation
+or HTML execution is supported. The MAIL adapter escapes the rendered text.
+
+Application detail shows the approved version, recipient, brand and full text
+before **Confirm and send this message**. Confirmation creates a draft and queues
+it with a passkey; the trusted MAIL dispatcher performs transport. Queueing is
+not proof of delivery. Provider configuration and suppression checks remain the
+trusted connector's responsibility under the MAIL adapter contract.
+
+Both queue and claim require exact current approved text and the candidate's
+current address. Queueing pins template ID/version; an edit after queueing blocks
+the claim, even if a newer version is approved. Refresh and prepare a reviewed
+new draft rather than changing a queued payload. Existing unapproved freeform
+and legacy drafts must acquire matching current template approval before queueing;
+legacy pending rows without a pinned template cannot be dispatched. Offer,
+withdrawal, erasure, scope and current sender-access guards still apply.
+
+Delivery history continues to use application/brand-scoped reads and distinguishes
+queued, sending, provider acceptance, failure and unknown outcomes. Unknown
+outcomes require reconciliation before another attempt.

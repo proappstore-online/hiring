@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -56,6 +57,7 @@ test('operational health aggregates exact permitted requisitions and never retur
    call('create_application','owner',{...s,requisition_id:req,candidate_id:'candidate-'+id,operation_id:'application-'+id,candidate_name:'SECRET NAME',email:'private@example.test',phone:'',source:'manual',profile_url:'',source_detail:'PRIVATE',basis_reference:'Policy',contact_context:'PRIVATE',assignee_user_id:'owner'})
    const p={...s,draft_id:id}
    call('create_communication_draft','owner',{...p,recipient_email:'private@example.test',subject:'SECRET SUBJECT',body:'SECRET BODY',operation_id:'draft-'+id})
+   seedApprovedTemplates(db)
    assert.equal(call('queue_communication','owner',{...p,operation_id:'queue-'+id}).at(-1),1)
    if(state!=='pending') {
      assert.equal(call('claim_communication','owner',{...p,operation_id:'claim-'+id},2000).at(-1),1)

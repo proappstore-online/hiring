@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -47,6 +48,7 @@ const row = db => db.prepare("SELECT * FROM hiring_outbox WHERE id='draft'").get
 const history = (call, logical, extra={}) => call('list_email_status_history','owner',{...scope,logical_email_id:logical,...extra})
 const archive = (logical, extra={}) => ({...scope,communication_id:'archive',direction:'outbound',from_email:'sender@example.test',to_email:'private@example.com',subject:'Private subject',body:'Secret body',provider_message_id:'provider-1',provider_thread_id:'thread-1',occurred_at:Date.now(),agent_instance_id:'agent',operation_id:'archive-op',logical_email_id:logical,...extra})
 function claimed(f) {
+ seedApprovedTemplates(f.db)
  f.call('queue_communication','owner',{...input,operation_id:'queue'})
  f.call('claim_communication','owner',{...input,operation_id:'claim'})
  return row(f.db).logical_email_id
@@ -138,6 +140,7 @@ test('legacy upgrade preserves unproven archives and outbox rows without invente
 test('queueing a legacy unsent draft starts a new identity with only the real queued event',()=>{
  const f=seeded()
  f.db.exec("INSERT INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at,operation_id) SELECT 'legacy',organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at,'legacy-op' FROM hiring_outbox WHERE id='draft'")
+ seedApprovedTemplates(f.db)
  f.call('queue_communication','owner',{...scope,draft_id:'legacy',operation_id:'legacy-queue'})
  const logical=f.db.prepare("SELECT logical_email_id FROM hiring_outbox WHERE id='legacy'").get().logical_email_id
  assert.match(logical,/^[0-9a-f-]{36}$/)
@@ -184,7 +187,7 @@ test('worker linked replay rejects altered receipt, event, mailbox and connectio
 })
 
 test('rejected and no-op queue and claim calls append no status events', () => {
- const f = seeded(); const logical = row(f.db).logical_email_id
+ const f = seeded(); seedApprovedTemplates(f.db); const logical = row(f.db).logical_email_id
  for (const name of ['queue_communication', 'claim_communication']) {
   const before = history(f.call, logical)
   assert.ok(f.call(name, 'outsider', { ...input, operation_id: 'denied' }).every(n => n === 0))

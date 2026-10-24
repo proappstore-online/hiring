@@ -230,3 +230,13 @@ step-up, not a general agent merge tool. `list_candidate_merges` is brand-owner-
 returns canonical fields and immutable source-field references. See
 [candidate duplicates](candidate-duplicates.md) for preserved ownership, pair-only merge
 limits, audit atomicity and erasure behavior.
+
+### Brand template approval (#27)
+
+`approve_communication_template` is a passkey-protected brand-wide owner action
+bound to `template_id` and `expected_version`. Its immutable approval record is
+the attribution evidence. `list_approved_communication_templates` requires live
+application sender access, including requisition restrictions. Queue and claim
+recheck exact approved content and recipient; queue pins template ID/version.
+Editing a template invalidates sending from the previous version. Unapproved
+freeform drafts remain unsent. See [MAIL contract](mail-contract.md).

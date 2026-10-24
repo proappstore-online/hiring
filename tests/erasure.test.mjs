@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -112,6 +113,7 @@ test('audit or processor persistence failure rolls back every redaction and requ
 test('protected bodies remain visible as blockers, never reported deleted or complete; tombstones fence rehydration and sends',()=>{
   const {db,call}=seeded()
   call('create_communication_draft','owner',{...scope,application_id:'app',draft_id:'draft',recipient_email:'private@example.test',subject:'Private',body:'Private body',operation_id:'draft'})
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...scope,application_id:'app',draft_id:'draft',operation_id:'queue'})
   call('request_candidate_erasure','owner',input)
   const report=status(call);const stores=JSON.parse(report.stores_json)
@@ -119,7 +121,7 @@ test('protected bodies remain visible as blockers, never reported deleted or com
   assert.equal(db.prepare("SELECT body FROM hiring_outbox WHERE id='draft'").get().body,'Private body')
   assert.equal(report.status,'partial');assert.equal(report.verification_code,'files_indexes_exports_backups_require_verification')
   assert.throws(()=>db.exec("UPDATE hiring_candidates SET name='Restored' WHERE id='candidate-brand'"),/erasure requested/)
-  assert.throws(()=>call('claim_communication','owner',{...scope,application_id:'app',draft_id:'draft',operation_id:'claim'}),/erasure requested/)
+  assert.ok(call('claim_communication','owner',{...scope,application_id:'app',draft_id:'draft',operation_id:'claim'}).every(n=>n===0))
   assert.throws(()=>call('add_application_note','owner',{...scope,application_id:'app',note_id:'note',body:'Restored PII',operation_id:'note'}),/erasure requested/)
   db.close()
 })
@@ -127,6 +129,7 @@ test('protected bodies remain visible as blockers, never reported deleted or com
 test('in-flight sends require reconciliation before destructive core redaction',()=>{
   const {db,call}=seeded()
   call('create_communication_draft','owner',{...scope,application_id:'app',draft_id:'draft',recipient_email:'private@example.test',subject:'Private',body:'Private body',operation_id:'draft'})
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...scope,application_id:'app',draft_id:'draft',operation_id:'queue'})
   call('claim_communication','owner',{...scope,application_id:'app',draft_id:'draft',operation_id:'claim'})
   assert.throws(()=>call('request_candidate_erasure','owner',input),/in-flight communication/)

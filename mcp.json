@@ -467,7 +467,7 @@
       "description": "Save an unsent email draft to the internal outbox; no send capability",
       "operation": "batch",
       "statements": [
-        "INSERT OR IGNORE INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at,operation_id,logical_email_id) SELECT :draft_id,:organization_id,:brand_id,:application_id,:recipient_email,:subject,:body,'draft',:__user_id,:__now,:operation_id,:__uuid FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.email=:recipient_email AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:subject))>0 AND length(trim(:body))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:operation_id))>0",
+        "INSERT OR IGNORE INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at,operation_id,logical_email_id,template_id,template_version) SELECT :draft_id,:organization_id,:brand_id,:application_id,:recipient_email,:subject,:body,'draft',:__user_id,:__now,:operation_id,:__uuid,:template_id,:template_version FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.email=:recipient_email AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:subject))>0 AND length(trim(:body))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:operation_id))>0",
         "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'communication.draft_created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND EXISTS (SELECT 1 FROM hiring_outbox WHERE id=:draft_id AND application_id=:application_id AND status='draft' AND operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:operation_id))>0 AND changes()=1"
       ],
       "params": {
@@ -494,6 +494,14 @@
         },
         "operation_id": {
           "type": "string"
+        },
+        "template_id": {
+          "type": "string",
+          "optional": true
+        },
+        "template_version": {
+          "type": "integer",
+          "optional": true
         }
       },
       "requires_auth": true
@@ -1362,7 +1370,7 @@
         }
       },
       "statements": [
-        "UPDATE hiring_outbox SET logical_email_id=COALESCE(logical_email_id,:__uuid),delivery_state='pending',idempotency_key=operation_id WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='draft' AND operation_id IS NOT NULL",
+        "UPDATE hiring_outbox SET template_id=(SELECT t.id FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version WHERE (hiring_outbox.template_id IS NULL OR (t.id=hiring_outbox.template_id AND t.version=hiring_outbox.template_version)) AND t.organization_id=hiring_outbox.organization_id AND t.brand_id=hiring_outbox.brand_id AND t.subject=hiring_outbox.subject AND t.body=hiring_outbox.body ORDER BY t.id LIMIT 1),template_version=(SELECT version FROM hiring_communication_templates WHERE id=(SELECT t.id FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version WHERE (hiring_outbox.template_id IS NULL OR (t.id=hiring_outbox.template_id AND t.version=hiring_outbox.template_version)) AND t.organization_id=hiring_outbox.organization_id AND t.brand_id=hiring_outbox.brand_id AND t.subject=hiring_outbox.subject AND t.body=hiring_outbox.body ORDER BY t.id LIMIT 1)),logical_email_id=COALESCE(logical_email_id,:__uuid),delivery_state='pending',idempotency_key=operation_id WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='draft' AND operation_id IS NOT NULL AND EXISTS (SELECT 1 FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version JOIN hiring_applications a ON a.id=hiring_outbox.application_id JOIN hiring_candidates c ON c.id=a.candidate_id WHERE (hiring_outbox.template_id IS NULL OR (t.id=hiring_outbox.template_id AND t.version=hiring_outbox.template_version)) AND t.organization_id=hiring_outbox.organization_id AND t.brand_id=hiring_outbox.brand_id AND t.subject=hiring_outbox.subject AND t.body=hiring_outbox.body AND ap.subject=t.subject AND ap.body=t.body AND c.email=hiring_outbox.recipient_email)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.queued',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.queued' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
       ],
       "step_up": true
@@ -1390,7 +1398,7 @@
         }
       },
       "statements": [
-        "UPDATE hiring_outbox SET delivery_state='sending',claim_id=:operation_id,claimed_by=:__user_id,attempt_count=attempt_count+1,last_attempt_at=:__now WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='pending'",
+        "UPDATE hiring_outbox SET delivery_state='sending',claim_id=:operation_id,claimed_by=:__user_id,attempt_count=attempt_count+1,last_attempt_at=:__now WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND delivery_state='pending' AND EXISTS (SELECT 1 FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version JOIN hiring_applications a ON a.id=hiring_outbox.application_id JOIN hiring_candidates c ON c.id=a.candidate_id WHERE t.id=hiring_outbox.template_id AND t.version=hiring_outbox.template_version AND t.organization_id=hiring_outbox.organization_id AND t.brand_id=hiring_outbox.brand_id AND t.subject=hiring_outbox.subject AND t.body=hiring_outbox.body AND ap.subject=t.subject AND ap.body=t.body AND c.email=hiring_outbox.recipient_email)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.claimed',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.claimed' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
       ]
     },
@@ -1453,7 +1461,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT logical_email_id,id,recipient_email,subject,body,idempotency_key FROM hiring_outbox WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND claim_id=:claim_id AND claimed_by=:__user_id AND delivery_state='sending' AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) LIMIT 1"
+      "sql": "SELECT template_id,template_version,logical_email_id,id,recipient_email,subject,body,idempotency_key FROM hiring_outbox WHERE id=:draft_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND claim_id=:claim_id AND claimed_by=:__user_id AND delivery_state='sending' AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) LIMIT 1"
     },
     {
       "name": "update_organization_identity",
@@ -1987,7 +1995,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT id,name,subject,body,version,updated_at FROM hiring_communication_templates WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY updated_at DESC,id LIMIT 100"
+      "sql": "SELECT id,name,subject,body,version,updated_at,EXISTS (SELECT 1 FROM hiring_template_approvals ap WHERE ap.template_id=hiring_communication_templates.id AND ap.version=hiring_communication_templates.version) AS approved FROM hiring_communication_templates WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) ORDER BY updated_at DESC,id LIMIT 100"
     },
     {
       "name": "save_communication_template",
@@ -3723,6 +3731,49 @@
         }
       },
       "sql": "SELECT x.*,f0.name AS name,f1.email AS email,f2.phone AS phone,COALESCE(f3.linkedin_profile_url,NULLIF(f3.linkedin_url,'')) AS linkedin_url FROM hiring_candidate_merges x JOIN hiring_candidates f0 ON f0.id=json_extract(x.field_sources_json,'$.name') AND f0.organization_id=x.organization_id AND f0.brand_id=x.brand_id JOIN hiring_candidates f1 ON f1.id=json_extract(x.field_sources_json,'$.email') AND f1.organization_id=x.organization_id AND f1.brand_id=x.brand_id JOIN hiring_candidates f2 ON f2.id=json_extract(x.field_sources_json,'$.phone') AND f2.organization_id=x.organization_id AND f2.brand_id=x.brand_id JOIN hiring_candidates f3 ON f3.id=json_extract(x.field_sources_json,'$.linkedin_url') AND f3.organization_id=x.organization_id AND f3.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND (x.source_id=:candidate_id OR x.target_id=:candidate_id) AND EXISTS (SELECT 1 FROM hiring_effective_access g WHERE g.organization_id=:organization_id AND g.brand_id=:brand_id AND g.user_id=:__user_id AND g.role='owner' AND g.requisition_id IS NULL) ORDER BY x.created_at DESC LIMIT 50"
+    },
+    {
+      "name": "approve_communication_template",
+      "description": "Owner approves the exact current template version after review; edits invalidate approval",
+      "operation": "execute",
+      "requires_auth": true,
+      "step_up": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "number"
+        }
+      },
+      "sql": "INSERT OR IGNORE INTO hiring_template_approvals(template_id,version,organization_id,brand_id,subject,body,approved_by,approved_at,operation_id) SELECT id,version,organization_id,brand_id,subject,body,:__user_id,:__now,:operation_id FROM hiring_communication_templates WHERE id=:template_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND length(subject)<=200 AND instr(subject,char(10))=0 AND instr(subject,char(13))=0 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128"
+    },
+    {
+      "name": "list_approved_communication_templates",
+      "description": "Approved current templates available to an authorized application sender",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT t.id,t.name,t.subject,t.body,t.version FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version WHERE t.organization_id=:organization_id AND t.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) ORDER BY t.name LIMIT 100"
     }
   ]
 }

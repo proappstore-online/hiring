@@ -83,3 +83,32 @@ function deliveryGuidance(reason: string) {
   if (['approval_unavailable', 'approval_required', 'scope_mismatch', 'invalid_payload'].includes(reason)) return 'Mail approval checks failed. Review the approved template, recipient, sender and suppression status before recovery.'
   return 'Check provider acceptance evidence before preparing any replacement.'
 }
+
+
+export function ApprovedMessage({ scope, applicationId, recipient, onChanged }: { scope: Scope; applicationId: string; recipient: string; onChanged: () => void }) {
+  type Template = { id: string; name: string; subject: string; body: string; version: number }
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [selected, setSelected] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const t = templates.find(row => row.id === selected)
+  useEffect(() => {
+    let active = true
+    setTemplates([]); setSelected('')
+    read<Template>('list_approved_communication_templates', { ...scope, application_id: applicationId }).then(rows => { if (active) setTemplates(rows) }).catch(() => { if (active) setMessage('Could not load approved templates.') })
+    return () => { active = false }
+  }, [scope.organization_id, scope.brand_id, applicationId])
+  async function send() {
+    if (!t) return
+    setBusy(true); setMessage('')
+    try {
+      await verifyPublicationPasskey()
+      const draft = id()
+      await write('create_communication_draft', { ...scope, application_id: applicationId, draft_id: draft, recipient_email: recipient, subject: t.subject, body: t.body, template_id: t.id, template_version: t.version, operation_id: id() })
+      await write('queue_communication', { ...scope, application_id: applicationId, draft_id: draft, operation_id: id() })
+      setMessage('Queued for the approved mail connector. Delivery is shown in message history.'); onChanged()
+    } catch { setMessage('Send could not be confirmed. Refresh message history before trying again.') }
+    finally { setBusy(false) }
+  }
+  return <section className="my-3 border p-3"><h3>Send approved message</h3><label>Approved template<select className="min-h-[44px]" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Choose template</option>{templates.map(row => <option key={row.id} value={row.id}>{row.name} · version {row.version}</option>)}</select></label>{t && <div aria-label="Message preview"><p>To: {recipient} · Brand: {scope.brand_id}</p><h4>{t.subject}</h4><p className="whitespace-pre-wrap">{t.body}</p><button className="min-h-[44px] underline" disabled={busy || !recipient} onClick={() => void send()}>Confirm and send this message</button></div>}<p role="status">{message}</p></section>
+}

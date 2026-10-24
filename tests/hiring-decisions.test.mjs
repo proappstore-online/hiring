@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -104,6 +105,7 @@ test('dispatch requires approved paid exact revision and payload; revocation blo
  if(compensation_type!=='paid'){assert.throws(()=>step(f,'authorize_offer_dispatch',{draft_id:'message'}),/unapproved or unpaid/);continue}
  assert.equal(step(f,'authorize_offer_dispatch',{draft_id:'message'}).at(-1),1)
  const queue={...scope,application_id:'app-a',draft_id:'message',operation_id:'queue'}
+ seedApprovedTemplates(f.db)
  assert.equal(f.call('queue_communication','staff-a',queue).at(-1),1)
  step(f,'revoke_offer')
  assert.throws(()=>f.call('claim_communication','staff-a',{...queue,operation_id:'claim'}),/not authorized/)
@@ -145,6 +147,7 @@ test('final dispositions and offer payloads cannot bypass approval or immutabili
  assert.throws(()=>f.db.exec("UPDATE hiring_outbox SET recipient_email='other@example.com' WHERE id='message'"),/immutable/)
  assert.throws(()=>f.db.exec("UPDATE hiring_outbox SET body='different terms' WHERE id='message'"),/immutable/)
  f.call('record_decision','staff-a',{...base,disposition:'rejected',expected_version:1,operation_id:'reject'})
+ seedApprovedTemplates(f.db)
  assert.throws(()=>f.call('queue_communication','staff-a',{...scope,application_id:'app-a',draft_id:'message',operation_id:'terminal-queue'}),/terminal/)
  assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'hired',expected_version:2,operation_id:'second-final'}))
  }finally{f.db.close()}
@@ -229,6 +232,7 @@ test('failed offer reconciliation preserves the immutable one-draft authorizatio
  step(f,'submit_offer_for_approval');step(f,'approve_offer');communication(f)
  step(f,'authorize_offer_dispatch',{draft_id:'message'})
  const message={...scope,application_id:'app-a',draft_id:'message'}
+ seedApprovedTemplates(f.db)
  f.call('queue_communication','staff-a',{...message,operation_id:'queue'})
  f.call('claim_communication','staff-a',{...message,operation_id:'claim'})
  f.call('complete_communication','staff-a',{...message,operation_id:'complete',claim_id:'claim',outcome:'failed'})

@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -46,11 +47,15 @@ const input = { ...scope, draft_id:'draft' }
 const row = db => db.prepare("SELECT * FROM hiring_outbox WHERE id='draft'").get()
 test('queue, exclusive claim and completion are scoped, attributed, durable and replay safe', () => {
  const {db,call}=seeded()
+ seedApprovedTemplates(db)
  for (const user of ['outsider']) assert.ok(call('queue_communication',user,{...input,operation_id:'bad'}).every(n=>n===0))
+ seedApprovedTemplates(db)
  assert.ok(call('queue_communication','owner',{...input,brand_id:'forged',operation_id:'bad'}).every(n=>n===0))
  const queue={...input,operation_id:'queue'}
+ seedApprovedTemplates(db)
  assert.equal(call('queue_communication','owner',queue).at(-1),1)
  assert.equal(row(db).idempotency_key,'draft-op')
+ seedApprovedTemplates(db)
  assert.ok(call('queue_communication','owner',queue).every(n=>n===0))
  assert.throws(()=>db.exec("UPDATE hiring_outbox SET body='changed'"),/immutable/)
  assert.throws(()=>db.exec('DELETE FROM hiring_outbox'),/durable/)
@@ -71,6 +76,7 @@ test('queue, exclusive claim and completion are scoped, attributed, durable and 
 test('audit failure rolls back queue, claim and completion, including attempt counters',()=>{
  for(const target of ['queue_communication','claim_communication','complete_communication']) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   if(target!=='queue_communication') call('queue_communication','owner',{...input,operation_id:'queue'})
   if(target==='complete_communication') call('claim_communication','owner',{...input,operation_id:'claim'})
   const before=row(db)
@@ -83,6 +89,7 @@ test('audit failure rolls back queue, claim and completion, including attempt co
 test('dispatcher sends once across retries and redacts provider exceptions and payloads',async()=>{
  for(const result of ['accepted','not_accepted','timeout']) {
  const {db,call}=seeded()
+ seedApprovedTemplates(db)
  call('queue_communication','owner',{...input,operation_id:'queue'})
  let sends=0; const logs=[]
  const actions=async(name,params)=>{const value=call(name,'owner',params);return action(name).operation==='query'?{rows:value}:{results:value.map(changes=>({meta:{changes}}))}}
@@ -99,6 +106,7 @@ test('dispatcher sends once across retries and redacts provider exceptions and p
 test('lost completion responses and process crashes cannot make a job claimable again', async () => {
  for (const loseAfterCommit of [true, false]) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...input,operation_id:'queue'})
   let sends=0
   const actions=async(name,params)=>{
@@ -129,6 +137,7 @@ test('draft creation and audit commit atomically',()=>{
 test('human reconciliation creates one safe replacement, requires scope and evidence, and audits atomically', () => {
  for (const outcome of ['accepted','not_accepted']) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...input,operation_id:'queue'})
   call('claim_communication','owner',{...input,operation_id:'claim'})
   call('complete_communication','owner',{...input,claim_id:'claim',outcome:'unknown',operation_id:'complete'})
@@ -167,6 +176,7 @@ test('human reconciliation creates one safe replacement, requires scope and evid
 test('reconciliation cannot retry recorded acceptance, pending jobs or active claims',()=>{
  for(const state of ['pending','sending','failed']) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...input,operation_id:'queue'})
   if(state!=='pending') call('claim_communication','owner',{...input,operation_id:'claim'})
   if(state==='failed') {
@@ -183,6 +193,7 @@ test('reconciliation cannot retry recorded acceptance, pending jobs or active cl
 
 test('stale sending recovery uses server time, configurable threshold and current scope without stealing claims',()=>{
  const {db,call}=seeded()
+ seedApprovedTemplates(db)
  call('queue_communication','owner',{...input,operation_id:'queue'})
  call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
  const args={...input,operation_id:'reclaim',expected_last_attempt_at:1000000}
@@ -213,6 +224,7 @@ test('stale sending recovery uses server time, configurable threshold and curren
 
 test('stale recovery rolls back on audit failure and supports a custom threshold',()=>{
  const {db,call}=seeded()
+ seedApprovedTemplates(db)
  call('queue_communication','owner',{...input,operation_id:'queue'})
  call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
  const args={...input,operation_id:'recover',expected_last_attempt_at:1000000,stale_after_ms:60000}
@@ -231,6 +243,7 @@ test('stale recovery rolls back on audit failure and supports a custom threshold
 test('stale recovery cannot alter non-sending jobs or downgrade recorded provider acceptance',()=>{
  for(const state of ['draft','pending','sent','failed','unknown','accepted-evidence']) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   if(state!=='draft')call('queue_communication','owner',{...input,operation_id:'queue'})
   if(!['draft','pending'].includes(state))call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
   if(['sent','failed','unknown'].includes(state))call('complete_communication','owner',{...input,operation_id:'complete',claim_id:'claim',outcome:state})
@@ -246,6 +259,7 @@ test('stale recovery cannot alter non-sending jobs or downgrade recorded provide
 
 test('MAIL quota persists actionable failure without rolling back application state or resending',async()=>{
  const {db,call}=seeded()
+ seedApprovedTemplates(db)
  call('queue_communication','owner',{...input,operation_id:'queue'})
  const before=db.prepare("SELECT * FROM hiring_applications WHERE id='app'").get()
  let sends=0
@@ -263,6 +277,7 @@ test('approved MAIL adapter and durable dispatcher reconcile timeout retries wit
  const {createMailAdapter}=await import('../scripts/mail.mjs')
  for(const outcome of ['accepted','quota','timeout']) {
   const {db,call}=seeded()
+  seedApprovedTemplates(db)
   call('queue_communication','owner',{...input,operation_id:'queue'})
   const actions=async(name,params)=>{const value=call(name,'owner',params);return action(name).operation==='query'?{rows:value}:{results:value.map(changes=>({meta:{changes}}))}}
   let sends=0

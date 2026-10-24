@@ -1,3 +1,4 @@
+import { seedApprovedTemplates } from './communication-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -50,6 +51,7 @@ const secret='test-secret-with-at-least-32-characters'
 const clock=1800000000000
 function callbackFixture() {
  const f=seeded()
+ seedApprovedTemplates(f.db)
  f.call('queue_communication','owner',{...input,operation_id:'queue'})
  const db={batch:async statements=>{f.db.exec('BEGIN');try{const result=statements.map(s=>({meta:{changes:f.db.prepare(s.sql).run(...s.params).changes}}));f.db.exec('COMMIT');return result}catch(e){f.db.exec('ROLLBACK');throw e}}}
  let mapping={...scope,draft_id:'draft',operation_id:'draft-op',message_id:'message',sender_verified:true,unambiguous:true}
