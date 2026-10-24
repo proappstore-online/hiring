@@ -312,8 +312,7 @@
           "type": "string"
         }
       },
-      "requires_auth": true,
-      "step_up": true
+      "requires_auth": true
     },
     {
       "name": "reassign_application",
