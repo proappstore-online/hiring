@@ -40,3 +40,5 @@ blocker and next action instead of leaving every requirement merely pending.
 The [#53 ADR review](architecture.md#affected-backlog-dependencies) records resolved #52/#9 policy inputs and remaining implementation/capability dependencies, including the separate FAS mail route #58.
 
 Issue #3 progress: publication and authenticated intake actions/UI have been added with regression tests; intake remains closed pending trusted file scanning and assigned-reviewer byte serving. See [intake contract](candidate-intake.md). This progress does not complete Phase 2 or authorize closing the epic.
+
+[Compliance and policy verification matrix (#54)](compliance-verification.md) maps approved policy clauses and every release-register requirement to gates, owner, pass criteria, evidence, existing workflow checks and backlog handoffs.
