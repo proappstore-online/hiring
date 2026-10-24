@@ -71,7 +71,8 @@ test('automated and forged actor claims cannot decide or approve',()=>{
  assert.ok(f.call('record_decision','system:worker',{...base,disposition:'deferred',expected_version:1,operation_id:'system'}).every(n=>n===0))
  step(f,'submit_offer_for_approval')
  assert.ok(step(f,'approve_offer',{actor_role:'automation'}).every(n=>n===0));assert.equal(offer(f).status,'pending_approval')
- for(const name of ['record_decision','approve_offer','submit_offer_for_approval','revoke_offer','authorize_offer_dispatch','change_application_stage'])assert.equal(action(name).step_up,true)
+ for(const name of ['record_decision','approve_offer','submit_offer_for_approval','revoke_offer','authorize_offer_dispatch'])assert.equal(action(name).step_up,true)
+ assert.equal(action('change_application_stage').step_up,undefined,'ordinary pipeline updates use scoped grants and audit without passkey step-up')
  }finally{f.db.close()}
 })
 test('offer revisions, optimistic locking, approval and revocation preserve evidence',()=>{

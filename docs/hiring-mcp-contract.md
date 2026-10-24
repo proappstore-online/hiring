@@ -207,3 +207,8 @@ platform-preexecution failures and broader mutation failures remain audit gaps.
 The core export excludes confidential review material and file bytes and does not
 satisfy the full async subject export contract. Full erasure/processor limitations
 remain unchanged; issue #5 still has acceptance gaps.
+
+Ordinary `change_application_stage` pipeline updates require current scoped staff
+authority, version/reason checks and audit, without platform passkey step-up.
+Dedicated final-decision, offer approval/dispatch and candidate-acceptance actions
+retain their separate human/passkey gates.
