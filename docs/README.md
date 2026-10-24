@@ -45,3 +45,7 @@ Owner identity editors, scoped member management, and immutable public identity 
 
 - [Duplicate review and merge](candidate-duplicates.md): scoped suggestions, owner/passkey
   confirmation, canonical field provenance and preserved application ownership (#21).
+
+- [Explicit deletion, legal holds and restore replay](retention.md): worker-only
+  per-store progress, scoped holds, signed private ledgers and closed-gate replay;
+  indefinite retention, with no automatic expiry (#28).

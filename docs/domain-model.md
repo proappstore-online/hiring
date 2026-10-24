@@ -227,3 +227,15 @@ member can participate in a subsequent merge. `hiring_candidate_merges` retains 
 human actor, operation, reason and selected source ID for each canonical profile field.
 Owner history resolves those fields without copying private values; later erasure
 redacts the source records normally. See [duplicate review](candidate-duplicates.md).
+
+## Explicit deletion and restore safeguards (#28; migration 0037)
+
+Indefinite retention remains unchanged. `hiring_store_holds` extends candidate-wide
+holds to the D1/R2/index deletion boundary. `hiring_deletion_requests`, steps,
+private object inventory and append-only tombstones/evidence track explicit
+continuations of verified erasure requests. Worker-only claims recheck both hold
+streams; uncertain external operations must settle before a new hold is accepted.
+Restore sessions import signed tombstone/hold ledgers before creating fresh replay
+attempts. Access stays closed until operator verification; protected D1 content and
+unavailable adapters remain blockers. See [retention contract](retention.md) for
+exact interfaces, private manifest handling and deployment/inventory limits.

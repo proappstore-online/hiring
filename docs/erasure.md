@@ -84,3 +84,13 @@ counts, rehydration/send fences, in-flight sends and lost-response reconciliatio
 API wrapper against a synthetic action transport at 375px, covering confirmation,
 failure/retry, scope/role reset and truthful partial progress. No real candidate or
 provider is touched. Run `pnpm test` and `pnpm build`.
+
+## Cross-store continuation and replay (#28)
+
+Migration 0037 adds explicit owner continuation of existing core erasure through
+`request_store_deletion`, per-store worker progress, broader holds, private signed
+ledger export and isolated restore replay. See [retention contract](retention.md).
+This preserves the original partial status and blocked MAIL evidence. Mutable
+local cleanup and verified registered-object/index deletion do not erase immutable
+archives or prove processor deletion. Missing integrations remain durable blockers;
+no automatic expiry or production restore drill is claimed.

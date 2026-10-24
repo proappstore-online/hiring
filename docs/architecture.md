@@ -105,3 +105,13 @@ use receipt-bound actions; raw legacy actions retain their existing audit gaps.
 Core exports are private, principal-bound and expire after 15 minutes, with current
 grant/identity/erasure checks on retrieval. Full export and erasure remain incomplete;
 see [privacy operations](privacy-operations.md) for exact boundaries.
+
+## Retention execution revision (#28)
+
+Migration 0037 and `worker/retention.mjs` implement explicit per-store deletion
+progress, cross-store claim/hold interlocks and signed closed-gate restore replay
+scaffolding. There is no age-based purge. Worker-only registered actions provide
+the trusted execution boundary; actual scoped R2/index/gate bindings still require
+host integration. Immutable local archives and unavailable services remain visible
+blockers. See [retention contract](retention.md); no live worker or recovery drill
+is asserted.

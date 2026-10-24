@@ -96,3 +96,12 @@ tombstones and hold uncertain sends. If compatibility is unproven, keep access
 contained and ship a forward fix. Final launch/rollback record names commander,
 backup/contact, candidate and rollback SHAs, evidence references, RPO/RTO, trigger,
 decision/time and required verification before reopening.
+
+### Executable replay scaffold (#28)
+
+`worker/retention.mjs` now provides signed private ledger export and closed-gate
+restore replay with fresh store attempts. The [retention contract](retention.md)
+defines required trusted bindings, independent latest checkpoint, gate/draining,
+resume identities and active-hold handling. This supersedes the absence of replay
+code above; the supported live backup/restore environment and completed drill
+remain unverified. Missing services and protected content keep access closed.

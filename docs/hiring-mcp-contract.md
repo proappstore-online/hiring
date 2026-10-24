@@ -240,3 +240,14 @@ application sender access, including requisition restrictions. Queue and claim
 recheck exact approved content and recipient; queue pins template ID/version.
 Editing a template invalidates sending from the previous version. Unapproved
 freeform drafts remain unsent. See [MAIL contract](mail-contract.md).
+
+## Retention and restore actions (#28)
+
+Owner actions `record_store_hold`, `request_store_deletion`, `get_store_deletion`,
+`release_restored_store_hold` and private ledger export reads require exact current
+brand-wide owner authority. Export artifacts are private and may contain opaque
+object keys/reason references. Worker execution, verification, per-store completion,
+imports and restore readiness actions are `callers: ["worker"]` only and check the
+platform worker identity. They must never be exposed through a user-supplied action
+proxy. [Retention contract](retention.md) defines claim interlocks, uncertain-outcome
+reconciliation, signed checkpoint/gate requirements and remaining integration limits.

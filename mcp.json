@@ -3774,6 +3774,654 @@
         }
       },
       "sql": "SELECT t.id,t.name,t.subject,t.body,t.version FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version WHERE t.organization_id=:organization_id AND t.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) ORDER BY t.name LIMIT 100"
+    },
+    {
+      "name": "record_store_hold",
+      "description": "Owner records a candidate-wide hold across D1, R2 and indexes; in-flight deletion must settle before a new hold can be accepted.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "reason_reference": {
+          "type": "string"
+        },
+        "review_at": {
+          "type": "integer"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_store_holds(sequence,operation_id,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at) SELECT MAX(COALESCE((SELECT MAX(sequence) FROM hiring_store_holds),0),COALESCE((SELECT MAX(sequence) FROM hiring_restore_hold_events WHERE ledger='stores'),0))+1,:operation_id,a.organization_id,a.brand_id,a.candidate_id,:state,:reason_reference,:review_at,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND NOT EXISTS (SELECT 1 FROM hiring_store_holds WHERE operation_id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'retention.hold_recorded',:__user_id,:operation_id,:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+      ]
+    },
+    {
+      "name": "request_store_deletion",
+      "description": "Explicit owner continuation of an existing identity-verified core erasure request; never age-triggered.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_deletion_requests(id,organization_id,brand_id,candidate_id,application_id,actor_user_id,created_at,origin) SELECT r.id,r.organization_id,r.brand_id,r.candidate_id,r.application_id,:__user_id,:__now,'explicit' FROM erasure_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests WHERE id=:request_id)",
+        "INSERT INTO hiring_deletion_tombstones(request_id,organization_id,brand_id,candidate_id,application_id,created_at) SELECT id,organization_id,brand_id,candidate_id,application_id,created_at FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(request_id) DO NOTHING",
+        "INSERT INTO hiring_deletion_objects(request_id,object_id,organization_id,brand_id,storage_path) SELECT r.id,f.id,r.organization_id,r.brand_id,f.storage_path FROM hiring_attachments f JOIN hiring_applications a ON a.id=f.application_id JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(request_id,object_id) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'d1','pending' FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(request_id,store) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'r2','pending' FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(request_id,store) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'index','pending' FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(request_id,store) DO NOTHING"
+      ]
+    },
+    {
+      "name": "get_store_deletion",
+      "description": "Read owner-scoped durable progress; no content or storage keys.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT s.store,s.state,s.reason_code,s.attempts FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY s.store LIMIT 3"
+    },
+    {
+      "name": "check_store_hold",
+      "description": "Worker-authoritative current hold check, exact deletion scope.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT r.id AS request_id,r.candidate_id,r.application_id,(COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AS held FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
+    },
+    {
+      "name": "claim_store_deletion",
+      "description": "Worker claims a store step atomically against latest holds. No age-based reclaim.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "store": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_deletion_steps SET state='running',attempt_id=:attempt_id,attempts=attempts+1,reason_code=NULL WHERE request_id=:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND store=:store AND state IN ('pending','failed','blocked') AND :__user_id=('system'||char(58)||'worker') AND EXISTS (SELECT 1 FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active')) AND NOT EXISTS (SELECT 1 FROM hiring_restore_sessions WHERE organization_id=:organization_id AND brand_id=:brand_id AND state='importing')",
+        "INSERT INTO hiring_retention_evidence(request_id,organization_id,brand_id,store,attempt_id,outcome,created_at) SELECT request_id,organization_id,brand_id,store,attempt_id,state,:__now FROM hiring_deletion_steps WHERE request_id=:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND store=:store AND attempt_id=:attempt_id AND :__user_id=('system'||char(58)||'worker') AND changes()=1"
+      ]
+    },
+    {
+      "name": "get_store_deletion_attempt",
+      "description": "Worker reads its exact running/unknown attempt.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "store": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT s.store,s.state,s.attempt_id,r.candidate_id,r.application_id,r.origin FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store=:store AND s.attempt_id=:attempt_id AND s.state IN ('running','unknown') AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
+    },
+    {
+      "name": "finish_store_deletion",
+      "description": "Worker persists verified outcome and content-free evidence atomically. Unknown outcomes keep the hold interlock.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "store": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reason_code": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_deletion_steps SET state=:outcome,reason_code=:reason_code WHERE request_id=:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND store=:store AND attempt_id=:attempt_id AND state IN ('running','unknown') AND :outcome IN ('complete','failed','blocked','unknown') AND :reason_code IN ('verified_absent','retryable','adapter_unavailable','protected_records','unconfirmed') AND (:outcome<>'complete' OR :reason_code='verified_absent') AND :__user_id=('system'||char(58)||'worker') AND state<>:outcome",
+        "INSERT INTO hiring_retention_evidence(request_id,organization_id,brand_id,store,attempt_id,outcome,created_at) SELECT request_id,organization_id,brand_id,store,attempt_id,state,:__now FROM hiring_deletion_steps WHERE request_id=:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND store=:store AND attempt_id=:attempt_id AND :__user_id=('system'||char(58)||'worker') AND changes()=1"
+      ]
+    },
+    {
+      "name": "list_deletion_objects",
+      "description": "Worker-only attachment inventory derived from the candidate scope; cursor pages every object.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "after_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT f.object_id AS id,f.storage_path FROM hiring_deletion_objects f JOIN hiring_deletion_requests r ON r.id=f.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND f.object_id>COALESCE(:after_id,'') AND :__user_id=('system'||char(58)||'worker') UNION SELECT f.id,f.storage_path FROM hiring_attachments f JOIN hiring_applications a ON a.id=f.application_id JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND f.id>COALESCE(:after_id,'') AND :__user_id=('system'||char(58)||'worker') ORDER BY id LIMIT 100"
+    },
+    {
+      "name": "export_retention_tombstones",
+      "description": "Owner exports a paged private content-free tombstone ledger, including original core-only requests.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "after_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT request_id,organization_id,brand_id,candidate_id,application_id,MIN(created_at) AS created_at FROM (SELECT r.id AS request_id,r.organization_id,r.brand_id,r.candidate_id,r.application_id,r.created_at FROM erasure_requests r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION SELECT t.request_id,t.organization_id,t.brand_id,t.candidate_id,t.application_id,t.created_at FROM hiring_deletion_tombstones t WHERE t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.request_id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION SELECT t.request_id,t.organization_id,t.brand_id,t.candidate_id,t.application_id,t.created_at FROM hiring_restore_tombstones t WHERE t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.request_id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)) GROUP BY request_id,organization_id,brand_id,candidate_id,application_id ORDER BY request_id LIMIT 100"
+    },
+    {
+      "name": "export_retention_holds",
+      "description": "Owner exports both hold ledgers, including releases and review metadata. Keep reason references private.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "after_sequence": {
+          "type": "integer",
+          "optional": true
+        },
+        "ledger": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT sequence,operation_id,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at FROM hiring_store_holds WHERE organization_id=:organization_id AND brand_id=:brand_id AND sequence>COALESCE(:after_sequence,0) AND :ledger='stores' AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION ALL SELECT sequence,operation_id,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at FROM erasure_hold_events WHERE organization_id=:organization_id AND brand_id=:brand_id AND sequence>COALESCE(:after_sequence,0) AND :ledger='legacy' AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY sequence LIMIT 100"
+    },
+    {
+      "name": "retention_ledger_watermark",
+      "description": "Authorize private owner export and detect concurrent ledger changes.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT (SELECT COUNT(*) FROM erasure_requests WHERE organization_id=:organization_id AND brand_id=:brand_id) AS core_count,(SELECT COUNT(*) FROM hiring_deletion_tombstones WHERE organization_id=:organization_id AND brand_id=:brand_id) AS tombstone_count,(SELECT COUNT(*) FROM erasure_hold_events WHERE organization_id=:organization_id AND brand_id=:brand_id) AS legacy_count,(SELECT COUNT(*) FROM hiring_store_holds WHERE organization_id=:organization_id AND brand_id=:brand_id) AS store_count,(SELECT COUNT(*) FROM hiring_restore_hold_events WHERE organization_id=:organization_id AND brand_id=:brand_id) AS replayed_hold_count,(SELECT COUNT(*) FROM hiring_deletion_objects WHERE organization_id=:organization_id AND brand_id=:brand_id) AS object_count,(SELECT COUNT(*) FROM hiring_restore_tombstones WHERE organization_id=:organization_id AND brand_id=:brand_id) AS restored_tombstone_count,(SELECT COUNT(*) FROM hiring_attachments WHERE organization_id=:organization_id AND brand_id=:brand_id) AS attachment_count FROM hiring_brands WHERE id=:brand_id AND organization_id=:organization_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1"
+    },
+    {
+      "name": "begin_retention_restore",
+      "description": "Worker starts a closed-gate isolated restore. The signed manifest digest identifies the exact ledger.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "tombstone_count": {
+          "type": "integer"
+        },
+        "hold_count": {
+          "type": "integer"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_restore_sessions(id,organization_id,brand_id,digest,tombstone_count,hold_count,state,created_at) SELECT :restore_id,:organization_id,:brand_id,:digest,:tombstone_count,:hold_count,'importing',:__now WHERE :__user_id=('system'||char(58)||'worker') AND NOT EXISTS (SELECT 1 FROM hiring_deletion_steps WHERE organization_id=:organization_id AND brand_id=:brand_id AND state IN ('running','unknown')) ON CONFLICT(id) DO NOTHING"
+      ]
+    },
+    {
+      "name": "import_retention_tombstone",
+      "description": "Worker imports verified manifest tombstones and creates fresh replay steps; previous completion never skips restored copies.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "integer"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_restore_tombstones(restore_id,request_id,organization_id,brand_id,candidate_id,application_id,created_at) SELECT :restore_id,:request_id,:organization_id,:brand_id,:candidate_id,:application_id,:created_at WHERE :__user_id=('system'||char(58)||'worker') AND EXISTS (SELECT 1 FROM hiring_restore_sessions WHERE id=:restore_id AND organization_id=:organization_id AND brand_id=:brand_id AND state='importing') ON CONFLICT(restore_id,request_id) DO NOTHING",
+        "INSERT INTO hiring_deletion_requests(id,organization_id,brand_id,candidate_id,application_id,actor_user_id,created_at,origin) SELECT :restore_id||':'||request_id,organization_id,brand_id,candidate_id,application_id,('system'||char(58)||'worker'),created_at,'restore' FROM hiring_restore_tombstones WHERE restore_id=:restore_id AND request_id=:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') ON CONFLICT(id) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'d1','pending' FROM hiring_deletion_requests r WHERE id=:restore_id||':'||:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') ON CONFLICT(request_id,store) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'r2','pending' FROM hiring_deletion_requests r WHERE id=:restore_id||':'||:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') ON CONFLICT(request_id,store) DO NOTHING",
+        "INSERT INTO hiring_deletion_steps(request_id,organization_id,brand_id,store,state) SELECT id,organization_id,brand_id,'index','pending' FROM hiring_deletion_requests r WHERE id=:restore_id||':'||:request_id AND organization_id=:organization_id AND brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') ON CONFLICT(request_id,store) DO NOTHING"
+      ]
+    },
+    {
+      "name": "import_retention_hold",
+      "description": "Worker imports verified hold history before replay, preserving separate legacy/store ledgers.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "ledger": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "reason_reference": {
+          "type": "string"
+        },
+        "review_at": {
+          "type": "integer"
+        },
+        "actor_user_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_restore_hold_events(restore_id,ledger,sequence,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at,operation_id) SELECT :restore_id,:ledger,:sequence,:organization_id,:brand_id,:candidate_id,:state,:reason_reference,:review_at,:actor_user_id,:created_at,:operation_id WHERE :__user_id=('system'||char(58)||'worker') AND EXISTS (SELECT 1 FROM hiring_restore_sessions WHERE id=:restore_id AND organization_id=:organization_id AND brand_id=:brand_id AND state='importing') ON CONFLICT(restore_id,ledger,sequence) DO NOTHING"
+      ]
+    },
+    {
+      "name": "seal_retention_restore",
+      "description": "Worker seals complete import before any store claim is permitted.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_restore_sessions SET state='replaying' WHERE id=:restore_id AND organization_id=:organization_id AND brand_id=:brand_id AND digest=:digest AND state='importing' AND :__user_id=('system'||char(58)||'worker') AND tombstone_count=(SELECT COUNT(*) FROM hiring_restore_tombstones WHERE restore_id=:restore_id) AND hold_count=(SELECT COUNT(*) FROM hiring_restore_hold_events WHERE restore_id=:restore_id)"
+      ]
+    },
+    {
+      "name": "get_retention_restore",
+      "description": "Worker reads replay readiness. Caller must keep access/intake/dispatch closed until ready and separately verified.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT z.state,z.digest,z.tombstone_count,z.hold_count,NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones t JOIN hiring_deletion_steps s ON s.request_id=z.id||':'||t.request_id WHERE t.restore_id=z.id AND s.state<>'complete') AS stores_complete FROM hiring_restore_sessions z WHERE z.id=:restore_id AND z.digest=:digest AND z.organization_id=:organization_id AND z.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
+    },
+    {
+      "name": "finish_retention_restore",
+      "description": "Worker records readiness only after all restored store steps verify absence.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_restore_sessions SET state='ready' WHERE id=:restore_id AND digest=:digest AND organization_id=:organization_id AND brand_id=:brand_id AND state='replaying' AND :__user_id=('system'||char(58)||'worker') AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones t LEFT JOIN hiring_deletion_steps s ON s.request_id=:restore_id||':'||t.request_id WHERE t.restore_id=:restore_id GROUP BY t.request_id HAVING COUNT(s.store)<>3 OR SUM(s.state='complete')<>3)"
+      ]
+    },
+    {
+      "name": "worker_get_store_deletion",
+      "description": "Worker reads scoped progress without caller claims.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT s.store,s.state,s.reason_code,s.attempts FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') ORDER BY s.store LIMIT 3"
+    },
+    {
+      "name": "purge_store_d1",
+      "description": "Worker redacts restored core and deletes mutable local content only. Protected archives are reported as blockers; this action cannot declare whole-subject erasure.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "attempt_id": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "UPDATE hiring_candidates SET name='[redacted]',email='[redacted]',phone='[redacted]',linkedin_url='[redacted]',linkedin_profile_url=NULL WHERE id IN (SELECT candidate_id FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker')) AND (name<>'[redacted]' OR email<>'[redacted]' OR phone<>'[redacted]' OR linkedin_url<>'[redacted]' OR linkedin_profile_url IS NOT NULL)",
+        "UPDATE hiring_applications SET source_detail='[redacted]',basis_reference='[redacted]',contact_context='[redacted]',submitted_snapshot_json=NULL WHERE id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker')) AND (source_detail<>'[redacted]' OR basis_reference<>'[redacted]' OR contact_context<>'[redacted]' OR submitted_snapshot_json IS NOT NULL)",
+        "DELETE FROM hiring_notes WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker'))",
+        "DELETE FROM hiring_agent_activity WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker'))",
+        "DELETE FROM hiring_candidate_access_tokens WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker'))",
+        "DELETE FROM hiring_outbox WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND delivery_state='draft' AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker'))",
+        "DELETE FROM hiring_attachments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.store='d1' AND s.attempt_id=:attempt_id AND s.state='running' AND NOT (COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM erasure_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='legacy') ORDER BY sequence DESC LIMIT 1),'released')='active' OR COALESCE((SELECT state FROM (SELECT h.state,h.sequence FROM hiring_store_holds h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id UNION ALL SELECT h.state,h.sequence FROM hiring_restore_hold_events h WHERE h.organization_id=r.organization_id AND h.brand_id=r.brand_id AND h.candidate_id=r.candidate_id AND h.ledger='stores') ORDER BY sequence DESC LIMIT 1),'released')='active') AND :__user_id=('system'||char(58)||'worker')) AND EXISTS(SELECT 1 FROM hiring_deletion_steps WHERE request_id=:request_id AND store='r2' AND state='complete')"
+      ]
+    },
+    {
+      "name": "verify_store_d1",
+      "description": "Worker verifies mutable cleanup and reports protected content conservatively.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT (SELECT COUNT(*) FROM hiring_stage_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_assignment_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_consent_records WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_rights_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interviews WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignment_history WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offers WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_approval_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox_authorizations WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_mail_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_intake_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_application_sources WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_worker_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_scorecard_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_decisions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_acceptances WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_attachments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_notes WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_agent_activity WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker'))) + (SELECT COUNT(*) FROM hiring_candidates c WHERE c.id=r.candidate_id AND c.organization_id=r.organization_id AND c.brand_id=r.brand_id AND (c.name IS NOT '[redacted]' OR c.email IS NOT '[redacted]' OR c.phone IS NOT '[redacted]' OR c.linkedin_url IS NOT '[redacted]' OR c.linkedin_profile_url IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_applications a WHERE a.id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND (a.source_detail IS NOT '[redacted]' OR a.basis_reference IS NOT '[redacted]' OR a.contact_context IS NOT '[redacted]' OR a.submitted_snapshot_json IS NOT NULL OR a.acceptance_evidence IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_rights_requests q WHERE q.candidate_id=r.candidate_id AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) + (SELECT COUNT(*) FROM hiring_candidate_merges q WHERE (q.source_id=r.candidate_id OR q.target_id=r.candidate_id) AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) AS remaining_records FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
+    },
+    {
+      "name": "export_retention_objects",
+      "description": "Owner exports private opaque object inventory for an exact core tombstone; never expose storage paths as audit evidence.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "after_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT f.object_id AS id,f.storage_path FROM hiring_deletion_objects f JOIN hiring_deletion_requests r ON r.id=f.request_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND f.object_id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION SELECT f.id,f.storage_path FROM hiring_attachments f JOIN hiring_applications a ON a.id=f.application_id JOIN erasure_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND f.id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) UNION SELECT f.object_id AS id,f.storage_path FROM hiring_deletion_objects f JOIN hiring_restore_tombstones t ON f.request_id=t.restore_id||':'||t.request_id WHERE t.request_id=:request_id AND t.organization_id=:organization_id AND t.brand_id=:brand_id AND f.object_id>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY id LIMIT 100"
+    },
+    {
+      "name": "import_retention_object",
+      "description": "Worker imports signed private object inventory; exact scope derives from the replay request.",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "object_id": {
+          "type": "string"
+        },
+        "storage_path": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_deletion_objects(request_id,object_id,organization_id,brand_id,storage_path) SELECT r.id,:object_id,r.organization_id,r.brand_id,:storage_path FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.origin='restore' AND :__user_id=('system'||char(58)||'worker') ON CONFLICT(request_id,object_id) DO NOTHING"
+      ]
+    },
+    {
+      "name": "export_replayed_retention_holds",
+      "description": "Owner exports previously restored hold ledgers so subsequent backups preserve them too.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "after_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "operation": "query",
+      "sql": "SELECT restore_id||'/'||ledger||'/'||printf('%020d',sequence) AS cursor,ledger,sequence,operation_id,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at FROM hiring_restore_hold_events WHERE organization_id=:organization_id AND brand_id=:brand_id AND restore_id||'/'||ledger||'/'||printf('%020d',sequence)>COALESCE(:after_id,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY cursor LIMIT 100"
+    },
+    {
+      "name": "release_restored_store_hold",
+      "description": "Owner explicitly releases a restored hold stream after reviewing it. No review-date expiry.",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "restore_id": {
+          "type": "string"
+        },
+        "ledger": {
+          "type": "string"
+        },
+        "reason_reference": {
+          "type": "string"
+        },
+        "review_at": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "operation": "batch",
+      "statements": [
+        "INSERT INTO hiring_restore_hold_events(restore_id,ledger,sequence,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at,operation_id) SELECT :restore_id,:ledger,MAX(COALESCE((SELECT MAX(sequence) FROM hiring_restore_hold_events WHERE ledger=:ledger),0),CASE WHEN :ledger='legacy' THEN COALESCE((SELECT MAX(sequence) FROM erasure_hold_events),0) ELSE COALESCE((SELECT MAX(sequence) FROM hiring_store_holds),0) END)+1,:organization_id,:brand_id,a.candidate_id,'released',:reason_reference,:review_at,:__user_id,:__now,:operation_id FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :ledger IN ('legacy','stores') AND EXISTS(SELECT 1 FROM hiring_restore_hold_events WHERE restore_id=:restore_id AND candidate_id=a.candidate_id AND organization_id=:organization_id AND brand_id=:brand_id AND ledger=:ledger) AND NOT EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.candidate_id=a.candidate_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.state IN ('running','unknown')) AND NOT EXISTS(SELECT 1 FROM hiring_restore_hold_events WHERE operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'retention.restored_hold_released',:__user_id,:operation_id,:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+      ]
     }
   ]
 }

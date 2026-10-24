@@ -279,7 +279,15 @@ test('new action SQL has declared params, authenticated writes, no identity inpu
     const sql=statements.join(' ')
     assert.doesNotMatch(sql,/;/)
     for(const [,p] of sql.matchAll(/:([a-z_][a-z0-9_]*)/gi)) assert.ok(p.startsWith('__') || t.params[p],`${t.name}: ${p}`)
-    assert.ok(!Object.keys(t.params).some(k => k.startsWith('__') || ['worker_user_id','uploader_user_id','actor_user_id','scan_state','storage_path'].includes(k)))
+    // Signed restore imports carry historical attribution and opaque object keys.
+    // They are private worker actions, never a user-supplied authority claim.
+    const restoreImport = ['import_retention_hold','import_retention_object'].includes(t.name)
+    if (restoreImport) {
+      assert.deepEqual(t.callers, ['worker'])
+      assert.match(sql, /:__user_id=\('system'\|\|char\(58\)\|\|'worker'\)/)
+    }
+    const forbidden = ['worker_user_id','uploader_user_id','scan_state',...(restoreImport ? [] : ['actor_user_id','storage_path'])]
+    assert.ok(!Object.keys(t.params).some(k => k.startsWith('__') || forbidden.includes(k)), t.name)
     if(t.operation!=='query') assert.equal(t.requires_auth,true)
     if(t.requires_auth) for(const [index, statement] of statements.entries()) assert.match(statement,/:__user_id/,`${t.name} statement[${index}] must bind the authenticated caller`)
     else { assert.match(sql,/LIMIT (1|25)$/); assert.doesNotMatch(sql,/hiring_candidates|hiring_applications|hiring_attachments/) }
