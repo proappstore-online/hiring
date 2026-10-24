@@ -16,7 +16,9 @@
       "repository_evidence": [
         "marketing/src/site.ts",
         "tests/marketing.test.mjs",
-        "docs/privacy-governance.md"
+        "docs/privacy-governance.md",
+        "docs/public-copy-review.json",
+        "docs/public-copy-review.md"
       ],
       "blocker": {
         "kind": "owner_action",

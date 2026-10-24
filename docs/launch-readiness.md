@@ -122,8 +122,9 @@ tests with mixed IDs and revoked grants; a hidden navigation link is insufficien
 
 Read-only probes on 24 October 2026: app root returned HTTP 200; marketing root
 `https://about-hiring.proappstore.online/` returned HTTP 404. `marketing/src/site.ts`
-still identifies the operator as “The hiring team” with no contact email or
-jurisdiction. Do not invent those values. Marketing publication is separate from
+now explicitly marks the public copy as draft, with operator identity and contact
+unconfirmed. The exact draft and existing brand assets are hashed in
+`docs/public-copy-review.json`; no owner sign-off is recorded. Do not invent those values. Marketing publication is separate from
 the app deploy. Existing GitHub runs for `a72c80d9113246e9954affe9fecf5d4158875d3e`
 passed [CI](https://github.com/proappstore-online/hiring/actions/runs/40065942674),
 [Platform Compliance](https://github.com/proappstore-online/hiring/actions/runs/40065942690)

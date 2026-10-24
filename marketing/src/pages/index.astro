@@ -72,49 +72,8 @@ const heading = 'mb-10 text-4xl font-bold leading-tight tracking-tight sm:text-5
     <a class={button} href={site.appUrl}>{site.ctaLabel}<span aria-hidden="true">↗</span></a>
   </section>
 
-  {/* ── Contact / Enquiry ──────────────────────────────────────── */}
   <section class={`${wrap} py-20`}>
-    <p class={eyebrow}>Get in touch</p>
-    <h2 class={heading}>Contact us</h2>
-
-    {/* success / error banners — the API redirects to #enquiry-<outcome>, shown via CSS :target, no JS needed */}
-    <div id="enquiry-sent" role="status" class="mb-8 hidden rounded-lg bg-green-50 p-6 text-green-800 target:block">
-      <strong>Message sent!</strong> We'll get back to you soon.
-    </div>
-    <div id="enquiry-invalid" role="alert" class="mb-8 hidden rounded-lg bg-red-50 p-6 text-red-800 target:block">
-      <strong>Something looks wrong.</strong> Please check your details and try again.
-    </div>
-    <div id="enquiry-rate-limited" role="alert" class="mb-8 hidden rounded-lg bg-yellow-50 p-6 text-yellow-800 target:block">
-      <strong>Too many messages.</strong> Please wait a while before trying again.
-    </div>
-
-    <form
-      method="POST"
-      action={`https://api.proappstore.online/v1/apps/${site.appId}/enquiries`}
-      class="mx-auto max-w-xl space-y-6"
-    >
-      {/* honeypot – bots fill it, humans don't see it */}
-      <input type="text" name="website" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true" />
-
-      <div>
-        <label for="enq-name" class="mb-1 block text-sm font-semibold">Name</label>
-        <input id="enq-name" name="name" type="text" required maxlength="100"
-          class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-deep" />
-      </div>
-
-      <div>
-        <label for="enq-email" class="mb-1 block text-sm font-semibold">Email</label>
-        <input id="enq-email" name="email" type="email" required maxlength="254"
-          class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-deep" />
-      </div>
-
-      <div>
-        <label for="enq-message" class="mb-1 block text-sm font-semibold">Message</label>
-        <textarea id="enq-message" name="message" required maxlength="5000" rows="5"
-          class="w-full rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent-deep"></textarea>
-      </div>
-
-      <button type="submit" class={button}>Send message</button>
-    </form>
+    <h2 class={heading}>Contact</h2>
+    <p>A verified public contact route is pending owner approval. Do not submit application documents or sensitive personal information through this draft site.</p>
   </section>
 </Layout>

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "copy_version": "2026-10-24-draft-1",
+  "status": "pending",
+  "operator": null,
+  "public_contact": null,
+  "processor_arrangements": null,
+  "reviewer": null,
+  "reviewed_at": null,
+  "approval_evidence": null,
+  "files": {
+    "marketing/public/icon-192.png": "068ce0b22606087c2bf67ee3125a7b18522f2ec95a762f5fe2be104fcacc5384",
+    "marketing/src/layouts/Layout.astro": "8b0aa0a6a2e2630af6b8ac4fe00e3e1034014883acfc59dbbf753c22fa97f5f6",
+    "marketing/src/layouts/Legal.astro": "01f786550ab56fc477d14d988ed4c7135c2ee438bc0bde65c0b3e9fbcc6c61dc",
+    "marketing/src/pages/index.astro": "c26de0eebdd61d6acf1319feb05116bbcff30a99ea683db958b6fb1bc3012679",
+    "marketing/src/pages/privacy.astro": "31a3253368f60bc999a3c667a235bbfcdf4087ad19d0b223a107b4d83548e899",
+    "marketing/src/pages/terms.astro": "f5e686c153f52e421c2f587e73c9c84fb534f6f07fa1540289b34c38a693b20a",
+    "marketing/src/site.ts": "d8cd56a669d3aa37737a02c373fe1ad45d21509450bb5a1953bb3e8583514c76",
+    "marketing/src/styles/global.css": "9d984aeae051cad1b0384a66d78085cf2eee2283673d5c4e47502fa3cee12b63",
+    "web/public/icon-192.png": "068ce0b22606087c2bf67ee3125a7b18522f2ec95a762f5fe2be104fcacc5384",
+    "web/public/icon-512.png": "ebe6d029764e050f2d2229d5516dec4d5b7f488ff18961db0c757687247c10a6",
+    "web/public/og-image.png": "20f9a16fd2b1211bf5192c04f9c08666d0f46af9b93623df1fdbbe984ad70b36"
+  }
+}

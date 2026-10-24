@@ -2,37 +2,18 @@
 import Legal from '../layouts/Legal.astro'
 import { contact, site } from '../site'
 ---
-<Legal title="Terms & Conditions" description={`The terms that apply when you use ${site.name}.`}>
-  <p>These terms apply when you use {site.name} at <a href={site.appUrl}>{site.appUrl}</a>, operated by {site.owner} ("we"). By using {site.name} you agree to them.</p>
-
-  <h2>Your account</h2>
-  <p>You sign in with a GitHub or Google account and are responsible for activity under it. Keep that account secure and tell us if you think it has been misused.</p>
-
-  <h2>Acceptable use</h2>
-  <p>Do not use {site.name} to break the law, infringe others' rights, send spam, upload malware, or try to disrupt or gain unauthorised access to the service or other users' data.</p>
-
-  <h2>Your content</h2>
-  <p>You keep ownership of what you create in {site.name}. You give us permission to store and process it only as needed to run the app for you.</p>
-
-  <h2>Paid access</h2>
-  <p>Some features may require a paid subscription. Any price and billing terms are shown before you subscribe, and you can cancel at any time; access continues until the end of the paid period.</p>
-
-  <h2>Availability and changes</h2>
-  <p>We work to keep {site.name} available and useful, but we may change, suspend or discontinue features. We will give reasonable notice of changes that significantly affect you.</p>
-
-  <h2>Disclaimer and liability</h2>
-  <p>{site.name} is provided "as is" without warranties of any kind. To the extent the law allows, we are not liable for indirect or consequential losses, or for loss of data, arising from your use of the app.</p>
-
-  <h2>Ending your use</h2>
-  <p>You can stop using {site.name} at any time. Your data remains stored until you explicitly ask us to delete your account. We may suspend accounts that break these terms.</p>
-
-  {site.governingLaw && (
-    <>
-      <h2>Governing law</h2>
-      <p>These terms are governed by the laws of {site.governingLaw}.</p>
-    </>
-  )}
-
-  <h2>Contact</h2>
-  <p>Questions about these terms? You can {contact}.</p>
+<Legal title="Terms & Conditions" description={`Draft terms for ${site.name}.`}>
+  <p>These draft terms describe the workspace at <a href={site.appUrl}>{site.appUrl}</a>. Operator identity and the final terms await owner approval. Public candidate intake remains closed.</p>
+  <h2>Accounts and access</h2>
+  <p>Sign in through GitHub or Google and keep that account secure. Organization, brand and assignment permissions determine which recruiting records you may access. An account does not grant access to another organization or brand.</p>
+  <h2>Recruiting responsibilities</h2>
+  <p>Organizations are responsible for accurate role descriptions, compensation and arrangement disclosures, applicable notices and authorized handling of candidate information. Human reviewers remain responsible for hiring decisions and offer approvals. The workspace is not payroll, contract signing or immigration advice.</p>
+  <h2>Acceptable use and content</h2>
+  <p>Submit only information you are authorized to provide. Do not break the law, infringe others’ rights, send spam, upload malware or attempt unauthorized access. Recruiting information must be used only for authorized purposes within the relevant scope.</p>
+  <h2>Service limitations</h2>
+  <p>This is an early recruiting workspace with release verification outstanding. Public intake and communication sending remain closed. A message accepted by a provider is not proof of delivery. No pricing, availability guarantee or subscription cancellation terms are offered on this site.</p>
+  <h2>Stopping use and data requests</h2>
+  <p>Stopping use or withdrawing an application does not automatically delete stored records. Data is retained indefinitely unless an explicit deletion request is processed, subject to recorded holds and retained-store review. For access, correction, export or erasure requests, {contact}.</p>
+  <h2>Version and contact</h2>
+  <p>The version above identifies this draft. A verified public contact route and final operator terms must be supplied by the owner before public intake opens.</p>
 </Legal>

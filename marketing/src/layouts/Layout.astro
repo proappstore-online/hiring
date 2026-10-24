@@ -29,7 +29,7 @@ const links = [
     <meta name="theme-color" content={site.colors.accent} />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content={site.approvalStatus === 'pending' ? 'noindex, nofollow' : 'index, follow'} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/icon-192.png" type="image/png" />
     <meta property="og:type" content="website" />
@@ -52,10 +52,11 @@ const links = [
       <a class="border-b border-current pb-0.5 font-bold no-underline" href={site.appUrl}>{site.ctaLabel}<span aria-hidden="true"> ↗</span></a>
     </header>
     <main id="main">
+      <p role="note" class="mx-auto max-w-3xl px-6 py-4">Draft public information — operator identity, contact details, copy and brand assets await owner approval. Public candidate intake remains closed.</p>
       <slot />
     </main>
     <footer class="mx-auto flex w-[min(1160px,calc(100%-48px))] items-center justify-between gap-6 pt-9 pb-14 text-sm text-muted max-sm:flex-col max-sm:items-start">
-      <span class="font-extrabold text-ink">© {new Date().getFullYear()} {site.owner}</span>
+      <span class="font-extrabold text-ink">© {new Date().getFullYear()} {site.owner || site.name}</span>
       <nav aria-label="Legal and support" class="flex flex-wrap gap-6">
         {links.map((link) => <a class="no-underline hover:underline" href={link.url}>{link.label}</a>)}
       </nav>

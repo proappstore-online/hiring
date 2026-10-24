@@ -13,7 +13,7 @@ export const site = {
   name: 'hiring',
   appUrl: 'https://hiring.proappstore.online/',
   /** Who runs the app; named as the operator on the legal pages and in the footer. */
-  owner: 'The hiring team',
+  owner: '',
   /** Where people can reach you. Leave empty to point them at the app instead. */
   contactEmail: '',
   /** Optional help page or support link shown in the footer. */
@@ -21,7 +21,9 @@ export const site = {
   /** Jurisdiction whose law governs the Terms. Leave empty to omit the clause. */
   governingLaw: '',
   /** Shown on the legal pages; update it whenever you change them. */
-  legalUpdated: '2026-10-21',
+  legalUpdated: '2026-10-24',
+  legalVersion: '2026-10-24-draft-1',
+  approvalStatus: 'pending' as const,
   /** Brand colours, mapped into the Tailwind theme (bg-accent, text-accent-deep, ...). */
   colors: {
     accent: '#d86f4d',
@@ -46,7 +48,7 @@ export const site = {
     { title: 'Record human decisions', body: 'Keep attributed decisions and offer approval history. Provider acceptance is recorded separately from confirmed delivery.' },
   ],
   howItWorks: [
-    { title: 'Open the app', body: 'Go to hiring in any modern browser. It installs like an app on phone and desktop.' },
+    { title: 'Open the app', body: 'Open the recruiting workspace in your browser. Public candidate intake remains closed.' },
     { title: 'Sign in', body: 'Use your GitHub or Google account. No new password to remember.' },
     { title: 'Choose your workspace', body: 'Authorized staff select an organization and brand to review their permitted applications.' },
   ],
@@ -60,4 +62,4 @@ interface Image {
 /** How the legal pages tell people to reach you. */
 export const contact = site.contactEmail
   ? `email ${site.contactEmail}`
-  : `contact us through ${site.appUrl}`
+  : 'use the application’s scoped subject-rights request flow if you have an account; a verified public contact route is pending owner approval'

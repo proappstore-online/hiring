@@ -2,34 +2,18 @@
 import Legal from '../layouts/Legal.astro'
 import { contact, site } from '../site'
 ---
-<Legal title="Privacy Policy" description={`How ${site.name} collects, uses and protects your information.`}>
-  <p>This policy explains what information {site.owner} ("we") collects when you use {site.name} at <a href={site.appUrl}>{site.appUrl}</a>, and how we use it.</p>
-
-  <h2>Information we collect</h2>
-  <ul>
-    <li><strong>Account details.</strong> When you sign in with GitHub or Google, we receive your account ID, display name, avatar and email address from that provider. We never see your password.</li>
-    <li><strong>Content you create.</strong> Whatever you save in {site.name} is stored so the app can show it back to you.</li>
-    <li><strong>Usage data.</strong> We use cookieless analytics that count page views and performance without identifying you or tracking you across sites.</li>
-  </ul>
-
-  <h2>How we use it</h2>
-  <p>We use this information to provide and secure {site.name}, keep you signed in, and understand which features are used so we can improve them. We do not sell your personal information or use it for advertising.</p>
-
-  <h2>Legal basis for processing</h2>
-  <p>We process your information to perform the service you signed up for (contract), because we have a legitimate interest in providing and improving {site.name} (legitimate interest), and—for cookieless analytics—on the basis of our legitimate interest in understanding aggregate usage. We do not process special-category personal data.</p>
-
-  <h2>Where it is stored</h2>
-  <p>{site.name} runs on cloud infrastructure operated by our hosting providers, who process data on our behalf. Payments, where they apply, are handled by a payment processor; we do not store card numbers.</p>
-
-  <h2>How long we keep it</h2>
-  <p>We keep your data for as long as your account exists. We do not automatically delete data after a fixed period. When you ask us to delete your account we delete your content and account details, except where the law requires us to keep them (for example, payment records).</p>
-
-  <h2>Your choices</h2>
-  <p>You can ask to see, correct, export or delete your information at any time: {contact}.</p>
-
-  <h2>Children</h2>
-  <p>{site.name} is not directed at children under 13, and we do not knowingly collect their information.</p>
-
-  <h2>Changes</h2>
-  <p>If we change this policy we will update the date above. Significant changes will be announced in the app.</p>
+<Legal title="Privacy Policy" description={`Draft privacy information for ${site.name}.`}>
+  <p>This draft describes the recruiting workspace at <a href={site.appUrl}>{site.appUrl}</a>. The service operator identity, public contact route and processor arrangements await owner confirmation. This draft does not authorize public candidate intake. Each recruiting organization must identify itself and provide its brand-specific notice before collecting applications.</p>
+  <h2>Information processed</h2>
+  <p>The workspace processes sign-in identifiers and profile details, worker profiles, application answers, recruiting contact details, attachment records, interview assignments, scorecards, human decisions, messages, consent evidence and audit records. Collect only information relevant to the role. Do not submit special-category or sensitive personal information that the role does not require.</p>
+  <h2>Purposes and access</h2>
+  <p>Account and requested service processing supports contract performance. Providing, securing and improving the service supports legitimate interests. Optional communications and talent-pool participation require separate consent. Organization, brand and assignment permissions restrict staff access; applying to one brand does not create a shared cross-brand talent pool. The workspace records human hiring decisions; it does not make autonomous hiring decisions.</p>
+  <h2>Providers and transfers</h2>
+  <p>Sign-in uses GitHub or Google through the hosting platform. Recruiting records use platform database and object storage services; transactional messaging uses a separate mail integration when enabled. The owner must confirm the processor list, processing locations, contractual safeguards and respective organization responsibilities before public intake opens. No payment processing or analytics service is represented as enabled by this draft.</p>
+  <h2>Retention</h2>
+  <p>Recruiting data is retained indefinitely without scheduled expiry or automatic retention purge. Stopping use, rejection or withdrawal does not automatically delete records. Explicit deletion requests remain available; recorded legal holds and other retained stores require review.</p>
+  <h2>Your requests</h2>
+  <p>You may request access/export, correction, withdrawal or erasure. To raise a request, {contact}. Requests are scoped to the relevant brand and require proportionate identity verification. Export downloads are private and expire. Core erasure does not establish complete deletion of attachments, audit records, messages or processor-held data; the responsible owner must record outstanding stores and completion evidence.</p>
+  <h2>Changes and notice versions</h2>
+  <p>Updates receive a new version and date. The responsible organization must present its applicable notice and record notice-version evidence before application submission. This draft is pending owner approval.</p>
 </Legal>
