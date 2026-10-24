@@ -17,9 +17,9 @@ This epic establishes governance; it authorizes no candidate-data transfer or AI
 | #41 candidate transfer | Separately blocked | Explicit transfer contract, recipients/fields, basis/notice and required consent, processor rights propagation and two-brand security evidence. |
 | #49 import | Bounded v1 implemented; [contract](governed-import-webhooks.md) | Source format/schema and organization/brand mapping, provenance, consent basis, duplicates, validation, rollback and tenant-isolated dry run. Test forged tenant and partial failure before activation. |
 | #49 outbound webhooks | Bounded v1 implemented; [contract](governed-import-webhooks.md) | Installation and permitted-brand subscriptions, minimal payloads, signatures, replay prevention, bounded retries, dedupe and audit. Test duplicate delivery, revocation and rights propagation. |
-| #50 AI assistance | Open; assessment only | Human attribution, fairness evaluation and model-data controls; no automated ranking, rejection or offers. No candidate training or external model transfer without separately approved basis and controls. |
-| #50 background checks | Open; assessment only | Jurisdiction/basis, processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. Unresolved risks hold this capability. |
-| #50 agency workflows | Open; assessment only | Jurisdiction/basis, agency roles and processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. No broad agency access. |
+| #50 AI assistance | Assessed, blocked; [assessment](conditional-workflow-assessment.md) | Human attribution, fairness evaluation and model-data controls; no automated ranking, rejection or offers. No candidate training or external model transfer without separately approved basis and controls. |
+| #50 background checks | Assessed, blocked; [assessment](conditional-workflow-assessment.md) | Jurisdiction/basis, processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. Unresolved risks hold this capability. |
+| #50 agency workflows | Assessed, blocked; [assessment](conditional-workflow-assessment.md) | Jurisdiction/basis, agency roles and processor/data-flow map, scoped consent and assignment, notice impact, retention/erasure and revocation. No broad agency access. |
 
 The pending reviews for #39/#40 record missing activation attestations; they do not
 claim those implemented local features were removed or that a runtime switch was added.
@@ -61,8 +61,8 @@ Neither #38 nor #44 closure satisfies a capability's approval or opens intake.
 formats or event families into further issues after schema, mapping, authorization
 and processor review. #50 must produce separate go/no-go assessments and follow-on
 implementation backlogs; it must not build or enable those three capabilities.
-The bounded #49 repository implementation is complete; #50 remains assessment
-work. All production activation reviews remain independent.
+The bounded #49 repository implementation is complete; #50 completes assessment
+only with separate no-go decisions and follow-on backlogs in the [assessment](conditional-workflow-assessment.md). All production activation reviews remain independent.
 
 The #49 SQL actions and server dispatch adapter implement a bounded v1 behind
 empty trusted approval records. No production import runner, webhook dispatcher,

@@ -67,3 +67,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 [Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.
 
 - [Governed import and outbound webhooks](governed-import-webhooks.md) — bounded requisition JSON import and signed lifecycle delivery (#49), activation pending.
+
+[Conditional workflow assessment (#50)](conditional-workflow-assessment.md): separate no-go decisions and follow-on backlogs for AI assistance, background checks and agency workflows; none authorized for implementation or activation.

@@ -47,3 +47,5 @@ Launch requires two distinct brands to run end-to-end without cross-brand access
 Brand-scoped talent pools support separate opt-in, a 180-day participation expiry and candidate withdrawal; see [talent pool](talent-pool.md).
 
 [Calendar and job-board integration assessment (#41)](integration-assessment.md) records capability, privacy, security and commercial review. Implementation is deferred; calendar, listing syndication and separate candidate-transfer approval gates remain closed.
+
+[Conditional workflow assessment (#50)](conditional-workflow-assessment.md): separate no-go decisions and follow-on backlogs for AI assistance, background checks and agency workflows; none authorized for implementation or activation.

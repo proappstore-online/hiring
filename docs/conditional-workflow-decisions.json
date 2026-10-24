@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "issue": 50,
+  "reviewed_on": "2026-10-25",
+  "assessment_only": true,
+  "external_legal_signoff_required": false,
+  "capabilities": [
+    {
+      "id": "ai_assistance",
+      "owner": "Serge",
+      "decision": "no_go",
+      "status": "blocked",
+      "implementation_authorized": false,
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "jurisdiction_legal_basis": {
+        "status": "unresolved",
+        "jurisdiction": null,
+        "basis": null,
+        "requirement": "Record actual controller, candidate/work location, purpose and applicable basis per approved scope before build; existing core-service basis is not approval."
+      },
+      "security_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Current server-side tenant/brand grants, least privilege, assignment, audit, revocation, content-free logs and synthetic two-brand threat tests."
+      },
+      "commercial_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Name supplier/entity, contract revision, processor roles, region/subprocessors, secondary use, quotas, spend cap, support, incident obligations and exit/deletion terms; no purchase approved."
+      },
+      "processor_data_flow": "Assigned recruiter -> minimized requisition text -> approved model processor -> labelled draft -> human editor; no candidate data in initial proposal.",
+      "candidate_notice_impact": "Explain assistance, human responsibility and correction route; candidate-data use requires a separately approved notice and basis.",
+      "launch_holds": [
+        "No selected model, processor contract or model-data guarantees",
+        "No fairness benchmark or human-attribution design approved"
+      ],
+      "follow_on_backlog": [
+        {
+          "id": "ai_assistance-1",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Define requisition-only draft schema and human attribution/version history"
+        },
+        {
+          "id": "ai_assistance-2",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Evaluate accuracy, bias across synthetic demographic proxies, accessibility and human override against approved thresholds"
+        },
+        {
+          "id": "ai_assistance-3",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Prove no training, bounded logs, retention, prompt-injection resistance and model/version change review"
+        },
+        {
+          "id": "ai_assistance-4",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Test cross-brand denial, output escaping, excluded decisions and disabled candidate transfer"
+        }
+      ]
+    },
+    {
+      "id": "background_checks",
+      "owner": "Serge",
+      "decision": "no_go",
+      "status": "blocked",
+      "implementation_authorized": false,
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "jurisdiction_legal_basis": {
+        "status": "unresolved",
+        "jurisdiction": null,
+        "basis": null,
+        "requirement": "Record actual controller, candidate/work location, purpose and applicable basis per approved scope before build; existing core-service basis is not approval."
+      },
+      "security_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Current server-side tenant/brand grants, least privilege, assignment, audit, revocation, content-free logs and synthetic two-brand threat tests."
+      },
+      "commercial_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Name supplier/entity, contract revision, processor roles, region/subprocessors, secondary use, quotas, spend cap, support, incident obligations and exit/deletion terms; no purchase approved."
+      },
+      "processor_data_flow": "Assigned recruiter -> candidate-approved check request -> selected screening processor -> restricted status/result -> assigned authorized reviewer; no raw report in general notes.",
+      "candidate_notice_impact": "Before request disclose check type, purpose, provider/recipients, jurisdiction, fields, retention, rights and refusal/withdrawal path.",
+      "launch_holds": [
+        "No role-specific jurisdiction or permitted check types established",
+        "No screening provider contract, sensitive-data basis or result-retention decision"
+      ],
+      "follow_on_backlog": [
+        {
+          "id": "background_checks-1",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Specify role/jurisdiction eligibility, scoped consent and candidate alternative/review process"
+        },
+        {
+          "id": "background_checks-2",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Design check-specific assignment, separate restricted result store and minimal status schema"
+        },
+        {
+          "id": "background_checks-3",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Implement revocation, cancellation and processor correction/deletion reconciliation before any dispatch"
+        },
+        {
+          "id": "background_checks-4",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Test refusal without automatic rejection, withdrawn queued checks, wrong assignment, stale callbacks and partial erasure"
+        }
+      ]
+    },
+    {
+      "id": "agency_workflows",
+      "owner": "Serge",
+      "decision": "no_go",
+      "status": "blocked",
+      "implementation_authorized": false,
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "jurisdiction_legal_basis": {
+        "status": "unresolved",
+        "jurisdiction": null,
+        "basis": null,
+        "requirement": "Record actual controller, candidate/work location, purpose and applicable basis per approved scope before build; existing core-service basis is not approval."
+      },
+      "security_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Current server-side tenant/brand grants, least privilege, assignment, audit, revocation, content-free logs and synthetic two-brand threat tests."
+      },
+      "commercial_review": {
+        "status": "pending",
+        "evidence": null,
+        "requirement": "Name supplier/entity, contract revision, processor roles, region/subprocessors, secondary use, quotas, spend cap, support, incident obligations and exit/deletion terms; no purchase approved."
+      },
+      "processor_data_flow": "Candidate -> named agency -> approved assigned requisition in one brand -> Hiring reviewer; any return status is separately allowlisted. No agency browsing of candidate inventory.",
+      "candidate_notice_impact": "Name agency and its role, represented requisition/brand, permitted recipients and fields, rights contact, retention and consent withdrawal route.",
+      "launch_holds": [
+        "No named agency or controller/processor responsibility agreement",
+        "No approved candidate representation consent, assignment or downstream retention arrangement"
+      ],
+      "follow_on_backlog": [
+        {
+          "id": "agency_workflows-1",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Define named-agency responsibility agreement, represented-candidate consent and field allowlist"
+        },
+        {
+          "id": "agency_workflows-2",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Design expiring requisition/candidate assignments with no global search, bulk export or cross-brand access"
+        },
+        {
+          "id": "agency_workflows-3",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Implement immediate access revocation and queued-transfer cancellation with downstream rights tracking"
+        },
+        {
+          "id": "agency_workflows-4",
+          "owner": "Serge",
+          "status": "unstarted",
+          "requirement": "Test agency-to-agency isolation, forged assignments, expired consent, revoked sessions and duplicate submissions"
+        }
+      ]
+    }
+  ]
+}

@@ -260,8 +260,10 @@
       "delivery_status": "blocked",
       "production_activation_authorized": false,
       "candidate_transfer_authorized": false,
-      "contract": "docs/next-stage-gates.md",
-      "repository_tests": [],
+      "contract": "docs/conditional-workflow-assessment.md",
+      "repository_tests": [
+        "tests/conditional-workflow-assessment.test.mjs"
+      ],
       "approval": {
         "status": "pending",
         "evidence": null
@@ -293,8 +295,10 @@
       "delivery_status": "blocked",
       "production_activation_authorized": false,
       "candidate_transfer_authorized": false,
-      "contract": "docs/next-stage-gates.md",
-      "repository_tests": [],
+      "contract": "docs/conditional-workflow-assessment.md",
+      "repository_tests": [
+        "tests/conditional-workflow-assessment.test.mjs"
+      ],
       "approval": {
         "status": "pending",
         "evidence": null
@@ -326,8 +330,10 @@
       "delivery_status": "blocked",
       "production_activation_authorized": false,
       "candidate_transfer_authorized": false,
-      "contract": "docs/next-stage-gates.md",
-      "repository_tests": [],
+      "contract": "docs/conditional-workflow-assessment.md",
+      "repository_tests": [
+        "tests/conditional-workflow-assessment.test.mjs"
+      ],
       "approval": {
         "status": "pending",
         "evidence": null
