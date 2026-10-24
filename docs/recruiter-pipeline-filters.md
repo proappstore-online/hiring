@@ -1,10 +1,11 @@
 # Recruiter pipeline filters (#74)
 
 The signed-in application list uses `ApplicationFilters.tsx`, `useFilterParams.ts`
-and the existing registered SQL actions in `mcp.json`. This checkout has no
-standalone recruiter dashboard/data layer; this slice does not import the separate
-UI-2 branch. Integrating that branch should reuse this filter component and SQL
-parameters rather than maintain competing filter implementations.
+and the registered SQL actions in `mcp.json`. The recruiter Overview also shows
+current stage counts from `get_current_pipeline`, using the same effective grants
+and reviewer-assignment boundary. Stage links open this existing filter component;
+counts aggregate the complete authorized scope rather than the capped list.
+Historical funnel analytics remain a separate milestone view.
 
 Position/requisition, stage, source, assigned recruiter and submitted-date bounds
 are applied in SQL before the existing 100 owner/recruiter or 25 reviewer row limit.

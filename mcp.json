@@ -5674,6 +5674,21 @@
         }
       },
       "sql": "SELECT d.id FROM hiring_webhook_deliveries d WHERE d.attempts<5 AND ((d.state='pending' AND d.next_at<=:__now) OR (d.state='sending' AND d.claimed_at<:__now-300000)) AND EXISTS(SELECT 1 FROM hiring_webhook_subscriptions s JOIN hiring_integration_approvals ap ON ap.id=s.approval_id WHERE s.id=d.subscription_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.installation_id=:installation_id AND s.revoked_at IS NULL AND ap.organization_id=s.organization_id AND ap.brand_id=s.brand_id AND ap.installation_id=s.installation_id AND ap.capability='outbound_webhooks' AND ap.contract_version='requisition-import-v1' AND ap.revoked_at IS NULL AND ap.expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=s.organization_id AND p.brand_id=s.brand_id AND p.user_id=s.actor_user_id AND p.role='owner' AND p.requisition_id IS NULL)) AND :__user_id='system'||char(58)||'worker' ORDER BY d.next_at,d.id LIMIT 25"
+    },
+    {
+      "name": "get_current_pipeline",
+      "description": "Current application counts by effective stage, restricted to current grants and reviewer assignments; no candidate content or list limit.",
+      "operation": "query",
+      "sql": "SELECT COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,COUNT(*) AS count FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) GROUP BY COALESCE(a.accepted_stage,a.stage_extension,a.stage)",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
     }
   ]
 }
