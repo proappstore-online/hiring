@@ -35,6 +35,11 @@ Brand-scoped [funnel analytics](funnel-analytics.md) report lifetime milestone c
 
 **Conditional:** job-board syndication, AI assistance, background checks and agency workflows require their own security, fairness and commercial review; legal review is not currently required.
 
+The [next-stage capability gates (#44)](next-stage-gates.md) record independent
+approval and review requirements for talent pools, analytics, integrations, import,
+webhooks and conditional workflows. Conditional activation remains blocked;
+processing-basis/notice review respects the owner's waiver of external legal sign-off.
+
 Hiring is not payroll, HRIS, contract signing, immigration advice or an automated hiring decision maker. No ranking, rejection or offer may be made solely by AI. Candidate data is not a shared cross-brand talent pool by default. Unpaid trials, internships and volunteer roles follow ordinary role publishing without a legal-review gate at this stage.
 
 Launch requires two distinct brands to run end-to-end without cross-brand access, resilient messaging, working subject rights, accessibility/security evidence and approved public legal identity and copy; no separate legal review is required. Until then marketing and legal pages remain placeholders.

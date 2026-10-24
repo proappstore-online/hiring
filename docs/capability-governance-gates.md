@@ -28,6 +28,10 @@ Reviewed 21 October 2026. Accountable owner: **Serge (serge-ivo)**, the product/
 
 ## Closure boundary
 
+[Next-stage capability gates (#44)](next-stage-gates.md) separately track #39,
+#40, #41, #49 and #50. Discovery or epic closure never approves a conditional
+capability, candidate-data transfer or AI decisions.
+
 Issue #1 resolves discovery, policy decisions and ownership tracking. It does not complete the downstream implementation issues or approve public intake, mail sending or launch. The runtime gate remains `closed / public_intake_route_unverified`. Current communications remain drafts; unknown send outcomes must never be automatically retried. Revisit the relevant contract and this register when platform capabilities or owner decisions change; record evidence in the affected issue before opening a release gate.
 
 Issue #3 now implements public job discovery, passkey-gated publication and gated candidate submission/consent. Its attachment reservations remain quarantined. The existing intake gate stays closed until trusted scanning and brand/assignment-scoped byte serving are verified; SQL tests alone do not resolve that gate. See [intake contract](candidate-intake.md).

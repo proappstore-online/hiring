@@ -17,6 +17,11 @@ The [capability and governance gate register](capability-governance-gates.md) id
 
 ## Release scenarios
 
+[Next-stage capability gates (#44)](next-stage-gates.md) track separate approvals
+and security, fairness, commercial and processing-basis reviews for #39/#40/#41/#49/#50.
+Child delivery and production activation remain independent; #49 implementation
+and #50 assessments retain their own backlogs and closed activation gates.
+
 The [launch verification matrix](launch-readiness.md) maps these scenarios and
 the policy/security/accessibility/operations requirements to owners, automated
 checks and missing live evidence. [Release operations](release-operations.md)

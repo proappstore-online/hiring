@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "issue": 44,
+  "owner": "Serge",
+  "reviewed_on": "2026-10-25",
+  "launch_dependency": 38,
+  "external_legal_signoff_required": false,
+  "capabilities": [
+    {
+      "id": "talent_pool",
+      "issue": 39,
+      "owner": "Serge",
+      "delivery_status": "repository_implemented",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/talent-pool.md",
+      "repository_tests": [
+        "tests/talent-pool.test.mjs",
+        "tests/talent-pool-browser.test.mjs"
+      ],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Verify independent unchecked opt-in, brand-only current full-brand grants, 180-day participation expiry, withdrawal and erasure; expiry never purges application records."
+    },
+    {
+      "id": "funnel_analytics",
+      "issue": 40,
+      "owner": "Serge",
+      "delivery_status": "repository_implemented",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/funnel-analytics.md",
+      "repository_tests": [
+        "tests/funnel-analytics.test.mjs",
+        "tests/funnel-analytics-browser.test.mjs"
+      ],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Verify fixed brand aggregates, current full-brand grants, five-candidate pattern suppression and no filters, identifiers, drilldown or export."
+    },
+    {
+      "id": "calendar",
+      "issue": 41,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/integration-assessment.md",
+      "repository_tests": [
+        "tests/integration-assessment.test.mjs"
+      ],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Approve minimized scheduling fields and provider contract; prove scoped OAuth, candidate scheduling choice, revocation and timeout reconciliation."
+    },
+    {
+      "id": "job_listing",
+      "issue": 41,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/integration-assessment.md",
+      "repository_tests": [
+        "tests/integration-assessment.test.mjs"
+      ],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Approve public listing-only fields, partner contract and spend cap; prove update/expiry, no candidate fields and no candidate-transfer authority."
+    },
+    {
+      "id": "job_candidate_transfer",
+      "issue": 41,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/integration-assessment.md",
+      "repository_tests": [
+        "tests/integration-assessment.test.mjs"
+      ],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Separate candidate-transfer contract, recipient/field allowlist, basis/notice/required consent and downstream rights evidence; listing approval is insufficient."
+    },
+    {
+      "id": "import",
+      "issue": 49,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/next-stage-gates.md",
+      "repository_tests": [],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Review source schema, organization/brand mapping, provenance, consent basis, duplicates, validation, isolated dry run and rollback; test forged tenant and partial import failure before build/activation."
+    },
+    {
+      "id": "outbound_webhooks",
+      "issue": 49,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/next-stage-gates.md",
+      "repository_tests": [],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Review installation/brand subscriptions, minimized event schemas, signing and replay protection, bounded retries, duplicate delivery, audit, retention/erasure and revocation before build/activation."
+    },
+    {
+      "id": "ai_assistance",
+      "issue": 50,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/next-stage-gates.md",
+      "repository_tests": [],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Assessment only: record human attribution, fairness evaluation, model-data controls and no training or external model transfer without separately approved basis; no automated ranking, rejection or offers."
+    },
+    {
+      "id": "background_checks",
+      "issue": 50,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/next-stage-gates.md",
+      "repository_tests": [],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Assessment only: record jurisdiction, provider/data-flow map, scoped consent, assignment, candidate notice, retention, erasure and revocation; unresolved risks hold this capability."
+    },
+    {
+      "id": "agency_workflows",
+      "issue": 50,
+      "owner": "Serge",
+      "delivery_status": "blocked",
+      "production_activation_authorized": false,
+      "candidate_transfer_authorized": false,
+      "contract": "docs/next-stage-gates.md",
+      "repository_tests": [],
+      "approval": {
+        "status": "pending",
+        "evidence": null
+      },
+      "reviews": {
+        "legal_basis_and_notice": {
+          "status": "pending",
+          "evidence": null
+        },
+        "fairness": {
+          "status": "pending",
+          "evidence": null
+        },
+        "security": {
+          "status": "pending",
+          "evidence": null
+        },
+        "commercial": {
+          "status": "pending",
+          "evidence": null
+        }
+      },
+      "unblock_criteria": "Assessment only: record agency roles and processor/data-flow map, jurisdiction, scoped consent, assignment, notice, retention, erasure and revocation; no broad agency candidate access."
+    }
+  ]
+}
