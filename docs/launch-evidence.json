@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "revision": null,
+  "environment": null,
+  "checks": [
+    {
+      "id": "identity-policies",
+      "gate": "intake",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#36",
+      "criterion": "Approved operator/contact, processor list and versioned notices are published; no placeholder or unsupported claims.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "intake-files",
+      "gate": "intake",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#18",
+      "criterion": "Trusted scanner checks immutable bytes; only exact candidate/assigned brand staff retrieve clean private files.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "intake-authorization",
+      "gate": "intake",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#16",
+      "criterion": "Live candidate authentication, request throttling, ownership, notice evidence and idempotency pass.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "security",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#37",
+      "criterion": "Threat review covers tenant/assignment, public input, files, MAIL and MCP; critical findings fixed and retested.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "accessibility",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#37",
+      "criterion": "Keyboard, screen reader and 375px journeys pass with no unresolved blocking findings.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "monitoring",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#35",
+      "criterion": "Scoped redacted queue age/error/denial monitoring, alert delivery and safe recovery are exercised.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "incident-response",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#48",
+      "criterion": "Owner and backup contacts confirmed; cross-brand exposure and lost-token tabletops recorded.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "privacy",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#45",
+      "criterion": "Full export/erasure and processor handling verified, with indefinite retention and explicit holds preserved.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "ci-deploy",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#42",
+      "criterion": "CI, Platform Compliance and Deploy to R2 pass for the exact candidate revision.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "recovery",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Isolated D1/object restore, tombstone replay and authorization verification pass before reopening; RPO/RTO recorded.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-1",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Brand A cannot discover or mutate Brand B through UI, URL, export or MCP.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-2",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Same-email applications remain separate across brands; any authorized merge is audited.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-3",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Candidate applies, receives branded receipt, withdraws and requests export/deletion without staff membership.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-4",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Unpaid/internship/volunteer disclosures are accurate with ordinary human publication/offer authorization; no legal-review gate.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-5",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "MAIL timeout/quota preserve business state; unknown attempts reconcile manually without duplicate send; unsupported callbacks not claimed.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-6",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Schema expansion precedes tools/client and failed migration prevents release.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "scenario-7",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Private attachments and any candidate access token deny other candidates and unassigned staff.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "launch-decision",
+      "gate": "launch",
+      "owner": "Serge (serge-ivo)",
+      "issue": "#38",
+      "criterion": "Serge accepts the exact revision, evidence and rollback plan with dated go decision.",
+      "status": "pending",
+      "evidence": null,
+      "reviewer": null,
+      "reviewed_at": null
+    }
+  ]
+}

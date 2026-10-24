@@ -15,6 +15,8 @@ These documents are the implementation baseline. Changes to a decision require a
 | [Hiring MCP contract](hiring-mcp-contract.md) | Safe agent tools, identity, authorization and mutation rules. |
 | [Hiring agent operations](hiring-agent-operations.md) | Live PAGS communications-agent configuration, Gmail mailbox requirement, checks and recovery. |
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
+| [Launch readiness](launch-readiness.md) | Traceable release matrix, evidence checklist, live scenarios and current holds. |
+| [Release operations](release-operations.md) | Draft incident, messaging recovery and isolated restore/rollback procedures. |
 | [Google sign-in](google-sign-in.md) | Live PAS-native auth path and operator configuration. |
 
 This is a plan, not a claim that features exist or legal copy is approved. The runtime configuration remains a scaffold. Capability and policy discovery is recorded in the gate register; its remaining implementation and release gates must be verified before dependent launch work.

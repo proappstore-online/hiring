@@ -33,22 +33,22 @@ export const site = {
     paper: '#ffffff',
     paperDeep: '#f7f7f7',
   },
-  headline: 'Explore hiring.',
-  summary: 'Describe in one or two sentences what hiring does and who it is for.',
+  headline: 'Manage recruiting across distinct brands.',
+  summary: 'Hiring brings scoped application review, interview scorecards and human decision records into one recruiting workspace. Public candidate intake remains closed while release verification is completed.',
   ctaLabel: 'Open hiring',
   /** Optional hero image, e.g. { src: '/assets/hero.png', alt: '...' }. Without one, a brand-colour panel is shown. */
   heroImage: null as Image | null,
   /** Optional product screenshots, shown in a gallery. */
   screenshots: [] as Image[],
   benefits: [
-    { title: 'First benefit', body: 'What someone can do with hiring that matters to them.' },
-    { title: 'Second benefit', body: 'Another concrete outcome, in plain words.' },
-    { title: 'Third benefit', body: 'A third reason to try it.' },
+    { title: 'Work within your brand', body: 'Staff access follows organization, brand and assignment permissions.' },
+    { title: 'Keep review records together', body: 'Track applications, interview assignments and structured scorecards in the recruiting workspace.' },
+    { title: 'Record human decisions', body: 'Keep attributed decisions and offer approval history. Provider acceptance is recorded separately from confirmed delivery.' },
   ],
   howItWorks: [
     { title: 'Open the app', body: 'Go to hiring in any modern browser. It installs like an app on phone and desktop.' },
     { title: 'Sign in', body: 'Use your GitHub or Google account. No new password to remember.' },
-    { title: 'Get started', body: 'Describe the first thing a new user does.' },
+    { title: 'Choose your workspace', body: 'Authorized staff select an organization and brand to review their permitted applications.' },
   ],
 }
 

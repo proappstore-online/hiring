@@ -23,3 +23,10 @@ test('hiring appears only in files pas create substitutes', () => {
     assert.doesNotMatch(readFileSync(file, 'utf8'), /hiring/, file)
   }
 })
+
+test('marketing describes existing recruiting features and discloses the closed intake gate', () => {
+  const config = read('marketing/src/site.ts')
+  assert.doesNotMatch(config, /Describe in one or two sentences|First benefit|Second benefit|Third benefit|Describe the first thing/)
+  assert.match(config, /Public candidate intake remains closed/)
+  assert.match(config, /Provider acceptance is recorded separately from confirmed delivery/)
+})

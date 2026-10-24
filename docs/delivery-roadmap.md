@@ -17,6 +17,14 @@ The [capability and governance gate register](capability-governance-gates.md) id
 
 ## Release scenarios
 
+The [launch verification matrix](launch-readiness.md) maps these scenarios and
+the policy/security/accessibility/operations requirements to owners, automated
+checks and missing live evidence. [Release operations](release-operations.md)
+defines the incident and isolated restore procedures. All evidence starts pending;
+`scripts/launch-readiness.mjs` validates a separately reviewed, revision-bound
+record and does not open intake or authorize deployment. Issue #6 remains held
+until the actual release evidence and owner decision exist.
+
 1. Brand A recruiter cannot discover or mutate Brand B through UI, URL, export or MCP.
 2. Same-email applicants across brands remain separate absent an authorized audited merge.
 3. Candidate applies, receives branded receipt, withdraws and requests export/deletion without a recruiter account.
