@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { read, stageLabel, type Application, type Member, type Requisition, type Workspace } from './api'
-import { FILTER_STAGES, filterQuery, matchesSearch, type FilterKey } from './filter-params'
+import { FILTER_STAGES, ONBOARDING_STATUSES, filterQuery, matchesSearch, type FilterKey } from './filter-params'
 import { useFilterParams } from './useFilterParams'
 import { ErrorState, AccessDenied } from './route-ui'
 import { button, field, panel } from './ui'
@@ -43,9 +43,12 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
       {select('stage', 'Stage', FILTER_STAGES.map(value => [value, stageLabel(value)]))}
       <label>Source<input aria-label="Source" className={field} list="application-sources" value={filters.source} maxLength={100} onChange={event => change('source', event.target.value)} /><datalist id="application-sources">{['linkedin', 'direct', 'manual', 'referral', 'email', 'job_board', 'recruiter_import'].map(value => <option key={value} value={value} />)}</datalist>{filters.source && <button type="button" className="min-h-[44px] underline" onClick={() => change('source', '')}>Clear Source</button>}</label>
       {select('assignee', 'Assigned recruiter', [...new Map([...members.map(row => [row.user_id, row.user_id] as [string, string]), ...rows.map(row => [row.assignee_user_id, row.assignee_user_id] as [string, string])]).entries()])}
+      {select('onboarding', 'Onboarding status', ONBOARDING_STATUSES.map(value => [value, stageLabel(value)]))}
+      {(['invited_from', 'invited_to'] as const).map(name => <label key={name}>{name === 'invited_from' ? 'Invited from (UTC)' : 'Invited through (UTC)'}<input aria-label={name === 'invited_from' ? 'Invited from (UTC)' : 'Invited through (UTC)'} type="date" className={field} value={filters[name]} onChange={event => change(name, event.target.value)} />{filters[name] && <button type="button" className="min-h-[44px] underline" onClick={() => change(name, '')}>Clear {name === 'invited_from' ? 'invitation start date' : 'invitation end date'}</button>}</label>)}
+      <p className="text-sm">Onboarding and invitation dates use recorded internship evidence. Applications without that evidence do not match these filters.</p>
       {(['date_from', 'date_to'] as const).map(name => <label key={name}>{name === 'date_from' ? 'Submitted from (UTC)' : 'Submitted through (UTC)'}<input aria-label={name === 'date_from' ? 'Submitted from (UTC)' : 'Submitted through (UTC)'} type="date" className={field} value={filters[name]} onChange={event => change(name, event.target.value)} />{filters[name] && <button type="button" className="min-h-[44px] underline" onClick={() => change(name, '')}>Clear {name === 'date_from' ? 'start date' : 'end date'}</button>}</label>)}
       <label>Search candidate name{staff ? ' or source detail' : ''}<input aria-label={staff ? 'Search candidate name or source detail' : 'Search candidate name'} type="search" className={field} value={search} onChange={event => setSearch(event.target.value)} />{search && <button type="button" className="min-h-[44px] underline" onClick={() => setSearch('')}>Clear search</button>}</label>
-      {['LinkedIn campaign', 'Onboarding status', 'Invited date range'].map(label => <label key={label}>{label}<select aria-label={label} disabled className={field}><option>Unavailable — {label === 'LinkedIn campaign' ? 'campaign metadata not recorded' : 'onboarding tracking coming soon'}</option></select></label>)}
+      {['LinkedIn campaign'].map(label => <label key={label}>{label}<select aria-label={label} disabled className={field}><option>Unavailable — {label === 'LinkedIn campaign' ? 'campaign metadata not recorded' : 'onboarding tracking coming soon'}</option></select></label>)}
     </div>
     <button type="button" className={button + ' my-3'} onClick={reset}>Clear filters</button>
     <p className="text-sm">Showing up to {staff ? 100 : 25} recent authorized matches. Text search applies to these loaded results and stays on this page only.{!staff && ' Source detail is unavailable for reviewers.'}</p>

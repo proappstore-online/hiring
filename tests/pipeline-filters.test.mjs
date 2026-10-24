@@ -85,3 +85,30 @@ test('query plan uses existing tenant index without new migrations',()=>{
  if(process.env.PRINT_FILTER_PLAN)console.log(name+'\n'+plan.map(r=>r.detail).join('\n'))
  }}finally{db.close()}
 })
+
+test('onboarding uses latest recorded evidence, never application stage, and remains tenant scoped',()=>{
+ const {db,call}=fixture()
+ try {
+ db.prepare("UPDATE hiring_applications SET stage='hired' WHERE id='app-a'").run()
+ for(const name of ['list_applications','gateway_list_applications']) {
+  assert.equal(call(name,'staff-a',{...scope,onboarding:'active'}).length,0)
+  assert.equal(call(name,'staff-a',{...scope,invited_from:1}).length,0)
+ }
+ const insert=db.prepare("INSERT INTO hiring_internship_progress(operation_id,organization_id,brand_id,requisition_id,application_id,status,reason_code,evidence,discord_status,discord_username,actor_user_id,created_at,version) VALUES(?,'org-a','brand-a','req-a','app-a',?,?,'verified','invite_pending','','staff-a',?,?)")
+ insert.run('progress-1','sourced','source_verified',1000,1)
+ for(const name of ['list_applications','gateway_list_applications'])assert.equal(call(name,'staff-a',{...scope,onboarding:'sourced'}).length,1)
+ insert.run('progress-2','exception','manual_exception',2000,2)
+ for(const name of ['list_applications','gateway_list_applications']) {
+  assert.equal(call(name,'staff-a',{...scope,onboarding:'sourced'}).length,0)
+  assert.equal(call(name,'staff-a',{...scope,onboarding:'exception',stage:'hired'}).length,1)
+  assert.equal(call(name,'staff-b',{...scope,onboarding:'exception'}).length,0)
+ }
+ }finally{db.close()}
+})
+test('onboarding and invitation dates round-trip and use inclusive UTC end dates',()=>{
+ const state=filters.parseFilters(new URLSearchParams('onboarding=onboarding_pending&invited_from=2026-10-01&invited_to=2026-10-20'))
+ assert.deepEqual(filters.parseFilters(filters.serializeFilters(new URLSearchParams(),state)),state)
+ assert.equal(filters.filterQuery(state).invited_to,Date.parse('2026-10-21'))
+ assert.equal(filters.parseFilters(new URLSearchParams('onboarding=hired&invited_from=2026-02-30')).onboarding,'')
+ assert.equal(filters.parseFilters(new URLSearchParams('invited_from=2026-02-30')).invited_from,'')
+})

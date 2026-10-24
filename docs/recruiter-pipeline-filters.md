@@ -30,8 +30,11 @@ existing owner/recruiter-authorized provenance field, not contact context, notes
 email bodies or profile URLs. It is not rendered in list results.
 
 LinkedIn campaign is unavailable: profile URLs identify people and are not campaign
-IDs. Onboarding and invited-date controls are disabled pending #73; offered/hired
-are never used as substitutes. Historical interview stages remain filterable.
+IDs. Onboarding status now filters the latest recorded internship progress from #73.
+Invitation date bounds filter the first recorded `invited` event, using UTC days.
+Applications without the corresponding evidence do not match; offered/hired
+are never used as substitutes. These filters use `onboarding`, `invited_from` and
+`invited_to` URL parameters and are applied before row limits. Historical interview stages remain filterable.
 
 Both list actions preserve effective grants and organization/brand scope. Reviewer
 queries additionally enforce assignment. The full list now uses tenant-aware joins
