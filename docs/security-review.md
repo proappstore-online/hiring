@@ -70,3 +70,97 @@ boundary, stale versions, replay and audit rollback. Platform sign-in remains
 required; tokens do not enable anonymous D1 access. Legacy ownership-checked
 candidate actions remain available for compatibility. Database token values must
 be treated as credentials and excluded from logs and exports.
+
+## Issue #37 follow-up review — 24 October 2026
+
+Reviewed baseline `5b5f2fc39572589a294210bcc5ee90f2e7659ca7` and the
+attachment change in this follow-up. Reviewer: automated Codex engineering review.
+This does not supply the missing live or assistive-technology evidence.
+
+### Finding SR-37-01: stale attachment metadata across scope changes — fixed
+
+`Attachments` retained rows when its application, brand or signed-in user changed.
+A delayed list read or refresh after a delete could also populate the new view
+with the old application's filenames and deletion controls. Server authorization
+still checked the original scope, but private metadata must not survive the UI
+boundary. Severity: high confidentiality risk in a reused panel; no server
+permission bypass established. The component now remounts its state on organization,
+brand, application, user or upload-permission changes. Old asynchronous operations
+retain their original scope and cannot update the new panel.
+
+Retest: `tests/security-review-browser.test.mjs` uses the real React component in
+Chromium at 375 × 812, starts a deletion in A, switches to B while its list is
+pending, then completes A's mutation and returns A's refresh after B's list. It
+asserts A disappears immediately and cannot reappear, B remains usable, and a
+principal change clears B's list. API/storage are synthetic: this proves UI state
+isolation, not live storage authorization.
+
+### Finding SR-37-02: ambiguous attachment delete controls — fixed
+
+Repeated buttons all had the accessible name "Delete attachment". Each now
+includes its filename, and the attachment section is a named region. The same
+browser test captures an accessibility-tree snapshot and invokes the named
+control with Enter, asserting the exact brand on the mutation. This is keyboard
+and accessibility-tree evidence; it is **not an actual screen-reader session**.
+
+### Review coverage and residual risk
+
+| Surface | Reviewed control / executable evidence | Residual verification |
+| --- | --- | --- |
+| Public intake | `candidate-intake.test.mjs`: mixed scope, stale snapshots, ownership, throttle, consent, token purpose/expiry/replay and atomic rollback | Live authenticated abuse requests and approved brand notices |
+| Tenant boundaries | `permissions.test.mjs`, `multibrand.test.mjs`, `gateway.test.mjs`: forged sibling IDs, outsiders, revoked grants, assignment, read/write/audit isolation | Two live brand accounts through UI, direct URL and registered MCP |
+| Files | `candidate-intake.test.mjs`: quarantined metadata, candidate ownership, no client scan approval; SR-37-01 retest above | Trusted immutable-byte scanner and exact-brand byte serving remain unresolved under #18; reviewer download stays unavailable |
+| MAIL | `mail.test.mjs`, `mail-callbacks.test.mjs`, `outbox.test.mjs`: approved bounded rendering, changed recipient/template denial, signed callback forgery/replay/mapping, uncertain send reconciliation | Real provider timeout/quota and callback transport exercises under #47 |
+| MCP | `mutation-tools.test.mjs`, `gateway.test.mjs`, `hiring-decisions.test.mjs`: caller identity excluded, version/replay checks, stage/decision separation, human step-up metadata | Live platform principal binding and actual passkey ceremony |
+| Privacy / recovery | `candidate-export.test.mjs`, `erasure.test.mjs`, `retention.test.mjs`: scoped expiry/revocation, audited download, tombstone fences, legal holds and closed restore | Configured processor adapters and isolated restore exercise; no claim that all external copies were erased |
+| Accessible journeys | Routing, candidate-account, interview, scorecard, admin and acceptance browser suites: named controls, keyboard/dialog/error/mobile flows; SR-37-02 above | Actual screen-reader testing of all journeys below |
+
+The earlier export row's "full subject export coverage" gap is superseded by
+#30's asynchronous snapshot/expiry/download-audit implementation and tests.
+Processor coverage and live authorization evidence still require verification.
+The earlier retention/restore gaps now have worker contracts and regression tests
+under #28; configured external stores and a live isolated recovery drill remain
+requirements. Do not infer missing implementation solely from the older table.
+
+### Outstanding acceptance evidence
+
+Issue #37 remains open: neither local tests nor an automated review can provide
+an actual screen-reader run or invent live principal/byte-serving/provider evidence.
+Retain the security/accessibility launch holds in `docs/launch-evidence.json`.
+Do not record `closes #37` until both issue acceptance criteria are supported.
+
+For each remaining run, record the exact release SHA and environment, date,
+reviewer, browser/OS and assistive-technology versions, viewport, account roles,
+steps, expected and actual output/announcements, finding severity, restricted
+artifact location and retest result. Use synthetic candidates; do not put tokens,
+private filenames, identity documents or message bodies in public evidence.
+
+Required screen-reader/keyboard runs:
+
+1. Candidate sign-in, vacancy search/detail, application labels/consent/errors and receipt.
+2. Candidate status, withdrawal confirmation/error/retry and privacy request receipt.
+3. Recruiter list/detail, workspace switch, assignment, scorecard and decision/offer confirmation.
+4. Communication approval/failure/reconciliation and subject export/error/download flows.
+
+Required live abuse run: brand-A staff and a candidate attempt brand-B discovery,
+direct application URLs, attachment retrieval, export and MCP reads/mutations;
+repeat after assignment/grant revocation. Expect no private content and no writes
+or provider sends. Verify with server records, not just a hidden UI control.
+
+Dependency status checked through GitHub during this review: #17, #31 and #34
+are closed; #18, #45, #46 and #47 remain open. Their current scopes matter:
+#45 is correction/provenance/processor rectification, #46 is grant-scoped search
+(including no cross-brand snippets, counts or existence), and #47 is branded
+application receipts with accurate pending/failed delivery state. Those unfinished
+surfaces need review and negative tests when implemented. Closing a dependency
+issue is not itself evidence of its live behavior. Earlier references in this
+document to #45 as generic erasure work or #47 as general provider integration
+reflect older planning; use the current scopes above.
+
+Local validation of this follow-up: `pnpm test` exited 0 with 343 tests passed,
+0 failed, 0 skipped (includes TypeScript and all browser/SQL tests). `pnpm build`
+exited 0; platform compliance passed all hard checks with existing warnings about
+CLAUDE.md length and the copied deploy workflow. `pnpm audit --json` exited 0:
+675 dependencies, zero vulnerabilities at every severity. The launch-register
+validation and `git diff --check` also passed. These results describe the local
+follow-up tree, not a deployed revision or manual accessibility approval.

@@ -86,11 +86,12 @@
         "docs/security-review.md",
         "tests/permissions.test.mjs",
         "tests/multibrand.test.mjs",
-        "pnpm-lock.yaml"
+        "pnpm-lock.yaml",
+        "tests/security-review-browser.test.mjs"
       ],
       "blocker": {
         "kind": "owner_action",
-        "reason": "Automated scope tests, dependency remediation and a repository threat model do not constitute final security sign-off.",
+        "reason": "Attachment scope-state leakage found in the #37 review is fixed and regression-tested. Live principal binding, trusted file serving, provider exercises and final security acceptance remain unverified.",
         "next_action": "Review docs/security-review.md, assess remaining findings and accept/retest against the release SHA under #37."
       },
       "revision": null,
@@ -109,11 +110,12 @@
       "repository_evidence": [
         "tests/admin-browser.test.mjs",
         "tests/candidate-account-browser.test.mjs",
-        "tests/routing-browser.test.mjs"
+        "tests/routing-browser.test.mjs",
+        "tests/security-review-browser.test.mjs"
       ],
       "blocker": {
         "kind": "owner_action",
-        "reason": "Local browser tests exercise keyboard focus, dialogs and mobile layout; screen-reader review and acceptance remain unperformed.",
+        "reason": "Local browser tests exercise keyboard focus, dialogs, mobile layout and attachment accessibility-tree names; an actual screen-reader session covering candidate and staff journeys remains unperformed.",
         "next_action": "Run and record screen-reader and keyboard journeys under #37."
       },
       "revision": null,
