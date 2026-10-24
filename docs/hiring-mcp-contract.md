@@ -188,3 +188,10 @@ an exact committed operation; it rechecks current grants and original actor.
 Changed evidence or scope does not match a retry. Accepted is terminal. Existing
 application reads and stage filters expose accepted; only authorized staff receive
 acceptance evidence. Approval and interview booking never imply acceptance.
+
+Stranded dispatch operators may call `reclaim_stale_communication` with exact scope,
+draft, operation ID, expected attempt timestamp and optional staleness milliseconds.
+This passkey-gated owner/recruiter action moves only a server-verified stale sending
+attempt to unknown, with atomic audit/history and preserved claim. It neither sends
+nor requeues. See [stranded sending recovery](audit-outbox.md#stranded-sending-recovery-4)
+for bounds, replay behavior and subsequent human reconciliation.

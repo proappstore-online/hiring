@@ -207,3 +207,30 @@ This supersedes the earlier statement that all failed attempts are permanently
 terminal: original attempts remain terminal, and recovery uses explicit linked
 drafts. Unknown outcomes still have no automatic retry. No provider setup or live
 mail roundtrip is implied. The MAIL provider and FAS setup gates remain in force.
+
+## Stranded sending recovery (#4)
+
+`reclaim_stale_communication` is an authenticated, passkey-gated operator action
+for current scoped owners/recruiters, including an operator other than the original
+claimant. Supply organization, brand, application and draft IDs, a new operation ID,
+`expected_last_attempt_at` from `list_communication_drafts`, and optional
+`stale_after_ms` (default 900000 milliseconds / 15 minutes). The threshold must be
+a whole number from 1 through 2147483647 milliseconds. Server time determines
+staleness; the exact stored attempt timestamp must match and its age must be at
+least the threshold. Missing timestamps, fresh attempts, stale comparisons,
+unauthorized scopes, used operation IDs and non-sending jobs change nothing.
+
+The action moves only `sending → unknown`, preserving claimant, claim ID, payload,
+idempotency key and attempt count. It never marks a timeout as failed, requeues,
+releases the claim or calls a provider. State, attributed `outbox.completed` audit
+(with redacted summary `outbox.stale_reclaimed`) and unknown status history commit
+atomically. Audit failure rolls the transition back. Existing provider acceptance
+protection still rejects an unknown downgrade when acceptance evidence is recorded.
+Replays and late claimant completions cannot mutate the recovered job.
+
+After recovery, use the existing evidence-backed `reconcile_communication` action.
+Staleness alone is not evidence of non-acceptance: investigate the provider outcome
+before requesting a replacement. The earlier no-expiry rule still prohibits
+automatic claim expiry/resend; this explicit operator path resolves stranded state
+without granting permission to send again. Zero changes is not confirmation of a
+new transition; refresh the scoped draft and status/audit history after uncertainty.

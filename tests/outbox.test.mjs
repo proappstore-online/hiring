@@ -10,10 +10,10 @@ function fixture() {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys=ON')
   for (const migration of migrations.migrations) db.exec(migration.sql)
-  const call = (name, user, values = {}) => {
+  const call = (name, user, values = {}, now = Date.now()) => {
     const tool = action(name)
     const optional = Object.fromEntries(Object.entries(tool.params ?? {}).filter(([, schema]) => schema.optional).map(([key]) => [key, null]))
-    const params = { ...optional, ...values, __user_id: user, __now: Date.now(), __uuid: crypto.randomUUID() }
+    const params = { ...optional, ...values, __user_id: user, __now: now, __uuid: crypto.randomUUID() }
     const statements = tool.statements ?? [tool.sql]
     const result = []
     db.exec('BEGIN')
@@ -178,4 +178,68 @@ test('reconciliation cannot retry recorded acceptance, pending jobs or active cl
   db.close()
  }
  assert.equal(action('reconcile_communication').step_up,true)
+})
+
+
+test('stale sending recovery uses server time, configurable threshold and current scope without stealing claims',()=>{
+ const {db,call}=seeded()
+ call('queue_communication','owner',{...input,operation_id:'queue'})
+ call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
+ const args={...input,operation_id:'reclaim',expected_last_attempt_at:1000000}
+ assert.equal(call('list_communication_drafts','owner',scope)[0].last_attempt_at,1000000)
+ for(const [user,patch] of [['outsider',{}],['owner',{brand_id:'forged'}],['owner',{organization_id:'forged'}],['owner',{application_id:'forged'}],['owner',{expected_last_attempt_at:999999}],['owner',{stale_after_ms:0}],['owner',{stale_after_ms:-1}],['owner',{stale_after_ms:1.5}],['owner',{stale_after_ms:'1'}],['owner',{operation_id:' '}],['owner',{operation_id:'queue'}]]) {
+  assert.ok(call('reclaim_stale_communication',user,{...args,...patch},1900000).every(n=>n===0))
+ }
+ assert.ok(call('reclaim_stale_communication','owner',args,1899999).every(n=>n===0))
+ assert.equal(row(db).delivery_state,'sending')
+ // Another current recruiter can recover an abandoned claim, with no claimant impersonation.
+ call('add_workspace_member','owner',{...scope,member_user_id:'operator',role:'recruiter',operation_id:'operator-grant'})
+ assert.equal(call('reclaim_stale_communication','operator',args,1900000).at(-1),1)
+ assert.equal(row(db).delivery_state,'unknown')
+ assert.equal(row(db).claim_id,'claim');assert.equal(row(db).claimed_by,'owner');assert.equal(row(db).attempt_count,1)
+ const audit=db.prepare("SELECT * FROM hiring_audit_events WHERE id='reclaim'").get()
+ assert.equal(audit.actor_user_id,'operator');assert.equal(audit.created_at,1900000);assert.equal(audit.redacted_summary,'outbox.stale_reclaimed')
+ const event=db.prepare("SELECT * FROM email_status_events WHERE id='reclaim'").get()
+ assert.equal(event.status,'unknown');assert.equal(event.actor,'operator');assert.equal(event.timestamp,1900000)
+ assert.ok(call('reclaim_stale_communication','operator',args,1900001).every(n=>n===0))
+ assert.ok(call('reclaim_stale_communication','operator',{...args,operation_id:'repeat'},1900001).every(n=>n===0))
+ assert.ok(call('complete_communication','owner',{...input,claim_id:'claim',outcome:'sent',operation_id:'late-completion'}).every(n=>n===0))
+ assert.ok(call('claim_communication','operator',{...input,operation_id:'resend'}).every(n=>n===0))
+ call('reconcile_communication','operator',{...input,operation_id:'reconcile',outcome:'not_accepted',evidence:'Provider investigation confirms no acceptance'})
+ assert.ok(call('get_communication_reconciliation','operator',input)[0].replacement_draft_id)
+ assert.equal(action('reclaim_stale_communication').step_up,true)
+ db.close()
+})
+
+test('stale recovery rolls back on audit failure and supports a custom threshold',()=>{
+ const {db,call}=seeded()
+ call('queue_communication','owner',{...input,operation_id:'queue'})
+ call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
+ const args={...input,operation_id:'recover',expected_last_attempt_at:1000000,stale_after_ms:60000}
+ assert.ok(call('reclaim_stale_communication','owner',args,1059999).every(n=>n===0))
+ const before=row(db)
+ db.exec("CREATE TRIGGER fail_reclaim_audit BEFORE INSERT ON hiring_audit_events BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+ assert.throws(()=>call('reclaim_stale_communication','owner',args,1060000),/audit unavailable/)
+ assert.deepEqual(row(db),before)
+ assert.equal(db.prepare("SELECT count(*) n FROM email_status_events WHERE id='recover'").get().n,0)
+ db.exec('DROP TRIGGER fail_reclaim_audit')
+ assert.equal(call('reclaim_stale_communication','owner',args,1060000).at(-1),1)
+ assert.equal(row(db).delivery_state,'unknown')
+ db.close()
+})
+
+test('stale recovery cannot alter non-sending jobs or downgrade recorded provider acceptance',()=>{
+ for(const state of ['draft','pending','sent','failed','unknown','accepted-evidence']) {
+  const {db,call}=seeded()
+  if(state!=='draft')call('queue_communication','owner',{...input,operation_id:'queue'})
+  if(!['draft','pending'].includes(state))call('claim_communication','owner',{...input,operation_id:'claim'},1000000)
+  if(['sent','failed','unknown'].includes(state))call('complete_communication','owner',{...input,operation_id:'complete',claim_id:'claim',outcome:state})
+  if(state==='accepted-evidence')call('record_candidate_email','owner',{...scope,communication_id:'archive',direction:'outbound',from_email:'sender@example.test',to_email:'private@example.com',subject:'Private subject',body:'Secret body',provider_message_id:'provider-1',provider_thread_id:'thread-1',occurred_at:1000001,agent_instance_id:'agent',operation_id:'archive-op',logical_email_id:row(db).logical_email_id})
+  const before=row(db)
+  const args={...input,operation_id:'recover',expected_last_attempt_at:1000000}
+  if(state==='accepted-evidence')assert.throws(()=>call('reclaim_stale_communication','owner',args,1900000),/contradicts recorded provider acceptance/)
+  else assert.ok(call('reclaim_stale_communication','owner',args,1900000).every(n=>n===0))
+  assert.deepEqual(row(db),before)
+  db.close()
+ }
 })
