@@ -101,8 +101,24 @@ to its status route. Uncertain responses retain the same mounted-form identifier
 and require receipt payload reconciliation. Reloading does not persist PII or
 form state; server requisition deduplication remains authoritative.
 
-Candidate withdrawal is explicitly unavailable: no candidate-owned withdrawal
-mutation is registered. Private attachment metadata and quarantine remain visible;
+Candidate withdrawal is available through `withdraw_my_application` (#6/#19).
+It derives ownership from the authenticated worker's exact intake receipt, checks
+the current version and active stage, then commits `withdrawn`, the next version,
+attributed immutable stage history and `application.withdrawn` audit atomically.
+Other candidates, staff acting as staff, mixed brand IDs, stale versions, terminal
+states and duplicate operation IDs cannot change the record. The detail/list
+reads include `version`; no staff notes or contact data are added.
+
+The candidate detail screen requires explicit confirmation. It retains its
+operation ID across a failed attempt and reads the current owned application after
+both successful and uncertain writes; it reports withdrawal only from durable
+`withdrawn` state. Refreshing reads the same state. Withdrawal stops active-stage
+changes, does not erase data, and cannot recall already-started messages.
+Migration `0031_withdrawn_dispatch_guard` prevents new queue/claim transitions for
+withdrawn applications, including jobs queued before withdrawal. Pending jobs
+remain held for operator review; no cancellation or delivery claim is fabricated.
+
+Private attachment metadata and quarantine remain visible;
 neither the status page nor discovery introduces download capability or opens
 intake/scanning gates. Browser tests use mocked auth/actions; they do not verify
 a live OAuth ceremony, scanner, or file-serving integration.

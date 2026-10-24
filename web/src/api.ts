@@ -52,7 +52,7 @@ export const write = async (name: string, params: Params) => {
 }
 
 export type PublicJob = Scope & { requisition_id: string; title: string; brand_name: string; organization_name: string; location: string; description: string; arrangement: string; compensation: string; contact: string; notice_version: string; notice_text: string; version: number }
-export type CandidateApplication = Scope & { application_id: string; requisition_id: string; title: string; brand_name: string; organization_name?: string; created_at: number; stage: Stage }
+export type CandidateApplication = Scope & { application_id: string; requisition_id: string; title: string; brand_name: string; organization_name?: string; created_at: number; stage: Stage; version: number }
 export type IntakeReceipt = Scope & { application_id: string; requisition_id: string; payload_json: string; stage: Stage }
 export type Attachment = { id: string; filename: string; mime_type: string; size_bytes: number; scan_state: 'pending' | 'clean' | 'infected' | 'failed'; uploader_user_id: string }
 export const readPublic = async <T,>(name: string, params: Params = {}) => (await app.actions.callPublic<Rows<T>>(name, params)).rows

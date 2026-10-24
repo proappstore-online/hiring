@@ -63,6 +63,13 @@ Historical `interviewing`, `decision_pending` and `withdrawn` records remain
 readable; this contract provides no outgoing transitions for them or reopening.
 No stage change grants publication, review approval or email sending authority.
 
+Candidate self-service withdrawal is a separate authenticated action from the
+staff transition map: `withdraw_my_application` requires the caller's exact intake
+receipt and current version and permits active stages to become `withdrawn`.
+It writes stage/history/audit atomically, never reopens terminal applications,
+and does not erase records. Migration 0031 blocks new dispatch claims after
+withdrawal; already-started provider attempts still require reconciliation.
+
 `web/src/application-stages.json` is the static source for UI choices and the
 registered SQL predicate. Run `node scripts/application-stages.mjs --write`
 after changing it; contract tests check generated SQL and every allowed/denied edge.

@@ -11,9 +11,10 @@ const { default: react } = await import(require.resolve('@vitejs/plugin-react'))
 const { default: tailwind } = await import(require.resolve('@tailwindcss/vite'))
 const web = new URL('../web/', import.meta.url).pathname
 const fixture = `import React from 'react';import{createRoot}from'react-dom/client';import{AdminTest}from'/src/admin.test.tsx';import'/src/index.css';
-window.calls=[];window.fail=false;window.rows=[];window.conflict=false;window.templates=[];
+window.calls=[];window.fail=false;window.rows=[];window.health=[];window.conflict=false;window.templates=[];
 window.read=async(name,params)=>{window.calls.push({name,params});if(window.fail)throw Error('fixture');switch(name){
 case'list_communication_templates':return window.templates;
+case'get_operational_health':return window.health;
 case'list_vacancy_management':return[{id:'req',title:'Engineer',state:'draft',updated_at:1000}];
 case'get_vacancy_management':return params.requisition_id==='req'?[{id:'req',title:'Engineer',status:'draft',state:'draft',updated_at:1000,can_publish:1}]:[];
 case'get_pd_draft':return[];
@@ -54,10 +55,16 @@ test('Administration UI permissions, confirmations, operational states and mobil
  })
  await t.test('diagnostics empty, retry and content allowlist',async()=>{
  await page.evaluate(()=>window.show('operations'));await expect(page.getByText('No activity recorded in your scope.')).toBeVisible()
- await page.evaluate(()=>{window.fail=true;window.show('operations')});await expect(page.getByRole('alert')).toContainText('Diagnostics could not be loaded')
+ await page.evaluate(()=>{window.fail=true;window.show('operations')});await expect(page.getByRole('alert').filter({hasText:'Diagnostics could not be loaded'})).toBeVisible();await expect(page.getByRole('alert').filter({hasText:'Queue health could not be loaded'})).toBeVisible()
  await page.evaluate(()=>{window.fail=false;window.rows=[{id:'event',agent_instance_id:'agent-1',action:'email_thread_scanned',occurred_at:1000,outcome:'unknown',source_url:'https://example.test/candidate/PRIVATE?email=SECRET',summary:'CANDIDATE CONTENT'}]})
  await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.getByText('Agent: agent-1')).toBeVisible();await expect(page.getByText('Source: Redacted')).toBeVisible()
  assert.doesNotMatch(await page.locator('body').innerText(),/PRIVATE|SECRET|CANDIDATE CONTENT/)
+ })
+ await t.test('queue health exposes truthful counts and keyboard refresh without a resend control',async()=>{
+ await page.evaluate(()=>{window.fail=false;window.health=[{pending_count:2,sending_count:1,failed_count:1,unknown_count:1,oldest_pending_draft_age_ms:120000,oldest_sending_age_ms:60000,denied_or_missing_24h:null,unconfirmed_reads_24h:null,observed_at:1000}];window.show('operations')})
+ const health=page.getByRole('region',{name:'Queue health'});await expect(health).toBeVisible();await expect(health).toContainText('2 minutes');await expect(health).toContainText('Restricted to brand-wide owners/auditors');await expect(health.getByRole('status')).toContainText('Manual reconciliation required')
+ await expect(page.getByRole('button',{name:/resend/i})).toHaveCount(0)
+ await page.evaluate(()=>{window.health=[]});await page.getByRole('button',{name:'Refresh operations',exact:true}).focus();await page.keyboard.press('Enter');await expect(health).toHaveCount(0)
  })
  await t.test('compliance truthful capabilities and owner-only two-step deletion',async()=>{
  await page.evaluate(()=>window.show('compliance'));await expect(page.getByText('Indefinite retention — no automatic purge',{exact:true})).toBeVisible();await expect(page.getByRole('button')).toHaveCount(0)

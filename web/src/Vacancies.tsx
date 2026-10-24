@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigationType, useParams, useSearchParams } from 'react-router-dom'
 import { readPublic, type PublicJob } from './api'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { parsePD, PD_FIELDS, PositionDescription } from './position-description'
@@ -11,6 +11,9 @@ type Vacancy = PublicJob & { pd_json: string | null; pd_version: number | null; 
 export const vacancyLink = (v: Pick<Vacancy, 'requisition_id'>) => vacancyUrl(v.requisition_id)
 export function VacanciesIndexPage() {
   const [query, setQuery] = useSearchParams()
+  const navigationType = useNavigationType()
+  const querySearch = () => new URL(safeBack('/vacancies?' + query, 'vacancies'), 'https://hiring.invalid').searchParams.get('q') ?? ''
+  const [search, setSearch] = useState(querySearch)
   const [rows, setRows] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -20,7 +23,10 @@ export function VacanciesIndexPage() {
     const clean = new URL(safeBack('/vacancies?' + query, 'vacancies'), 'https://hiring.invalid').searchParams
     if (clean.toString() !== query.toString()) setQuery(clean, { replace: true })
   }, [query, setQuery])
-  const search = query.get('q') ?? ''
+  // Text input must update urgently. Router transitions can otherwise restore
+  // an older URL value between keystrokes and lose characters. Our filter
+  // writes use REPLACE; incoming links and browser history restore their query.
+  useEffect(() => { if (navigationType !== 'REPLACE') setSearch(querySearch()) }, [query, navigationType])
   const arrangement = query.get('arrangement') ?? ''
   const brand = query.get('filter_brand') ?? ''
   const brands = [...new Map(rows.map(r => [r.brand_id, { id: r.brand_id, name: r.brand_name }])).values()]
@@ -41,7 +47,7 @@ export function VacanciesIndexPage() {
   })
   function filter(key: string, value: string) { setQuery(old => { const next = new URLSearchParams(old); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true }) }
   return <div className="mx-auto max-w-5xl space-y-5 py-6"><h1 className="text-2xl font-semibold">Vacancies</h1><p>Explore open roles and their position descriptions.</p>
-    <DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={value => filter('q', value)} onBrand={value => filter('filter_brand', value)} />
+    <DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={value => { const next = value.slice(0, 100); setSearch(next); filter('q', next) }} onBrand={value => filter('filter_brand', value)} />
     <label className="block">Working arrangement<select className={field} value={arrangement} onChange={e => filter('arrangement', e.target.value)}><option value="">All arrangements</option>{arrangements.map(a => <option key={a}>{a}</option>)}</select></label>
     <p className="text-sm">Showing published, open vacancies only. Search and filters apply to loaded results.</p>
     {loading && <LoadingState>Loading vacancies…</LoadingState>}{error && <ErrorState retry={() => void load()}>Vacancies could not be loaded.</ErrorState>}

@@ -16,6 +16,7 @@ These documents are the implementation baseline. Changes to a decision require a
 | [Hiring agent operations](hiring-agent-operations.md) | Live PAGS communications-agent configuration, Gmail mailbox requirement, checks and recovery. |
 | [Delivery roadmap](delivery-roadmap.md) | Phases, dependency gates and release acceptance. |
 | [Launch readiness](launch-readiness.md) | Traceable release matrix, evidence checklist, live scenarios and current holds. |
+| [Repository security review](security-review.md) | Threat boundaries, dependency remediation, regression evidence and manual review limits. |
 | [Release operations](release-operations.md) | Draft incident, messaging recovery and isolated restore/rollback procedures. |
 | [Google sign-in](google-sign-in.md) | Live PAS-native auth path and operator configuration. |
 

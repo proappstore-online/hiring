@@ -38,6 +38,19 @@ There is no resend control and no new reconciliation mutation.
 
 ## Operational diagnostics
 
+`get_operational_health` adds a current snapshot of permitted outbox counts and
+ages. Owner/recruiter/auditor access follows exact brand and requisition grants;
+ungranted callers get no row. Failed/unknown counts exclude reconciled attempts.
+Pending age is since draft creation (not queue insertion); sending age uses
+`last_attempt_at`. Missing timestamps return no recorded age, not zero.
+Only brand-wide owners/auditors receive 24-hour recorded privacy denied/missing
+and unconfirmed-read counts; everyone else receives null, not a fabricated zero.
+These cover gateway/export receipts only, not all API failures. There is no
+automatic retention purge or alert transport. Counts contain no IDs or candidate
+content. The operations UI offers keyboard refresh and manual reconciliation
+guidance, never an automatic resend. SQL and browser tests cover scope, restricted
+counters, age, empty/error/retry states and keyboard refresh.
+
 `list_operational_diagnostics` returns at most 100 scoped activity IDs, agent instance
 IDs, action names and timestamps. Owners/recruiters/auditors can read only granted
 requisitions. Candidate content, source URLs, summaries, contact fields and application

@@ -212,3 +212,12 @@ Ordinary `change_application_stage` pipeline updates require current scoped staf
 authority, version/reason checks and audit, without platform passkey step-up.
 Dedicated final-decision, offer approval/dispatch and candidate-acceptance actions
 retain their separate human/passkey gates.
+
+`withdraw_my_application` is authenticated candidate self-service. It requires
+exact organization/brand/application, expected version and an operation ID, and
+binds the caller to the immutable intake receipt rather than a claimed worker or
+staff role. It records an active-to-withdrawn transition, immutable stage history
+and audit in one batch. `get_my_application` and `list_my_job_applications` expose
+the current version for optimistic concurrency and durable retry readback. No
+candidate token, staff membership or passkey ceremony is required for this own-
+account action. It does not fulfill an erasure request or recall in-flight mail.

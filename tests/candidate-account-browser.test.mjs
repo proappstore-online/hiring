@@ -16,9 +16,9 @@ const sdk = `import React from 'react'; export const initPro=()=>({auth:{user:nu
 const fixture = `import React from 'react';import {createRoot} from 'react-dom/client';import App from '/src/App.tsx';import '/src/index.css';
 window.auth={user:{id:'candidate'},loading:false};window.calls=[];window.gate='open';window.receipt=null;window.uncertain=false;window.holdSubmit=false;window.fail=false;
 const jobs=['a','b'].map(brand=>({requisition_id:'job-'+brand,organization_id:'org',brand_id:brand,title:brand==='a'?'Engineer':'Designer',brand_name:'Brand '+brand,organization_name:'Org',location:'Remote',description:'Approved role',arrangement:'Remote',notice_text:'Approved privacy notice',notice_version:'v1',version:1}));
-const applications=jobs.map((j,i)=>({...j,application_id:'app-'+j.brand_id,created_at:1000+i,stage:i?'in_review':'submitted'}));
+const applications=jobs.map((j,i)=>({...j,application_id:'app-'+j.brand_id,created_at:1000+i,stage:i?'in_review':'submitted',version:1}));
 window.read=async(name,p={})=>{window.calls.push({name,p});if(window.fail)throw Error('Unavailable');if(name==='list_public_jobs'||name==='list_vacancies')return jobs;if(name==='get_public_job'||name==='get_vacancy_detail'){if(window.loadHold)await new Promise(resolve=>window.finishLoad=resolve);if(window.unpublished)return [];return jobs.filter(j=>j.requisition_id===p.requisition_id&&(!p.brand_id||j.brand_id===p.brand_id)&&(!p.organization_id||j.organization_id===p.organization_id))};if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='list_my_job_applications')return window.empty?[]:applications;if(name==='get_my_application') {if(window.detailFail)throw Error('not registered');return applications.filter(a=>a.application_id===p.application_id)};if(name==='get_my_application_receipt'||name==='get_my_requisition_receipt'){if(window.receiptFail){window.receiptFail=false;throw Error('Receipt connection lost')}return window.receipt?[window.receipt]:[]};if(name==='list_application_attachments')return [{id:'file',filename:'resume.pdf',size_bytes:100,mime_type:'application/pdf',scan_state:'pending',uploader_user_id:'candidate'}];return []};
-window.write=async(name,p)=>{window.calls.push({name,p});if(name==='submit_job_application'){if(window.rejectSubmission)throw Error(window.rejectSubmission);if(window.holdSubmit)await new Promise(resolve=>window.finishSubmit=resolve);const payload={name:p.candidate_name,email:p.email,phone:p.phone,statement:p.statement,notice_version:p.notice_version,publication_version:p.expected_version,notice_acknowledged:p.notice_acknowledged,talent_pool_consent:p.talent_pool_consent,communications_consent:p.communications_consent,requisition_id:p.requisition_id,brand_id:p.brand_id,organization_id:p.organization_id};window.receipt={...p,application_id:'app-'+p.brand_id,payload_json:JSON.stringify(payload),stage:'submitted'};if(window.uncertain)throw Error('Submission connection lost')}};
+window.write=async(name,p)=>{window.calls.push({name,p});if(name==='withdraw_my_application'){if(window.withdrawFail)throw Error('No write');const a=applications.find(a=>a.application_id===p.application_id);if(a&&a.version===p.expected_version){a.stage='withdrawn';a.version++}if(window.withdrawLost)throw Error('Lost response');return}if(name==='submit_job_application'){if(window.rejectSubmission)throw Error(window.rejectSubmission);if(window.holdSubmit)await new Promise(resolve=>window.finishSubmit=resolve);const payload={name:p.candidate_name,email:p.email,phone:p.phone,statement:p.statement,notice_version:p.notice_version,publication_version:p.expected_version,notice_acknowledged:p.notice_acknowledged,talent_pool_consent:p.talent_pool_consent,communications_consent:p.communications_consent,requisition_id:p.requisition_id,brand_id:p.brand_id,organization_id:p.organization_id};window.receipt={...p,application_id:'app-'+p.brand_id,payload_json:JSON.stringify(payload),stage:'submitted'};if(window.uncertain)throw Error('Submission connection lost')}};
 const root=createRoot(document.getElementById('root'));window.render=()=>root.render(<App/>);window.render();`
 
 test('candidate account and application journey', async t => {
@@ -38,13 +38,17 @@ test('candidate account and application journey', async t => {
    await expect(page.getByRole('link',{name:'Engineer',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'Designer',exact:true})).toBeVisible()
    await page.getByRole('link',{name:'Engineer',exact:true}).focus();await page.keyboard.press('Enter')
    await expect(page).toHaveURL(/my-applications\/app-a$/);await expect(page.getByText('Status: submitted')).toBeVisible()
-   await expect(page.getByText('Withdrawal is not currently available.')).toBeVisible();await expect(page.getByText(/resume.pdf/)).toBeVisible();await expect(page.getByRole('link',{name:/download/i})).toHaveCount(0)
+   await expect(page.getByRole('button',{name:'Withdraw application',exact:true})).toBeVisible();await expect(page.getByText(/resume.pdf/)).toBeVisible();await expect(page.getByRole('link',{name:/download/i})).toHaveCount(0)
    assert.doesNotMatch(await page.locator('main').innerText(),/Designer|recruiter note/)
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
    await go('/my-applications/app-b');await expect(page.getByRole('heading',{name:'Designer',exact:true})).toBeVisible();await expect(page.getByText('Status: in review')).toBeVisible();await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toHaveCount(0)
    await go('/my-applications/another-owner');await expect(page.getByRole('heading',{name:'404 — Not found'})).toBeVisible()
    assert.equal(await page.evaluate(()=>window.calls.some(c=>/gateway|notes|workspaces/.test(c.name))),false)
-   await page.evaluate(()=>window.detailFail=true);await page.getByRole('link',{name:'My Applications',exact:true}).first().click();const listCount=await page.evaluate(()=>window.calls.filter(c=>c.name==='list_my_job_applications').length);await page.getByRole('link',{name:'Engineer',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Your applications could not be loaded.');assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='list_my_job_applications').length),listCount);await page.evaluate(()=>window.detailFail=false)
+   await page.evaluate(()=>window.detailFail=true);await page.getByRole('link',{name:'My Applications',exact:true}).first().click()
+   // Router transitions can finish after click resolves. Measure fallback reads
+   // only after the list's normal fetch has completed and its link is rendered.
+   await expect(page.getByRole('heading',{name:'My Applications',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'Engineer',exact:true})).toBeVisible()
+   const listCount=await page.evaluate(()=>window.calls.filter(c=>c.name==='list_my_job_applications').length);await page.getByRole('link',{name:'Engineer',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Your applications could not be loaded.');assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='list_my_job_applications').length),listCount);await page.evaluate(()=>window.detailFail=false)
   })
   await t.test('public discovery retains filters and uses canonical record URL',async()=>{
    await go('/vacancies');await page.getByRole('combobox',{name:'Brand',exact:true}).selectOption('b')
@@ -132,7 +136,7 @@ test('candidate account and application journey', async t => {
    await page.getByRole('link',{name:'Engineer',exact:true}).click();await expect(page.getByText('Loading vacancy…')).toBeVisible()
    await expect.poll(()=>page.evaluate(()=>typeof window.finishLoad)).toBe('function');await page.evaluate(()=>{window.loadHold=false;window.finishLoad()})
    await expect(page.getByRole('heading',{name:'Engineer',level:1,exact:true})).toBeVisible()
-   await page.getByRole('link',{name:'All vacancies'}).first().click();await page.evaluate(()=>window.fail=true)
+   await page.getByRole('link',{name:'All vacancies'}).first().click();await expect(page.getByRole('link',{name:'Designer',exact:true})).toBeVisible();await page.evaluate(()=>window.fail=true)
    await page.getByRole('link',{name:'Designer',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Vacancy could not be loaded')
    await page.evaluate(()=>window.fail=false);await page.getByRole('button',{name:'Retry',exact:true}).focus();await page.keyboard.press('Enter')
    await expect(page.getByRole('heading',{name:'Designer',level:1,exact:true})).toBeVisible()
@@ -165,6 +169,17 @@ test('candidate account and application journey', async t => {
    await go('/vacancies');await page.evaluate(()=>window.gate='closed');await page.getByRole('link',{name:'Engineer',exact:true}).click()
    await expect(page.getByText('Applications are not open yet. Please check back later.')).toBeVisible();await expect(page.getByRole('link',{name:'Apply for this job'})).toHaveCount(0)
    await page.evaluate(()=>window.fail=true);await page.getByRole('link',{name:'My Applications',exact:true}).first().click();await expect(page.getByRole('alert')).toBeVisible();await page.evaluate(()=>window.fail=false);await page.getByRole('button',{name:'Retry',exact:true}).click();await expect(page.getByRole('link',{name:'Designer',exact:true})).toBeVisible()
+  })
+  await t.test('candidate withdrawal confirms explicitly, retries the same operation and reads back a lost response',async()=>{
+   await go('/my-applications/app-a')
+   const withdraw=page.getByRole('button',{name:'Withdraw application',exact:true})
+   await withdraw.click();await expect(page.getByRole('dialog')).toContainText('does not delete your records');await page.keyboard.press('Escape')
+   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='withdraw_my_application').length),0)
+   await page.evaluate(()=>window.withdrawFail=true);await withdraw.click();await page.getByRole('button',{name:'Confirm withdrawal',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Withdrawal could not be confirmed')
+   await page.evaluate(()=>{window.withdrawFail=false;window.withdrawLost=true});await withdraw.click();await page.getByRole('button',{name:'Confirm withdrawal',exact:true}).focus();await page.keyboard.press('Enter')
+   await expect(page.getByText('Status: withdrawn')).toBeVisible();await expect(withdraw).toHaveCount(0)
+   const calls=await page.evaluate(()=>window.calls.filter(c=>c.name==='withdraw_my_application'));assert.equal(calls.length,2);assert.equal(calls[0].p.operation_id,calls[1].p.operation_id);assert.equal(calls[0].p.expected_version,1);assert.equal(calls[0].p.brand_id,'a')
+   await page.getByRole('link',{name:'My Applications',exact:true}).first().click();await page.getByRole('link',{name:'Designer',exact:true}).click();await expect(page.getByText('Status: in review')).toBeVisible()
   })
  } finally { await browser?.close();await server.close();rmSync(cacheDir,{recursive:true,force:true}) }
 })

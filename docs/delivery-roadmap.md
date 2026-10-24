@@ -22,8 +22,12 @@ the policy/security/accessibility/operations requirements to owners, automated
 checks and missing live evidence. [Release operations](release-operations.md)
 defines the incident and isolated restore procedures. All evidence starts pending;
 `scripts/launch-readiness.mjs` validates a separately reviewed, revision-bound
-record and does not open intake or authorize deployment. Issue #6 remains held
-until the actual release evidence and owner decision exist.
+record and does not open intake or authorize deployment. Under the Pilot's
+24 October clarification, #6 can close for completed repository launch work with
+explicit external/dependency handoffs. Production launch remains held under #38
+until actual release evidence and the owner decision exist; epic closure never
+turns a blocked live check into a pass. The evidence register now classifies each
+blocker and next action instead of leaving every requirement merely pending.
 
 1. Brand A recruiter cannot discover or mutate Brand B through UI, URL, export or MCP.
 2. Same-email applicants across brands remain separate absent an authorized audited merge.

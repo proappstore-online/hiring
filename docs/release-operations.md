@@ -9,11 +9,14 @@ Keep contact details and subject-level evidence in restricted operator storage.
 ## Operational triage and safe recovery
 
 Check `/admin/operations` under the exact organization/brand grant. Its latest
-100 activity records omit candidate content and have unknown outcomes; it is not
-complete queue-age/error monitoring. Inspect authorized application communication
+100 activity records omit candidate content and have unknown outcomes. The
+`get_operational_health` snapshot adds permitted pending/sending counts and ages,
+unreconciled failed/unknown counts and restricted recorded privacy counters.
+It is not a complete API error or retention-failure monitor. Pending draft age is
+since creation; sending age is since last attempt. Inspect application communication
 history and `list_communication_drafts` for delivery state. No alerting service is
-claimed. #35 still needs scoped queue age, error/denial aggregation and exercised
-alert delivery; agree an operational response target before launch.
+claimed. #35 still needs an operator-approved alert transport/recipient and
+exercised alert delivery; agree an operational response target before launch.
 
 | Observation | Operator action | Evidence before continuing |
 | --- | --- | --- |

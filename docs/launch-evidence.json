@@ -9,10 +9,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#36",
       "criterion": "Approved operator/contact, processor list and versioned notices are published; no placeholder or unsupported claims.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "marketing/src/site.ts",
+        "tests/marketing.test.mjs",
+        "docs/privacy-governance.md"
+      ],
+      "blocker": {
+        "kind": "owner_action",
+        "reason": "Verified operator/contact, processor arrangements and approval of copy have not been supplied; marketing publication was unavailable.",
+        "next_action": "Owner supplies approved values/versions and arranges marketing publication under #36."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "intake-files",
@@ -20,10 +32,21 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#18",
       "criterion": "Trusted scanner checks immutable bytes; only exact candidate/assigned brand staff retrieve clean private files.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/candidate-intake.md",
+        "tests/candidate-intake.test.mjs"
+      ],
+      "blocker": {
+        "kind": "implementation_dependency",
+        "reason": "Trusted scanner and exact-brand private byte serving are not implemented or verified. This is a real product/platform dependency, not just missing sign-off.",
+        "next_action": "Complete scanner/object binding and byte-serving integration in #18 once a supported platform route is available."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "intake-authorization",
@@ -31,10 +54,21 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#16",
       "criterion": "Live candidate authentication, request throttling, ownership, notice evidence and idempotency pass.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/candidate-intake.test.mjs",
+        "tests/candidate-account-browser.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Local authorization and intake tests exist; production candidate accounts and configured notices are needed for live evidence.",
+        "next_action": "Run approved synthetic candidate submissions and abuse/retry checks on the deployed environment."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "security",
@@ -42,10 +76,23 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#37",
       "criterion": "Threat review covers tenant/assignment, public input, files, MAIL and MCP; critical findings fixed and retested.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/security-review.md",
+        "tests/permissions.test.mjs",
+        "tests/multibrand.test.mjs",
+        "pnpm-lock.yaml"
+      ],
+      "blocker": {
+        "kind": "owner_action",
+        "reason": "Automated scope tests, dependency remediation and a repository threat model do not constitute final security sign-off.",
+        "next_action": "Review docs/security-review.md, assess remaining findings and accept/retest against the release SHA under #37."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "accessibility",
@@ -53,10 +100,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#37",
       "criterion": "Keyboard, screen reader and 375px journeys pass with no unresolved blocking findings.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/admin-browser.test.mjs",
+        "tests/candidate-account-browser.test.mjs",
+        "tests/routing-browser.test.mjs"
+      ],
+      "blocker": {
+        "kind": "owner_action",
+        "reason": "Local browser tests exercise keyboard focus, dialogs and mobile layout; screen-reader review and acceptance remain unperformed.",
+        "next_action": "Run and record screen-reader and keyboard journeys under #37."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "monitoring",
@@ -64,10 +123,24 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#35",
       "criterion": "Scoped redacted queue age/error/denial monitoring, alert delivery and safe recovery are exercised.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "web/src/OperationalDiagnostics.tsx",
+        "mcp.json",
+        "tests/admin-actions.test.mjs",
+        "tests/admin-browser.test.mjs",
+        "docs/release-operations.md"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Scoped queue health and privacy counters exist; alert transport, recipients and delivery exercise need an operator-supported integration.",
+        "next_action": "Configure an approved monitor using get_operational_health and exercise quota/outage/denial alerts in #35; do not treat on-screen counts as paging."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "incident-response",
@@ -75,10 +148,20 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#48",
       "criterion": "Owner and backup contacts confirmed; cross-brand exposure and lost-token tabletops recorded.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/release-operations.md"
+      ],
+      "blocker": {
+        "kind": "owner_action",
+        "reason": "The incident runbook exists; backup, escalation contacts, notification authority and executed tabletops are unconfirmed.",
+        "next_action": "Owner supplies contacts and records the two exercises in #48."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "privacy",
@@ -86,10 +169,23 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#45",
       "criterion": "Full export/erasure and processor handling verified, with indefinite retention and explicit holds preserved.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/erasure.md",
+        "docs/privacy-operations.md",
+        "tests/erasure.test.mjs",
+        "tests/privacy-operations.test.mjs"
+      ],
+      "blocker": {
+        "kind": "implementation_dependency",
+        "reason": "Core export/redaction exist; remaining immutable stores, file bytes and processor cleanup are incomplete. These are product implementation gaps.",
+        "next_action": "Complete full-store cleanup/export and processor integration in #28-#31/#45; keep partial status until verified."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "ci-deploy",
@@ -97,10 +193,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#42",
       "criterion": "CI, Platform Compliance and Deploy to R2 pass for the exact candidate revision.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/compliance.yml",
+        ".github/workflows/deploy.yml"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Each candidate needs its own completed CI/compliance/deploy runs; earlier revisions cannot approve a later SHA.",
+        "next_action": "Record the passing run URLs for the final tested and deployed candidate."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "recovery",
@@ -108,10 +216,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Isolated D1/object restore, tombstone replay and authorization verification pass before reopening; RPO/RTO recorded.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/release-operations.md",
+        "docs/erasure.md",
+        "tests/erasure.test.mjs"
+      ],
+      "blocker": {
+        "kind": "implementation_dependency",
+        "reason": "There is no verified platform restore route or complete-store tombstone replay integration; a real drill is also required.",
+        "next_action": "Arrange supported isolated D1/R2 restore with platform owner, implement required replay in #28, then execute #38 drill."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-1",
@@ -119,10 +239,23 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Brand A cannot discover or mutate Brand B through UI, URL, export or MCP.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/multibrand.test.mjs",
+        "tests/permissions.test.mjs",
+        "tests/gateway.test.mjs",
+        "tests/privacy-operations.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Local SQL and browser scope tests are not deployed two-brand evidence.",
+        "next_action": "Exercise UI/direct URL/export/MCP denial using approved live two-brand accounts."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-2",
@@ -130,10 +263,21 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Same-email applications remain separate across brands; any authorized merge is audited.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/candidate-intake.test.mjs",
+        "tests/multibrand.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Local same-email separation is covered; deployed two-brand accounts are needed.",
+        "next_action": "Run same-email candidate flow across both live brands and record independent records."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-3",
@@ -141,10 +285,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Candidate applies, receives branded receipt, withdraws and requests export/deletion without staff membership.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/candidate-account-browser.test.mjs",
+        "tests/privacy-operations.test.mjs",
+        "docs/mail-contract.md"
+      ],
+      "blocker": {
+        "kind": "implementation_dependency",
+        "reason": "Live provider receipt and complete rights handling depend on unresolved MAIL/privacy work.",
+        "next_action": "Complete relevant #30/#31/#45/#47 integrations and run the approved candidate lifecycle in #38."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-4",
@@ -152,10 +308,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Unpaid/internship/volunteer disclosures are accurate with ordinary human publication/offer authorization; no legal-review gate.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/vacancies.test.mjs",
+        "tests/hiring-decisions.test.mjs",
+        "tests/acceptance-browser.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Local publication/disposition tests exist; live owner passkey and configured brand notices are needed.",
+        "next_action": "Run accurate arrangement publication and human decision/offer checks on approved live fixtures."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-5",
@@ -163,10 +331,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "MAIL timeout/quota preserve business state; unknown attempts reconcile manually without duplicate send; unsupported callbacks not claimed.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "scripts/outbox.mjs",
+        "tests/outbox.test.mjs",
+        "docs/audit-outbox.md"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Queue/reclaim/reconciliation are tested locally; no provider attempt evidence is fabricated.",
+        "next_action": "Exercise approved test mailbox quota/timeouts and reconcile actual provider outcomes under #47/#38."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-6",
@@ -174,10 +354,22 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Schema expansion precedes tools/client and failed migration prevents release.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        ".github/workflows/deploy.yml",
+        "tests/deploy-json.test.mjs",
+        "tests/migrations.test.mjs"
+      ],
+      "blocker": {
+        "kind": "infrastructure",
+        "reason": "Deploy order and failure handling are covered by repository checks; an isolated failed migration release exercise is still required.",
+        "next_action": "Execute failed migration drill in isolated environment and retain run evidence."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "scenario-7",
@@ -185,10 +377,21 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Private attachments and any candidate access token deny other candidates and unassigned staff.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "tests/candidate-intake.test.mjs",
+        "docs/candidate-intake.md"
+      ],
+      "blocker": {
+        "kind": "implementation_dependency",
+        "reason": "Quarantine/metadata denial tests exist; trusted scanner and scoped byte route are unresolved #18 work.",
+        "next_action": "Complete #18 integration and prove live byte denial for other candidates/unassigned staff."
+      },
+      "revision": null,
+      "environment": null
     },
     {
       "id": "launch-decision",
@@ -196,10 +399,21 @@
       "owner": "Serge (serge-ivo)",
       "issue": "#38",
       "criterion": "Serge accepts the exact revision, evidence and rollback plan with dated go decision.",
-      "status": "pending",
+      "status": "blocked",
       "evidence": null,
       "reviewer": null,
-      "reviewed_at": null
+      "reviewed_at": null,
+      "repository_evidence": [
+        "docs/launch-readiness.md",
+        "docs/release-operations.md"
+      ],
+      "blocker": {
+        "kind": "owner_action",
+        "reason": "No dated production go decision has been supplied. Closing repository work does not authorize launch.",
+        "next_action": "Serge reviews all live evidence and records go/no-go and rollback decision in #38."
+      },
+      "revision": null,
+      "environment": null
     }
   ]
 }

@@ -42,6 +42,51 @@ function fixture({ open = true } = {}) {
 }
 const counts = db => ['hiring_candidates','hiring_applications','hiring_intake_receipts','hiring_consent_records','hiring_stage_events','hiring_audit_events'].map(t => db.prepare(`SELECT count(*) AS n FROM ${t}`).get().n)
 
+test('candidate withdrawal is exact-owner scoped, versioned, atomic and replay safe across brands', () => {
+  const {db,call,submit,advance}=fixture();submit();advance()
+  call('submit_job_application','worker',application(B,'b'))
+  const input={...A,application_id:'application-a',expected_version:1,operation_id:'withdraw-a'}
+  assert.equal(call('get_my_application','worker',{application_id:'application-a'})[0].version,1)
+  for(const [user,p] of [['other-worker',input],['staff-a',input],['owner',input],['worker',{...input,brand_id:'b'}],['worker',{...input,expected_version:2}],['worker',{...input,operation_id:'submit-a'}]]) {
+    assert.deepEqual(call('withdraw_my_application',user,p),[0,0,0])
+  }
+  assert.deepEqual(call('withdraw_my_application','worker',input),[1,1,1])
+  assert.deepEqual(call('withdraw_my_application','worker',input),[0,0,0])
+  assert.deepEqual(call('withdraw_my_application','worker',{...input,expected_version:2,operation_id:'again'}),[0,0,0])
+  const row=call('get_my_application','worker',{application_id:'application-a'})[0]
+  assert.equal(row.stage,'withdrawn');assert.equal(row.version,2)
+  assert.equal(call('get_my_application','worker',{application_id:'application-b'})[0].stage,'submitted')
+  const event=db.prepare("SELECT from_stage,to_stage,actor_user_id,version FROM hiring_stage_events WHERE id='withdraw-a'").get()
+  assert.deepEqual({...event},{from_stage:'submitted',to_stage:'withdrawn',actor_user_id:'worker',version:2})
+  assert.equal(db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE action='application.withdrawn'").get().actor_user_id,'worker')
+  assert.deepEqual(call('change_application_stage','staff-a',{...A,application_id:'application-a',expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'reopen'}),[0,0,0,0])
+  db.close()
+})
+
+test('candidate withdrawal rolls back stage and history when audit fails', () => {
+  const {db,call,submit}=fixture();submit()
+  db.exec("CREATE TRIGGER fail_withdraw_audit BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.withdrawn' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+  assert.throws(()=>call('withdraw_my_application','worker',{...A,application_id:'application-a',expected_version:1,operation_id:'withdraw'}),/audit unavailable/)
+  assert.equal(call('get_my_application','worker',{application_id:'application-a'})[0].stage,'submitted')
+  assert.equal(call('get_my_application','worker',{application_id:'application-a'})[0].version,1)
+  assert.equal(db.prepare("SELECT count(*) n FROM hiring_stage_events WHERE id='withdraw'").get().n,0)
+  db.close()
+})
+
+test('withdrawal prevents new queue or claim attempts without pretending to recall existing provider attempts', () => {
+  const {db,call,submit}=fixture();submit()
+  const p={...A,application_id:'application-a',draft_id:'draft'}
+  call('create_communication_draft','staff-a',{...p,recipient_email:'candidate@example.com',subject:'Hello',body:'Test',operation_id:'draft'})
+  call('queue_communication','staff-a',{...p,operation_id:'queue'})
+  call('withdraw_my_application','worker',{...A,application_id:'application-a',expected_version:1,operation_id:'withdraw'})
+  assert.throws(()=>call('claim_communication','staff-a',{...p,operation_id:'claim'}),/withdrawn application/)
+  assert.equal(db.prepare("SELECT delivery_state FROM hiring_outbox WHERE id='draft'").get().delivery_state,'pending')
+  const q={...p,draft_id:'later'}
+  call('create_communication_draft','staff-a',{...q,recipient_email:'candidate@example.com',subject:'Hello',body:'Test',operation_id:'later'})
+  assert.throws(()=>call('queue_communication','staff-a',{...q,operation_id:'later-queue'}),/withdrawn application/)
+  db.close()
+})
+
 test('publication requires an exact brand owner or recruiter grant', () => {
   const { db, call } = fixture()
   try {

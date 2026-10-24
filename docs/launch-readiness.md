@@ -1,16 +1,48 @@
 # Launch verification and evidence (#6)
 
-Status on 24 October 2026: **HOLD**. Accountable release owner: Serge
+Production status on 24 October 2026: **HOLD**. Accountable release owner: Serge
 (`serge-ivo`, as recorded in the capability/governance register). No owner
 approval, live E2E pass or restore drill is asserted by this document.
 External legal review remains waived by #52; owner approval of public identity,
 contact, processor arrangements and notice versions is still required.
 
+## Issue #6 repository completion and production approval
+
+The Pilot's clarified instruction on 24 October permits closing #6 when the
+repository launch work is complete and external actions are explicitly handed
+off. Issue closure is therefore a repository delivery decision, **not a production
+go decision**. Do not check off live sign-off/scenario evidence or open intake
+because GitHub closes the epic. #38 continues to own the production launch gate.
+
+Issue #6 has no comments and exactly two original acceptance checkboxes:
+
+| Original criterion | Repository work delivered | Genuine unresolved acceptance / handoff |
+| --- | --- | --- |
+| Legal, security, accessibility and recovery evidence is signed off | Evidence register/validator, policy mapping, threat review, dependency patches, keyboard/mobile regression checks, incident and restore/rollback procedures | Owner identity/contact/copy approval, security and screen-reader acceptance, backup/contacts/tabletops, supported restore environment and an executed drill (#36/#37/#38/#48). External legal review remains waived; no approval is fabricated. |
+| Live two-brand end-to-end scenarios pass | All seven executable verification protocols mapped to existing SQL/browser tests; scoped operational counts, authorization/recovery regressions and failure states | Actual deployed two-brand sessions, passkey/provider/scanner evidence and protected result artifacts (#18/#38/#47). Local fixtures are not live evidence. |
+
+The actual code gaps found in this follow-up were missing candidate withdrawal
+and queue-health aggregates, an unactionable all-pending evidence template,
+insufficient artifact-to-revision binding, vulnerable dependencies and a deferred
+vacancy-search input bug exposed by the router upgrade. These are addressed here. Final human
+review and infrastructure execution cannot be implemented as a passing fixture.
+
+Pre-existing product gaps remain genuine implementation work: trusted scanner and
+brand-scoped byte serving (#18), complete-store/processor export and erasure
+(#28–#31/#45), complete restore replay (#28/#38), and configured alert delivery
+(#35). They are not relabeled as owner sign-off and are not claimed complete by
+this epic's closure. Their existing issues retain ownership; they continue to
+block affected production scenarios. Supported scanner/storage/processor/restore
+interfaces must be established before their integrations can be safely completed.
+This launch-readiness delivery does not invent those platform capabilities.
+
 ## Evidence matrix (#54)
 
 [launch-evidence.json](launch-evidence.json) is the checklist: each entry names
 the accountable owner, source issue, intake/launch gate and exact pass criterion.
-All entries are pending until supported by reviewed artifacts. Intake checks
+Every unresolved entry classifies its blocker as `owner_action`, `infrastructure`
+or `implementation_dependency`, records why it is blocked and the next action,
+and links actual repository evidence. No blocked entry counts as a release pass. Intake checks
 also block launch. Passing local tests cannot replace live or manual evidence.
 Conditional integrations (AI, background checks, agencies, job boards) remain
 disabled and require their own reviews; they are not approved by this checklist.
@@ -24,7 +56,7 @@ disabled and require their own reviews; they are not approved by this checklist.
 | Human decisions and MAIL recovery | `hiring-decisions`, `outbox`, `email-history`, `email-browser` tests | #35/#47 actual provider scope, quota/timeout, stale sending and reconciliation, verified no duplicate; no unsupported callback claim |
 | Subject rights, export, erasure and holds | `privacy-operations`, `erasure`, browser tests | #28–#31/#45 all stores/processors accounted for, confidential exclusions, access audit/expiry, tombstones reapplied on restore; partial core erasure is insufficient |
 | Security and accessibility | Authorization tests and browser tests in CI | #37 threat review, critical finding retests, keyboard and screen-reader results for all public/staff journeys at 375px |
-| Monitoring and incident response | Scoped diagnostics and outbox tests | #35/#48 alert delivery, incident backup, escalation contacts and two tabletop records |
+| Monitoring and incident response | Scoped diagnostics, queue counts/ages, restricted 24-hour denial/unconfirmed-read counts, outbox and admin browser tests | #35/#48 alert delivery, incident backup, escalation contacts and two tabletop records |
 | Deployment safety | CI typecheck/full test suite; Platform Compliance build/no tracking/secrets/metadata/bundle checks; deploy migration-before-tools-before-client | #42 exact candidate SHA and passing run URLs for all three workflows; failed migration release evidence |
 | Live scenarios and recovery | Local tests cover portions of roadmap scenarios | #38 all seven live scenarios, isolated D1/R2 drill, RPO/RTO, tombstone replay and owner launch/rollback decision |
 
@@ -34,11 +66,17 @@ auth-gated skipped tests and HTTP 200 do not constitute an E2E pass. No workflow
 changes are made by this matrix. The release evidence CLI is an operator check,
 not a deployment interlock or an intake gate mutation.
 
+Run `node scripts/launch-readiness.mjs --check-register` to validate repository
+handoff completeness (owners, criteria, repository references and actionable
+blockers). This command can pass while production remains held. Its output never
+approves launch. Full-release evidence checking remains a separate, strict path.
+
 ## Recording and validating a release
 
 Copy `docs/launch-evidence.json` to a restricted release record outside the
 repository. Set `revision` to the full tested/deployed commit SHA and `environment`
-to its HTTPS origin. For every check record `status: pass`, reviewer identity,
+to its HTTPS origin. For every check record the same `revision` and `environment`,
+`status: pass`, reviewer identity,
 review timestamp with timezone and an HTTPS artifact reference. Artifacts must
 identify the same SHA/environment, actors, expected/actual results and findings.
 Use protected evidence storage; never commit tokens, candidate data or screenshots
@@ -50,7 +88,8 @@ It exits nonzero for incomplete, duplicate, malformed or mismatched attestations
 It checks record completeness only; reviewers must verify artifact authenticity,
 environment/revision binding, approval authority and unresolved findings. A new
 code revision requires a new evidence review. Store the dated final decision and
-artifact references in #38; only then can #6 be closed. This avoids committing a
+artifact references in #38; only then can production launch be approved. Closing
+#6 follows the repository completion rule above. This avoids committing a
 self-referential release SHA into the very commit it identifies.
 
 ## Live scenario protocol (#38)
@@ -92,7 +131,7 @@ and [Deploy](https://github.com/proappstore-online/hiring/actions/runs/400659426
 These are historical evidence, not approval of a subsequent revision.
 
 Remaining dependencies: #18 scanner/scoped bytes; #28–#31/#45 complete rights
-and restore handling; #35 monitoring/alert delivery; #36 approved/public copy;
+and restore handling; #35 alert configuration/delivery; #36 approved/public copy;
 #37 manual security/accessibility review; #47 provider evidence; #48 backup,
 contacts and exercises; #38 live scenarios/restore/owner decision. The #54 matrix
 is now documented, but other checks remain pending. See
