@@ -52,3 +52,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 
 - [Operational monitoring and replay](operational-monitoring.md): scoped failure
   inspection, content-free alerts, trusted callback observation and safe recovery.
+
+- [Verified candidate corrections](privacy-operations.md#verified-corrections-and-processor-rectification-45): scoped current-field execution, immutable provenance, MAIL/processor retries and completion gating.

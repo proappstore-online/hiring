@@ -30,8 +30,8 @@ reporting a change as committed.
 The Compliance screen provides receipt, verification, processing, denial and reviewed
 access/export fulfillment controls. Ownership starts with the current owner; the
 registered action can assign another current brand-wide owner. Changing role or
-workspace clears the UI state. Candidate intake is described below. Evidence upload, rectification execution
-and legally complete erasure remain separate execution work.
+workspace clears the UI state. Candidate intake is described below. Evidence upload and legally complete erasure remain separate execution work.
+Verified rectification execution is described in the #45 section below.
 
 ## Private asynchronous subject export (#30)
 
@@ -166,10 +166,87 @@ Identity review is proportionate and human-operated:
 `attest_candidate_rights_completion` adds owner/passkey-gated human completion
 attestation for correction, withdrawal and deletion after verified processing.
 It requires decision/execution evidence and preserves the version/audit guards.
+Correction additionally requires the execution and processor completion gate below.
 Review all applicable stores and processor outcomes first; core erasure, a held
 request or a pending processor step is not complete deletion. This action records
-reviewed completion and does not execute correction, withdrawal or erasure.
+reviewed completion and does not itself execute correction, withdrawal or erasure.
 Access/export retain human completion attestation after the asynchronous export and exclusion review.
 The candidate sees completion status, not private evidence or identity documents.
 Indefinite retention and legal holds remain unchanged. Additional subject-access disclosure review
 and erasure execution continue under privacy operations and erasure contracts (#31).
+
+## Verified corrections and processor rectification (#45)
+
+Migration `0040_candidate_corrections` adds the execution path after identity review.
+In Compliance, select the exact correction request, record its owner and deadline,
+then advance it to verified `processing`. Load correction context to capture the
+application version, review the field/value, and approve with a passkey and opaque
+reason reference. Brand-wide owners alone can execute or deny. Denial uses the
+existing versioned rights decision action and private reason reference. Communicate
+the actual reason through the verified private channel. Candidate status exposes
+only the safe lifecycle outcome and deadline, never processor or identity evidence.
+
+`apply_candidate_correction` requires both current rights and application versions,
+current owner grants, verified identity, exact scope and no erasure/deletion fence.
+One field is corrected per request: current candidate `name`, `email`, `phone`, or
+application `contact_context`. Empty phone/context clears an incorrect value.
+A contact change is refused if the candidate is attached to another application;
+review and separate the records through the approved scoped process first. This
+conservative restriction prevents a correction from changing another application's
+contact data. Multiple fields require separately reviewed correction requests.
+Merged candidates are refused. A pending same-field correction must finish all
+processor steps before a newer correction can be approved, preventing an older
+retry from overwriting a newer value. Once execution has committed, the request
+stays processing until propagation and review finish; it cannot be denied as
+though no correction had occurred. Submitted snapshots, original intake evidence,
+attachments, archives, notes, stage history and decisions are never rewritten.
+A correction is a current-data amendment, not a retraction of historical evidence.
+
+The previous/current value, field, private reason reference, actor, request and
+versions are immutable private provenance. Local change, version increment,
+processor targets and content-free business audit commit in one transaction.
+Retries of an operation/request do not change data again. Read
+`list_candidate_rectifications` to reconcile a lost response. No correction value
+is returned by that status action or written into business audit summaries.
+These provenance records are protected retained content; explicit erasure review
+must account for them alongside other protected records, with no automatic purge.
+
+Before approval, register every installed processor using owner/passkey-gated
+`register_rectification_processor` with exact organization/brand/processor ID.
+The inventory is append-only. MAIL is always queued even when no adapter is
+available. Approval snapshots the installed processor inventory atomically; a new
+installation must import corrected current data and cannot rely on historical
+snapshots. An omitted processor is an operator configuration error, not an
+implicitly completed propagation step.
+
+Private operators can call `propagateCandidateCorrection` from
+`scripts/rectification.mjs` with owner-bound registered actions, exact scope
+(`organization_id`, `brand_id`, `application_id`, `request_id`) and adapters keyed by
+registered processor ID (including `MAIL`). Each adapter implements
+`rectify(target)` and `verify(target)`. The target contains only the scoped IDs,
+field, new value and a stable correction/processor idempotency key. Adapters must
+enforce that key across retries/concurrency and verify authoritative provider state;
+verification returns `{confirmed:true, reference:'opaque-private-receipt'}` only
+when this exact correction is applied. Configure private provider credentials in
+the operator service. Never run adapters or expose credentials in browser code.
+There is no automatic scheduler or preconfigured live provider adapter in this repo.
+
+Missing adapters remain failed; provider uncertainty remains unknown; verified
+success alone records complete. Re-running the coordinator retries failed/unknown
+steps with the same provider key and skips completed processors. If evidence
+persistence fails, reload status before retrying. Every outcome append checks its
+processor version and current owner grants and commits with audit atomically.
+Payload reads also recheck current processing state and erasure fences. The UI
+shows each pending/failed/unknown step. For providers operated manually, use the
+same exact-scoped private correction and record the independently verified outcome
+with a passkey and opaque evidence reference in Compliance. A checkbox is not
+provider verification; owners are responsible for reviewing the actual receipt.
+
+Correction fulfillment now requires local execution and complete evidence for
+**all** queued processors. A local correction with a failed MAIL/processor cannot
+be attested fulfilled. Complete processor delivery does not itself close the rights
+request: the owner reviews it and explicitly attests fulfillment with the current
+rights version and decision reference. Other rights types keep their existing
+execution/attestation boundaries. Tests cover cross-brand denial, revoked grants,
+stale versions, preserved evidence, shared-candidate refusal, audit rollback,
+processor uncertainty, retry idempotency and the partial-failure completion gate.

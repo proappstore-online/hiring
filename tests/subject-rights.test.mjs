@@ -87,6 +87,8 @@ test('owner adopts exact receipt; verification and completion history remain pri
   const completion={...processing,operation_id:'complete',expected_version:3,status:'fulfilled',decision_reference:'private-execution-evidence'}
   assert.deepEqual(call('attest_candidate_rights_completion','worker',completion),[0])
   assert.deepEqual(call('attest_candidate_rights_completion','owner',{...completion,decision_reference:null}),[0])
+  assert.deepEqual(call('apply_candidate_correction','owner',{...p,operation_id:'correction-one',field:'phone',new_value:'123',reason_reference:'verified-correction-case',expected_version:3,expected_application_version:1}),[1])
+  assert.deepEqual(call('record_candidate_rectification','owner',{...p,processor_id:'MAIL',operation_id:'mail-rectification',expected_version:0,state:'complete',evidence_reference:'private-provider-proof'}),[1])
   db.exec("CREATE TRIGGER fail_completion BEFORE INSERT ON hiring_audit_events WHEN NEW.action='privacy.rights.fulfilled' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
   assert.throws(()=>call('attest_candidate_rights_completion','owner',completion),/audit unavailable/)
   assert.equal(call('list_my_rights_requests','worker',p)[0].status,'processing')
@@ -97,6 +99,6 @@ test('owner adopts exact receipt; verification and completion history remain pri
   assert.equal(row.status,'fulfilled');assert.equal(row.deadline_at,event.deadline_at);assert.equal(row.owner_user_id,'owner')
   assert.doesNotMatch(JSON.stringify(row),/private-/)
   assert.equal(call('list_candidate_rights_events','owner',p).length,4)
-  assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE request_id='rights-one'").get().n,5)
+  assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE request_id='rights-one'").get().n,7)
   db.close()
 })

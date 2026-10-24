@@ -3195,7 +3195,7 @@
           "optional": true
         }
       },
-      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND (:status<>'fulfilled' OR :request_type IN ('access','export'))",
+      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND (:status<>'fulfilled' OR :request_type IN ('access','export')) AND NOT (:request_type='correction' AND :status='denied_with_reason' AND EXISTS (SELECT 1 FROM hiring_corrections c WHERE c.request_id=:request_id))",
       "step_up": true
     },
     {
@@ -4498,7 +4498,7 @@
     },
     {
       "name": "attest_candidate_rights_completion",
-      "description": "Owner/passkey human attestation of reviewed correction, withdrawal or deletion completion. Requires verified processing and opaque evidence of all applicable execution/processor steps. Does not execute deletion or correction.",
+      "description": "Owner/passkey reviewed completion. Correction requires local execution and verified completion of every queued processor. Withdrawal/deletion remain external execution attestations.",
       "operation": "execute",
       "requires_auth": true,
       "params": {
@@ -4541,7 +4541,7 @@
           "optional": true
         }
       },
-      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND :status='fulfilled' AND :request_type IN ('correction','withdrawal','deletion')",
+      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND :status='fulfilled' AND :request_type IN ('correction','withdrawal','deletion') AND NOT EXISTS (SELECT 1 FROM hiring_corrections c JOIN hiring_rectification_targets t ON t.correction_id=c.id WHERE c.request_id=:request_id AND NOT EXISTS (SELECT 1 FROM hiring_rectification_attempts x WHERE x.correction_id=t.correction_id AND x.processor_id=t.processor_id AND x.state='complete')) AND (:request_type<>'correction' OR EXISTS (SELECT 1 FROM hiring_corrections c WHERE c.request_id=:request_id))",
       "step_up": true
     },
     {
@@ -5003,6 +5003,147 @@
         }
       },
       "sql": "SELECT kind,job_id,state,reason_code,attempts,created_at FROM (\nSELECT 'mail' kind,o.id job_id,o.delivery_state state,CASE WHEN o.delivery_reason IN ('quota','unavailable','forbidden','provider_rejected','approval_unavailable','approval_required','scope_mismatch','invalid_payload','reconcile_required') THEN o.delivery_reason ELSE 'unclassified' END reason_code,o.attempt_count attempts,o.created_at FROM hiring_outbox o WHERE o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.delivery_state IN ('failed','unknown','sending') AND NOT EXISTS(SELECT 1 FROM hiring_mail_reconciliations r WHERE r.original_draft_id=o.id)\nUNION ALL SELECT 'retention',s.request_id||'/'||s.store,s.state,s.reason_code,s.attempts,r.created_at FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id AND r.organization_id=s.organization_id AND r.brand_id=s.brand_id WHERE s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.state IN ('failed','blocked','unknown','running')\n) WHERE kind||':'||job_id>COALESCE(:after_key,'') AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','auditor') AND p.requisition_id IS NULL) ORDER BY kind||':'||job_id LIMIT 100"
+    },
+    {
+      "name": "register_rectification_processor",
+      "description": "Owner/passkey: register an installed processor before approving corrections. Append-only inventory; MAIL is always required.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "processor_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_rectification_processors SELECT :organization_id,:brand_id,:processor_id,:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:processor_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_rectification_processors WHERE organization_id=:organization_id AND brand_id=:brand_id AND processor_id=:processor_id)",
+      "step_up": true
+    },
+    {
+      "name": "apply_candidate_correction",
+      "description": "Approve one eligible field on an exact verified processing request. Immutable provenance; shared candidate contact corrections require separate scoped review. MAIL and installed processors are queued atomically.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "new_value": {
+          "type": "string"
+        },
+        "reason_reference": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "expected_application_version": {
+          "type": "integer"
+        }
+      },
+      "sql": "INSERT INTO hiring_corrections(id,organization_id,brand_id,application_id,candidate_id,request_id,rights_version,application_version,field,previous_value,new_value,reason_reference,actor_user_id,created_at)\nSELECT :operation_id,a.organization_id,a.brand_id,a.id,c.id,e.request_id,e.version,a.version,:field,CASE :field WHEN 'name' THEN c.name WHEN 'email' THEN c.email WHEN 'phone' THEN c.phone WHEN 'contact_context' THEN a.contact_context END,:new_value,:reason_reference,:__user_id,:__now\nFROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_rights_events e ON e.application_id=a.id AND e.organization_id=a.organization_id AND e.brand_id=a.brand_id\nWHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND e.request_id=:request_id AND e.request_type='correction' AND e.status='processing' AND length(trim(e.proof_reference))>0 AND e.version=:expected_version AND e.version=(SELECT MAX(version) FROM hiring_rights_events WHERE request_id=e.request_id) AND a.version=:expected_application_version AND c.merged_into IS NULL\nAND NOT EXISTS (SELECT 1 FROM erasure_requests d WHERE d.organization_id=a.organization_id AND d.brand_id=a.brand_id AND d.candidate_id=c.id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=a.organization_id AND d.brand_id=a.brand_id AND d.candidate_id=c.id)\nAND (:field='contact_context' OR NOT EXISTS (SELECT 1 FROM hiring_applications other WHERE other.candidate_id=c.id AND other.id<>a.id))\nAND :field IN ('name','email','phone','contact_context') AND length(:new_value)<=2000 AND (:field IN ('phone','contact_context') OR length(trim(:new_value))>0) AND (:field<>'email' OR (:new_value LIKE '%_@_%._%' AND length(:new_value)<=254 AND instr(:new_value,char(10))=0 AND instr(:new_value,char(13))=0)) AND length(trim(:reason_reference)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128\nAND NOT EXISTS (SELECT 1 FROM hiring_corrections WHERE request_id=:request_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_corrections prior JOIN hiring_rectification_targets t ON t.correction_id=prior.id WHERE prior.candidate_id=c.id AND prior.field=:field AND NOT EXISTS (SELECT 1 FROM hiring_rectification_attempts x WHERE x.correction_id=t.correction_id AND x.processor_id=t.processor_id AND x.state='complete'))",
+      "step_up": true
+    },
+    {
+      "name": "list_candidate_rectifications",
+      "description": "Owner-only correction provenance and per-processor latest outcome. No subject values; pending and partial failures stay visible.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT c.id AS correction_id,c.field,c.reason_reference,c.actor_user_id,c.created_at,c.application_version,t.processor_id,COALESCE(x.state,'pending') AS state,COALESCE(x.version,0) AS version,x.evidence_reference FROM hiring_corrections c JOIN hiring_rectification_targets t ON t.correction_id=c.id LEFT JOIN hiring_rectification_attempts x ON x.correction_id=t.correction_id AND x.processor_id=t.processor_id AND x.version=(SELECT MAX(version) FROM hiring_rectification_attempts v WHERE v.correction_id=t.correction_id AND v.processor_id=t.processor_id) WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.application_id=:application_id AND c.request_id=:request_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ORDER BY t.processor_id"
+    },
+    {
+      "name": "get_candidate_rectification_payload",
+      "description": "Owner-only exact processor payload for private rectification adapter; rechecks grants, processing state and erasure. Never use as a public URL.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "processor_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT c.id AS correction_id,c.organization_id,c.brand_id,c.application_id,c.candidate_id,c.field,c.new_value,t.processor_id FROM hiring_corrections c JOIN hiring_rectification_targets t ON t.correction_id=c.id WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.application_id=:application_id AND c.request_id=:request_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND t.processor_id=:processor_id AND NOT EXISTS (SELECT 1 FROM erasure_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=c.request_id AND e.version=(SELECT MAX(version) FROM hiring_rights_events WHERE request_id=c.request_id) AND e.status='processing') AND NOT EXISTS (SELECT 1 FROM hiring_rectification_attempts x WHERE x.correction_id=c.id AND x.processor_id=t.processor_id AND x.state='complete') AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_candidates subject ON subject.id=a.candidate_id AND subject.organization_id=a.organization_id AND subject.brand_id=a.brand_id WHERE a.id=c.application_id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id AND a.candidate_id=c.candidate_id AND subject.merged_into IS NULL AND CASE c.field WHEN 'name' THEN subject.name WHEN 'email' THEN subject.email WHEN 'phone' THEN subject.phone WHEN 'contact_context' THEN a.contact_context END=c.new_value)"
+    },
+    {
+      "name": "record_candidate_rectification",
+      "description": "Owner/passkey verified processor outcome with opaque evidence. Retry failed/unknown through an idempotent adapter. Complete requires verified provider evidence.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "processor_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "evidence_reference": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        }
+      },
+      "sql": "INSERT INTO hiring_rectification_attempts SELECT :operation_id,c.id,t.processor_id,:expected_version+1,:state,:evidence_reference,:__user_id,:__now FROM hiring_corrections c JOIN hiring_rectification_targets t ON t.correction_id=c.id WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.application_id=:application_id AND c.request_id=:request_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND t.processor_id=:processor_id AND NOT EXISTS (SELECT 1 FROM erasure_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_requests d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND :state IN ('complete','failed','unknown') AND length(trim(:evidence_reference)) BETWEEN 1 AND 128 AND :expected_version=COALESCE((SELECT MAX(version) FROM hiring_rectification_attempts WHERE correction_id=c.id AND processor_id=t.processor_id),0) AND NOT EXISTS (SELECT 1 FROM hiring_rectification_attempts WHERE correction_id=c.id AND processor_id=t.processor_id AND (state='complete' OR id=:operation_id)) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_rights_events e WHERE e.request_id=c.request_id AND e.version=(SELECT MAX(version) FROM hiring_rights_events WHERE request_id=c.request_id) AND e.status='processing') AND NOT EXISTS (SELECT 1 FROM hiring_restore_tombstones d WHERE d.organization_id=c.organization_id AND d.brand_id=c.brand_id AND d.candidate_id=c.candidate_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_candidates subject ON subject.id=a.candidate_id AND subject.organization_id=a.organization_id AND subject.brand_id=a.brand_id WHERE a.id=c.application_id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id AND a.candidate_id=c.candidate_id AND subject.merged_into IS NULL AND CASE c.field WHEN 'name' THEN subject.name WHEN 'email' THEN subject.email WHEN 'phone' THEN subject.phone WHEN 'contact_context' THEN a.contact_context END=c.new_value)",
+      "step_up": true
     }
   ]
 }

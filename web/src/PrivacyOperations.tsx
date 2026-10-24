@@ -1,3 +1,4 @@
+import { CorrectionControls } from './CorrectionControls'
 import { useEffect, useRef, useState } from 'react'
 import { app, id, read, type Scope } from './api'
 import { requestAsyncCandidateExport, downloadAsyncCandidateExport } from '../../scripts/privacy.mjs'
@@ -75,6 +76,7 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
       {latest?.status==='received' && <button className={button} onClick={()=>void run(()=>record('identity_verification'))}>Begin identity review</button>}
       {latest?.status==='identity_verification' && <button className={button} disabled={!proof.trim()} onClick={()=>void run(()=>record('processing'))}>Confirm verified identity with passkey</button>}
       {latest?.status==='processing' && ['access','export'].includes(latest.request_type) && <><button className={button} onClick={()=>void run(download)}>Prepare or download private export</button><button className={button} onClick={()=>{handle.current=null;setMessage('Next download will request a new 15-minute authorization.')}}>Request fresh export authorization</button><button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Record reviewed fulfillment</button></>}
+      {latest?.status==='processing' && latest.request_type==='correction' && <CorrectionControls key={JSON.stringify([scope, application, request, latest.version])} scope={scope} applicationId={application.trim()} requestId={request.trim()} rightsVersion={latest.version} />}
       {latest?.status==='processing' && ['correction','withdrawal','deletion'].includes(latest.request_type) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Attest reviewed execution completion</button>}
       {latest && !['fulfilled','denied_with_reason'].includes(latest.status) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('denied_with_reason'))}>Record denial with passkey</button>}
     </fieldset><p role="status" className="break-words">{message}</p>
