@@ -57,24 +57,20 @@ export type IntakeReceipt = Scope & { receipt_delivery_state?: string; applicati
 export type Attachment = { id: string; filename: string; mime_type: string; size_bytes: number; scan_state: 'pending' | 'clean' | 'infected' | 'failed'; uploader_user_id: string }
 export const readPublic = async <T,>(name: string, params: Params = {}) => (await app.actions.callPublic<Rows<T>>(name, params)).rows
 
-// Deliberately ephemeral: no server persistence or email delivery is implied.
-// Scope and principal are mandatory to prevent cross-workspace/account reuse.
-import type { InvitationRecord, InterviewOutcome, Playbook, WorkingInterviewRecord } from './playbook'
-const workingInterviews = new Map<string, WorkingInterviewRecord>()
-export const workingInterviewKey = (scope: Scope, candidateId: string) => JSON.stringify([app.auth.user?.id, scope.organization_id, scope.brand_id, candidateId])
-export const getWorkingInterview = (candidateId: string) => workingInterviews.get(candidateId)
-export function recordWorkingInterviewInvitation(candidateId: string, invitation: InvitationRecord) {
-  if (!invitation.owner.trim() || !invitation.invitationText.trim() || invitation.playbookVersion < 1) throw Error('Invitation requires an owner, text and playbook version.')
-  const record = { invitation: { ...invitation } }
-  workingInterviews.set(candidateId, record)
-  return record
+import type { Playbook, WorkingInterviewRecord } from './playbook'
+export const getWorkingInterviewRecords = (scope: Scope, application_id: string) => read<WorkingInterviewRecord>('get_working_interview_records', { ...scope, application_id })
+export async function createWorkingInterviewInvitation(scope: Scope, application_id: string, invitation: string, owner_user_id: string, playbook_version: number) {
+  const record_id = id()
+  await write('create_working_interview_invitation', { ...scope, application_id, record_id, invitation, owner_user_id, playbook_version, secure_join_confirmed: 1, operation_id: id() })
+  const rows = await getWorkingInterviewRecords(scope, application_id)
+  if (!rows.some(r => r.id === record_id)) throw Error('Invitation was not saved. Reload and check access and current playbook configuration.')
+  return rows
 }
-export function recordWorkingInterviewOutcome(candidateId: string, outcome: InterviewOutcome) {
-  const record = workingInterviews.get(candidateId)
-  if (!record || !outcome.outcome.trim()) throw Error('Record an invitation and outcome first.')
-  const next = { ...record, outcome: { ...outcome } }
-  workingInterviews.set(candidateId, next)
-  return next
+export async function recordWorkingInterviewOutcome(scope: Scope, application_id: string, record: WorkingInterviewRecord, outcome: string, exceptions: string) {
+  await write('record_working_interview_outcome', { ...scope, application_id, record_id: record.id, expected_version: record.version, outcome, exceptions, operation_id: id() })
+  const rows = await getWorkingInterviewRecords(scope, application_id)
+  if (!rows.some(r => r.id === record.id && r.version === record.version + 1 && r.outcome === outcome && r.exceptions === exceptions)) throw Error('Outcome was not confirmed. Reload and check access or version conflicts.')
+  return rows
 }
 export const getOrgRecruitingPlaybook = (organization_id: string) => read<Playbook>('get_org_recruiting_playbook', { organization_id })
 export async function saveOrgRecruitingPlaybook(organization_id: string, payload: string, expected_version: number) {

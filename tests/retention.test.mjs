@@ -288,3 +288,15 @@ test('a delayed explicit continuation exports exactly one tombstone identity',as
  assert.equal(JSON.parse(artifact.body).tombstones.length,1)
  f.db.close()
 })
+
+test('durable working interview versions count as protected subject records in deletion verification',()=>{
+ const f=fixture()
+ try {
+  f.call('save_org_recruiting_playbook','root',{organization_id:'org',payload:'{"meeting":{"time":"09:30","timezone":"UTC"}}',expected_version:0,operation_id:'policy'})
+  const requestId=erase(f);f.call('request_store_deletion','owner-a',{...A,request_id:requestId})
+  const count=()=>f.call('verify_store_d1','system:worker',{...A,request_id:requestId}).rows[0].remaining_records
+  const before=count()
+  f.call('create_working_interview_invitation','owner-a',{...A,application_id:'app-a',record_id:'working',invitation:'Observe stand-up then one-to-one. Join details separately.',owner_user_id:'owner-a',playbook_version:1,secure_join_confirmed:1,operation_id:'working-invite'})
+  assert.equal(count(),before+1)
+ } finally {f.db.close()}
+})

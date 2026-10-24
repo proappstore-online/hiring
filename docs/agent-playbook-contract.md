@@ -60,8 +60,9 @@ extracts query rows from the actual transport; do not pass a raw MCP envelope.
 It is tested reference consumer logic, not code installed into a live agent.
 A `ready` result means policy was loaded, not permission to perform any particular
 mutation. Apply the policy and existing action/approval guards before acting.
-Record the returned policy version with workflow evidence. The #78 invitation and
-outcome UI is session-only: it is not a durable audit store for agent activity.
+Record the returned policy version with workflow evidence. The invitation and outcome UI now uses durable, versioned records and atomic
+audit events (migration 0048); use the guarded workflow actions documented in
+[the playbook guide](org-recruiting-playbook.md).
 
 ## Redaction and safe fallback
 

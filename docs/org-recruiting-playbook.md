@@ -1,6 +1,6 @@
 # Organisation recruiting playbook
 
-Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles are unlisted, reject generic candidate intake, and do not use new interview workflows. This policy takes precedence over general intake/interview guidance below.
+Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles remain unlisted, reject generic candidate intake, and follow the separate direct Interns onboarding path under #73. For general recruiting, #76 supersedes the cancelled no-interviews policy: candidates observe daily stand-up, then remain for a one-to-one working interview.
 
 Hiring is the source of truth for the versioned organisation recruiting policy
 (#77, parent #76). No application or interview schema or historical record changes.
@@ -88,8 +88,7 @@ version. Do not cache mutable recruiting policy in instance instructions."
 If the policy is absent, access is denied, or loading fails, stop policy-dependent
 outreach, invitations and handoffs and request configuration from the organisation
 owner. Do not infer permission from this example, another tenant, or an old cached
-policy. Record the loaded policy version with subsequent workflow evidence when
-the working-interview integration is implemented (#78/#79).
+policy. Record the loaded policy version with subsequent workflow evidence through the durable working-interview actions (#76/#78/#79).
 
 ## Stacked delivery
 
@@ -115,13 +114,26 @@ for a one-to-one interview. Join details are always a placeholder. Redacted read
 cannot verify secure join configuration: staff must confirm it privately before
 recording an invitation already sent through the approved mail workflow.
 
-As explicitly scoped for #78, invitation/outcome records are an in-memory prototype,
-keyed by authenticated principal, organisation, brand and application. They are
-lost on reload, are not shared or audited, and do not send mail. The UI states this
-limitation. Version, invitation text, owner, sent time, outcome, exceptions and
-completion time are captured for the current session. Durable workflow evidence
-requires a subsequent schema/action change before operational reliance. Historical
-applications need no new fields and show “No working interview recorded”.
+Working-interview invitations and outcomes are now durable append-only versions in
+`working_interview_records` (migration 0048). The UI reloads them from guarded
+registered actions; records survive reload and are shared with authorised staff.
+No email is sent by these actions. Historical applications show “No working
+interview recorded”; invitation-only records have nullable outcome/completion fields.
+
+`create_working_interview_invitation` requires organisation, brand, application,
+record ID, invitation text, active owner/recruiter assignee, current playbook version,
+operation ID and explicit private secure-join confirmation. Missing playbook or
+meeting timing prevents creation. Store the approved invitation without secure join
+URLs or credentials. The server never copies policy payload or secrets into records.
+`get_working_interview_records` returns latest versions only to current scoped owners
+and recruiters; other roles receive no rows (including reviewers and auditors).
+`record_working_interview_outcome` accepts record ID, expected version, outcome,
+exceptions and operation ID in the same application scope. Only the owning recruiter
+or an active owner (the existing manager equivalent) can append an outcome revision.
+Stale versions abort; reload and review before retrying. Duplicate operations cannot
+create another version. Each version atomically creates a content-free audit event;
+audit failure rolls back the write. Previous invitation and outcome versions remain
+immutable. No new manager role or public/secret-read capability is introduced.
 
 Delivery is stacked on `feat/org-recruiting-playbook-77` (PR #80), references #78
 and parent #76, and preserves the #74 pipeline-filter work. No merge or deployment.
@@ -132,3 +144,18 @@ Registered reads now include `schema_version: 1` independently of the stored pol
 `version`. See [the agent integration contract](agent-playbook-contract.md) for the
 machine-readable response schema, tested caller adapter, bootstrap and operational
 migration guidance. No live agent configuration has been changed.
+
+## Parent completion (#76)
+
+The child issues #77, #78 and #79 already define the delivery breakdown. The
+stack notes above describe their original delivery dependencies; #74 pipeline
+filters are present on main. The durable workflow follow-up uses the owner's
+authorised direct-main delivery approach. No PR merge or manual deployment is
+performed. A main push invokes the repository's normal deployment workflow.
+
+Working-interview history is protected content under the existing indefinite
+retention policy. Store-deletion verification counts every retained version and
+reports protected records; it cannot falsely declare whole-subject erasure while
+these records remain. Outcomes and exceptions are private staff records, not a
+public candidate packet. Any future retention change needs an explicitly governed
+purge design, consistent with the existing protected interview and mail archives.

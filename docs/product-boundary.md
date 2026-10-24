@@ -1,6 +1,6 @@
 # Product boundary
 
-Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles are unlisted, reject generic candidate intake, and do not use new interview workflows. This policy takes precedence over general intake/interview guidance below.
+Internship intake follows the [restricted sourcing and direct Interns onboarding policy](internship-intake.md) (#73). Internship roles remain unlisted, reject generic candidate intake, and follow the separate direct Interns onboarding path under #73. For general recruiting, #76 supersedes the cancelled no-interviews policy: candidates observe daily stand-up, then remain for a one-to-one working interview.
 
 Hiring is a multi-tenant service where many recruiting organizations register through public organization sign-up and each operates distinct outward-facing brands with a controlled internal ATS. Each application belongs to exactly one brand and one requisition. A candidate can have multiple applications, including across brands, without exposing one brand's identity or data to another.
 

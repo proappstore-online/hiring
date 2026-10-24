@@ -3,9 +3,11 @@ export type PlaybookPayload = {
   [key: string]: unknown
 }
 export type Playbook = { version: number; payload: string | null }
-export type InvitationRecord = { playbookVersion: number; invitationText: string; owner: string; sentAt: number }
-export type InterviewOutcome = { outcome: string; exceptions: string; completedAt: number }
-export type WorkingInterviewRecord = { invitation: InvitationRecord; outcome?: InterviewOutcome }
+export type WorkingInterviewRecord = {
+  id: string; version: number; invitation: string; owner_user_id: string; playbook_version: number;
+  outcome: string | null; exceptions: string | null; invited_at: number; completed_at: number | null;
+  created_at: number; actor_user_id: string
+}
 export function parsePlaybook(payload: string | null): PlaybookPayload {
   const value: unknown = JSON.parse(payload ?? '{}')
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Playbook must be a JSON object.')
