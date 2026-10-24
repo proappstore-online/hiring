@@ -10,6 +10,18 @@ import { useSearchParams } from 'react-router-dom'
 
 export const applicationLink = candidateApplicationUrl
 
+// Keep access tokens in memory only, never in links, storage or analytics.
+async function candidateToken(applicationId: string, purpose: 'status' | 'withdraw') {
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('')
+  await write('issue_candidate_access_token', { application_id: applicationId, purpose, token })
+  return token
+}
+async function candidateStatus(applicationId: string) {
+  const token = await candidateToken(applicationId, 'status')
+  return read<CandidateApplication>('get_candidate_application_status', { application_id: applicationId, token })
+}
+
+
 export function CandidateApplicationCard({ application: a, userId, detail = false, onChanged }: { application: CandidateApplication; userId: string; detail?: boolean; onChanged?: () => void }) {
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -18,8 +30,8 @@ export function CandidateApplicationCard({ application: a, userId, detail = fals
   async function withdraw() {
     setConfirm(false); setBusy(true); setError(false)
     try {
-      try { await write('withdraw_my_application', { organization_id: a.organization_id, brand_id: a.brand_id, application_id: a.application_id, expected_version: a.version, operation_id: operationId }) } catch { /* Read back an uncertain write before suggesting a retry. */ }
-      const rows = await read<CandidateApplication>('get_my_application', { application_id: a.application_id })
+      try { const token = await candidateToken(a.application_id, 'withdraw'); await write('withdraw_candidate_application', { token, organization_id: a.organization_id, brand_id: a.brand_id, application_id: a.application_id, expected_version: a.version, operation_id: operationId }) } catch { /* Read back an uncertain write before suggesting a retry. */ }
+      const rows = await candidateStatus(a.application_id)
       if (rows[0]?.stage !== 'withdrawn') throw Error('Withdrawal unconfirmed')
       onChanged?.()
     } catch { setError(true) } finally { setBusy(false) }
@@ -48,7 +60,7 @@ export function CandidateApplications({ userId, applicationId }: { userId: strin
     setLoading(true); setError(false); setRows([])
     async function load() {
       if (!applicationId) return read<CandidateApplication>('list_my_job_applications')
-      return read<CandidateApplication>('get_my_application', { application_id: applicationId })
+      return candidateStatus(applicationId)
     }
     load().then(data => { if (current) setRows(data) }).catch(() => { if (current) setError(true) }).finally(() => { if (current) setLoading(false) })
     return () => { current = false }

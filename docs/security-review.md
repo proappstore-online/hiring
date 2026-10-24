@@ -60,3 +60,13 @@ decision/offer confirmation, communications and privacy request/error flows.
 Record browser/assistive technology versions, viewport, keyboard sequence,
 announcements, expected/actual results and blocking findings/retests. A passing
 DOM assertion is not a screen-reader pass.
+
+Issue #19 adds principal/application/purpose-bound 15-minute candidate tokens.
+The UI generates 256-bit random tokens in memory; SQL fixes expiry, checks current
+receipt ownership and limits issuance to 20 per candidate per rolling 15 minutes.
+Withdrawal consumes the token atomically with stage and audit writes; status tokens
+cannot withdraw. Tests cover cross-application and principal misuse, expiry at the
+boundary, stale versions, replay and audit rollback. Platform sign-in remains
+required; tokens do not enable anonymous D1 access. Legacy ownership-checked
+candidate actions remain available for compatibility. Database token values must
+be treated as credentials and excluded from logs and exports.

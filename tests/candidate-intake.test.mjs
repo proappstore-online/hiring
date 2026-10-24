@@ -431,3 +431,46 @@ test('both brand forms reject unpublished jobs and stale snapshots without parti
     } finally { db.close() }
   }
 })
+
+test('candidate tokens bind owner, application, purpose and server expiry with bounded issuance', () => {
+  const {db,call,submit,advance}=fixture();submit();advance()
+  call('submit_job_application','worker',application(B,'b'))
+  const token='a'.repeat(64), p={application_id:'application-a',token,purpose:'status'}
+  for (const user of ['other-worker','owner','staff-a',null]) assert.deepEqual(call('issue_candidate_access_token',user,p),[0])
+  for (const bad of [{token:'short'},{token:'Z'.repeat(64)},{purpose:'admin'},{application_id:'missing'}]) assert.deepEqual(call('issue_candidate_access_token','worker',{...p,...bad}),[0])
+  assert.deepEqual(call('issue_candidate_access_token','worker',p),[1])
+  assert.deepEqual(call('issue_candidate_access_token','worker',p),[0])
+  assert.equal(call('get_candidate_application_status','worker',p)[0].stage,'submitted')
+  for (const [user,changes] of [['other-worker',{}],['owner',{}],['worker',{application_id:'application-b'}],['worker',{token:'b'.repeat(64)}]]) assert.deepEqual(call('get_candidate_application_status',user,{...p,...changes}),[])
+  assert.deepEqual(call('withdraw_candidate_application','worker',{...A,...p,expected_version:1,operation_id:'wrong-purpose'}),[0,0,0,0])
+  assert.deepEqual(call('issue_candidate_access_token','worker',{...p,token:'b'.repeat(64),purpose:'withdraw'}),[1])
+  assert.deepEqual(call('get_candidate_application_status','worker',{...p,token:'b'.repeat(64)}),[])
+  for(let i=0;i<18;i++) assert.deepEqual(call('issue_candidate_access_token','worker',{...p,token:(i+16).toString(16).padStart(64,'0')}),[1])
+  assert.deepEqual(call('issue_candidate_access_token','worker',{...p,token:'c'.repeat(64)}),[0])
+  advance(900000)
+  assert.deepEqual(call('get_candidate_application_status','worker',p),[])
+  assert.deepEqual(call('withdraw_candidate_application','worker',{...A,...p,token:'b'.repeat(64),expected_version:1,operation_id:'expired'}),[0,0,0,0])
+  assert.deepEqual(call('issue_candidate_access_token','worker',{...p,token:'c'.repeat(64)}),[1])
+  db.close()
+})
+
+test('withdrawal token is consumed atomically with audit and cannot reopen or cross applications', () => {
+  const {db,call,submit,advance}=fixture();submit();advance()
+  call('submit_job_application','worker',application(B,'b'))
+  const token='d'.repeat(64), p={...A,application_id:'application-a',token,expected_version:1,operation_id:'token-withdraw'}
+  assert.deepEqual(call('issue_candidate_access_token','worker',{...p,purpose:'withdraw'}),[1])
+  for(const [user,changes] of [['other-worker',{}],['staff-a',{}],['worker',{application_id:'application-b'}],['worker',{brand_id:'b'}],['worker',{expected_version:2}]]) assert.deepEqual(call('withdraw_candidate_application',user,{...p,...changes}),[0,0,0,0])
+  db.exec("CREATE TRIGGER token_audit_failure BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.withdrawn' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+  assert.throws(()=>call('withdraw_candidate_application','worker',p),/audit unavailable/)
+  assert.equal(db.prepare('SELECT consumed_at FROM hiring_candidate_access_tokens WHERE token=?').get(token).consumed_at,null)
+  assert.equal(call('get_my_application','worker',p)[0].stage,'submitted')
+  db.exec('DROP TRIGGER token_audit_failure')
+  assert.deepEqual(call('withdraw_candidate_application','worker',p),[1,1,1,1])
+  assert.ok(db.prepare('SELECT consumed_at FROM hiring_candidate_access_tokens WHERE token=?').get(token).consumed_at)
+  assert.deepEqual(call('withdraw_candidate_application','worker',p),[0,0,0,0])
+  assert.equal(call('get_my_application','worker',{application_id:'application-b'})[0].stage,'submitted')
+  assert.deepEqual(call('change_application_stage','staff-a',{...A,application_id:p.application_id,expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'token-reopen'}),[0,0,0,0])
+  const event=db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE id='token-withdraw'").get()
+  assert.equal(event.actor_user_id,'worker')
+  db.close()
+})

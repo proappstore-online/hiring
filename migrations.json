@@ -123,6 +123,10 @@
     {
       "name": "0031_withdrawn_dispatch_guard",
       "sql": "CREATE TRIGGER hiring_withdrawn_dispatch_guard BEFORE UPDATE OF delivery_state ON hiring_outbox WHEN NEW.delivery_state IN ('pending','sending') AND EXISTS (SELECT 1 FROM hiring_applications a WHERE a.id=NEW.application_id AND a.organization_id=NEW.organization_id AND a.brand_id=NEW.brand_id AND a.stage='withdrawn') BEGIN SELECT RAISE(ABORT,'withdrawn application cannot dispatch'); END;"
+    },
+    {
+      "name": "0032_candidate_access_tokens",
+      "sql": "CREATE TABLE hiring_candidate_access_tokens (token TEXT PRIMARY KEY CHECK(length(token)=64 AND token NOT GLOB '*[^0-9a-f]*'),application_id TEXT NOT NULL REFERENCES hiring_applications(id),worker_user_id TEXT NOT NULL,purpose TEXT NOT NULL CHECK(purpose IN ('status','withdraw')),created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL CHECK(expires_at=created_at+900000),consumed_at INTEGER); CREATE INDEX hiring_candidate_tokens_owner ON hiring_candidate_access_tokens(worker_user_id,application_id,created_at);"
     }
   ]
 }

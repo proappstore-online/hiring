@@ -152,3 +152,33 @@ starts closed, is authenticated and audited, and is opened only by the existing
 scoped staff action. Earlier statements above that no action can open it or that
 publication always requires passkey step-up describe the older implementation.
 This form change does not open intake or add attachment-serving capabilities.
+
+## Scoped candidate access (#19)
+
+Migration `0032_candidate_access_tokens` adds access tokens bound to the signed-in
+candidate, exact application and one purpose (`status` or `withdraw`). The detail
+screen generates 32 cryptographically random bytes with Web Crypto, registers the
+hex token using `issue_candidate_access_token`, and keeps it only in memory.
+Tokens never appear in routes, persistent browser storage, audit summaries or mail.
+The SQL action derives ownership from the intake receipt; staff membership grants
+no candidate access. Issuance is capped at 20 per candidate per rolling 15 minutes.
+The server fixes expiry at 15 minutes using `:__now`; callers cannot set the clock
+or expiry. Unknown applications and unauthorized ownership cannot issue tokens.
+
+`get_candidate_application_status` accepts only a live status-purpose token for
+the same candidate and application, and returns the existing candidate-safe fields.
+`withdraw_candidate_application` accepts only a live withdrawal-purpose token and
+consumes it in the same transaction as the versioned withdrawal, stage event and
+attributed audit. Audit failure rolls back consumption and withdrawal together.
+Failed/stale requests leave the token unconsumed; successful replay cannot mutate
+again. The UI reconciles uncertain writes through a fresh status token and keeps
+its operation ID across retries. A withdrawal token never authorizes status, and
+status never authorizes withdrawal. Withdrawn applications remain terminal.
+
+These tokens supplement platform authentication; they are not anonymous bearer
+links. Candidates use their own platform account without any staff role, consistent
+with ADR-002. Existing `get_my_application` and `withdraw_my_application` remain
+ownership-checked compatibility actions for authenticated clients; the detail UI
+uses the scoped actions. Tokens are private database credentials and must not be
+included in operational logs or exports. No anonymous endpoint, email token delivery
+or privileged worker is introduced.

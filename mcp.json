@@ -3578,6 +3578,71 @@
         "UPDATE hiring_applications AS a SET stage='withdrawn',stage_extension=NULL,version=version+1,updated_at=:__now WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND a.version=:expected_version AND a.accepted_stage IS NULL AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_stage_events e WHERE e.id=:operation_id AND e.application_id=a.id AND e.organization_id=a.organization_id AND e.brand_id=a.brand_id AND e.actor_user_id=:__user_id AND e.version=a.version+1 AND e.to_stage='withdrawn')",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,a.organization_id,a.brand_id,a.id,'application.withdrawn',:__user_id,:operation_id,:__now,'application',a.id,'Candidate withdrew application' FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND changes()=1 AND a.stage='withdrawn' AND a.version=:expected_version+1 AND EXISTS (SELECT 1 FROM hiring_stage_events e WHERE e.id=:operation_id AND e.application_id=a.id AND e.actor_user_id=:__user_id)"
       ]
+    },
+    {
+      "name": "issue_candidate_access_token",
+      "description": "Register a candidate-generated cryptographically random 256-bit hex token for one owned application and status or withdraw purpose. Expires after 15 minutes. Requires candidate sign-in, no staff role. Never put tokens in URLs or logs. At most 20 issuances per candidate per 15 minutes.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "application_id": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_candidate_access_tokens(token,application_id,worker_user_id,purpose,created_at,expires_at) SELECT :token,r.application_id,:__user_id,:purpose,:__now,:__now+900000 FROM hiring_intake_receipts r WHERE r.application_id=:application_id AND r.worker_user_id=:__user_id AND :purpose IN ('status','withdraw') AND length(:token)=64 AND :token NOT GLOB '*[^0-9a-f]*' AND NOT EXISTS (SELECT 1 FROM hiring_candidate_access_tokens WHERE token=:token) AND (SELECT count(*) FROM hiring_candidate_access_tokens WHERE worker_user_id=:__user_id AND created_at>:__now-900000)<20"
+    },
+    {
+      "name": "get_candidate_application_status",
+      "description": "Read only candidate-safe status using a live status-purpose token bound to the signed-in owner and exact application.",
+      "operation": "query",
+      "params": {
+        "application_id": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.created_at,a.version,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,q.title,b.name AS brand_name,o.name AS organization_name FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id JOIN hiring_requisitions q ON q.id=r.requisition_id JOIN hiring_brands b ON b.id=r.brand_id JOIN hiring_organizations o ON o.id=r.organization_id WHERE r.worker_user_id=:__user_id AND r.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_candidate_access_tokens t WHERE t.token=:token AND t.application_id=:application_id AND t.worker_user_id=:__user_id AND t.purpose='status' AND t.created_at<=:__now AND t.expires_at>:__now AND t.consumed_at IS NULL) LIMIT 1"
+    },
+    {
+      "name": "withdraw_candidate_application",
+      "description": "Single-use withdrawal token plus exact candidate ownership and version checks. Atomic stage, audit and token consumption. No staff login required.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,a.organization_id,a.brand_id,a.id,COALESCE(a.accepted_stage,a.stage_extension,a.stage),'withdrawn',a.version+1,'Candidate withdrew application',:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND a.version=:expected_version AND COALESCE(a.accepted_stage,a.stage_extension,a.stage) IN ('submitted','in_review','shortlisted','interviewing','decision_pending','offered') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_stage_events WHERE id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_candidate_access_tokens t WHERE t.token=:token AND t.application_id=:application_id AND t.worker_user_id=:__user_id AND t.purpose='withdraw' AND t.created_at<=:__now AND t.expires_at>:__now AND t.consumed_at IS NULL)",
+        "UPDATE hiring_applications AS a SET stage='withdrawn',stage_extension=NULL,version=version+1,updated_at=:__now WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND a.version=:expected_version AND a.accepted_stage IS NULL AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_stage_events e WHERE e.id=:operation_id AND e.application_id=a.id AND e.organization_id=a.organization_id AND e.brand_id=a.brand_id AND e.actor_user_id=:__user_id AND e.version=a.version+1 AND e.to_stage='withdrawn')",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,a.organization_id,a.brand_id,a.id,'application.withdrawn',:__user_id,:operation_id,:__now,'application',a.id,'Candidate withdrew application' FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=a.id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id AND r.worker_user_id=:__user_id) AND changes()=1 AND a.stage='withdrawn' AND a.version=:expected_version+1 AND EXISTS (SELECT 1 FROM hiring_stage_events e WHERE e.id=:operation_id AND e.application_id=a.id AND e.actor_user_id=:__user_id)",
+        "UPDATE hiring_candidate_access_tokens SET consumed_at=:__now WHERE token=:token AND application_id=:application_id AND worker_user_id=:__user_id AND purpose='withdraw' AND consumed_at IS NULL AND changes()=1 AND EXISTS (SELECT 1 FROM hiring_audit_events e WHERE e.id=:operation_id AND e.application_id=:application_id AND e.actor_user_id=:__user_id AND e.action='application.withdrawn')"
+      ]
     }
   ]
 }
