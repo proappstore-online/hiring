@@ -95,3 +95,13 @@ core redaction, write fences, durable tombstones and blocked MAIL evidence. Exis
 schema/audit/archive protections remain in force. Status is always partial and
 lists retained stores; files, indexes, exports, backups, protected payloads and
 processor deletion still require evidence. This does not complete #31, #28 or #29.
+
+## Privacy operations revision (#5)
+
+Migration 0030 introduces append-only subject-rights events and access authorization
+receipts. Separate authorization and retrieval transactions preserve attempted-access
+evidence across read failures, without worker enablement. Restricted browser reads
+use receipt-bound actions; raw legacy actions retain their existing audit gaps.
+Core exports are private, principal-bound and expire after 15 minutes, with current
+grant/identity/erasure checks on retrieval. Full export and erasure remain incomplete;
+see [privacy operations](privacy-operations.md) for exact boundaries.

@@ -3137,6 +3137,404 @@
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.completed',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.stale_reclaimed' WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id)))"
       ],
       "step_up": true
+    },
+    {
+      "name": "record_candidate_rights_event",
+      "description": "Owner-only versioned rights receipt, identity review, processing or decision. Opaque references only; no identity documents. Deletion/correction/withdrawal cannot be marked fulfilled by this action.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "request_type": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "owner_user_id": {
+          "type": "string"
+        },
+        "deadline_at": {
+          "type": "integer"
+        },
+        "proof_reference": {
+          "type": "string",
+          "optional": true
+        },
+        "decision_reference": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND (:status<>'fulfilled' OR :request_type IN ('access','export'))",
+      "step_up": true
+    },
+    {
+      "name": "list_candidate_rights_events",
+      "description": "Owner-only bounded rights history for an exact application; missing and unauthorized both return no rows. Page by exclusive before_at/before_id.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "before_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "before_id": {
+          "type": "string",
+          "optional": true
+        },
+        "rights_request_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT e.* FROM hiring_rights_events e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND (:rights_request_id IS NULL OR e.request_id=:rights_request_id) AND (:before_at IS NULL OR e.created_at<:before_at OR (e.created_at=:before_at AND e.id<:before_id)) ORDER BY e.created_at DESC,e.id DESC LIMIT 50"
+    },
+    {
+      "name": "authorize_gateway_list_applications",
+      "description": "Persist a content-free, server-derived access outcome before the corresponding audited read. Missing and denied share not_found. Receipt expires after 60 seconds.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "assignee": {
+          "type": "string",
+          "optional": true
+        },
+        "source": {
+          "type": "string",
+          "optional": true
+        },
+        "date_from": {
+          "type": "integer",
+          "optional": true
+        },
+        "date_to": {
+          "type": "integer",
+          "optional": true
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,outcome,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:__user_id,'gateway_list_applications','',CASE WHEN EXISTS (SELECT 1 FROM (SELECT a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25) permitted) THEN 'authorized' ELSE 'not_found' END,:__now,:__now+60000 WHERE length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)"
+    },
+    {
+      "name": "audited_gateway_list_applications",
+      "description": "Receipt-bound restricted read. Current grants and assignment are rechecked; authorize_gateway_list_applications first.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "stage": {
+          "type": "string",
+          "optional": true
+        },
+        "requisition_id": {
+          "type": "string",
+          "optional": true
+        },
+        "assignee": {
+          "type": "string",
+          "optional": true
+        },
+        "source": {
+          "type": "string",
+          "optional": true
+        },
+        "date_from": {
+          "type": "integer",
+          "optional": true
+        },
+        "date_to": {
+          "type": "integer",
+          "optional": true
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT * FROM (SELECT a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND (:cursor_at IS NULL OR a.updated_at < :cursor_at OR (a.updated_at = :cursor_at AND a.id > :cursor_id)) AND (:stage IS NULL OR COALESCE(a.accepted_stage,a.stage_extension,a.stage)=:stage) AND (:requisition_id IS NULL OR a.requisition_id=:requisition_id) AND (:assignee IS NULL OR a.assignee_user_id=:assignee) AND (:source IS NULL OR (CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END)=:source) AND (:date_from IS NULL OR a.created_at>=:date_from) AND (:date_to IS NULL OR a.created_at<:date_to) ORDER BY a.updated_at DESC, a.id ASC LIMIT 25) permitted WHERE EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.actor_user_id=:__user_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.action='gateway_list_applications' AND x.target_id='' AND x.outcome='authorized' AND x.expires_at>:__now) LIMIT 25"
+    },
+    {
+      "name": "authorize_gateway_get_application",
+      "description": "Persist a content-free, server-derived access outcome before the corresponding audited read. Missing and denied share not_found. Receipt expires after 60 seconds.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,outcome,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:__user_id,'gateway_get_application',:application_id,CASE WHEN EXISTS (SELECT 1 FROM (SELECT CASE WHEN EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=a.organization_id AND g.brand_id=a.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) THEN a.acceptance_evidence ELSE NULL END AS acceptance_evidence,a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND a.id=:application_id LIMIT 1) permitted) THEN 'authorized' ELSE 'not_found' END,:__now,:__now+60000 WHERE length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)"
+    },
+    {
+      "name": "audited_gateway_get_application",
+      "description": "Receipt-bound restricted read. Current grants and assignment are rechecked; authorize_gateway_get_application first.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT * FROM (SELECT CASE WHEN EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=a.organization_id AND g.brand_id=a.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) THEN a.acceptance_evidence ELSE NULL END AS acceptance_evidence,a.id,a.requisition_id,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.version,CASE WHEN EXISTS (SELECT 1 FROM hiring_intake_receipts ir WHERE ir.application_id=a.id AND ir.organization_id=a.organization_id AND ir.brand_id=a.brand_id) THEN 'direct' ELSE COALESCE((SELECT s.source FROM hiring_application_sources s WHERE s.application_id=a.id),a.source) END AS source,a.assignee_user_id,a.created_at,a.updated_at,c.name AS candidate_name,(c.email IS NOT NULL AND c.email<>'') AS has_email,(c.phone IS NOT NULL AND c.phone<>'') AS has_phone,(COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) IS NOT NULL) AS has_linkedin,r.title AS requisition_title FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter' ,'reviewer') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) AND (p.role<>'reviewer' OR a.assignee_user_id=:__user_id)) AND a.id=:application_id LIMIT 1) permitted WHERE EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.actor_user_id=:__user_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.action='gateway_get_application' AND x.target_id=:application_id AND x.outcome='authorized' AND x.expires_at>:__now) LIMIT 25"
+    },
+    {
+      "name": "authorize_gateway_list_requisitions",
+      "description": "Persist a content-free, server-derived access outcome before the corresponding audited read. Missing and denied share not_found. Receipt expires after 60 seconds.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,outcome,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:__user_id,'gateway_list_requisitions','',CASE WHEN EXISTS (SELECT 1 FROM (SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) AND (:cursor_at IS NULL OR r.created_at < :cursor_at OR (r.created_at = :cursor_at AND r.id > :cursor_id)) ORDER BY r.created_at DESC, r.id ASC LIMIT 25) permitted) THEN 'authorized' ELSE 'not_found' END,:__now,:__now+60000 WHERE length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)"
+    },
+    {
+      "name": "audited_gateway_list_requisitions",
+      "description": "Receipt-bound restricted read. Current grants and assignment are rechecked; authorize_gateway_list_requisitions first.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "cursor_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "cursor_id": {
+          "type": "string",
+          "optional": true
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT * FROM (SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) AND (:cursor_at IS NULL OR r.created_at < :cursor_at OR (r.created_at = :cursor_at AND r.id > :cursor_id)) ORDER BY r.created_at DESC, r.id ASC LIMIT 25) permitted WHERE EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.actor_user_id=:__user_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.action='gateway_list_requisitions' AND x.target_id='' AND x.outcome='authorized' AND x.expires_at>:__now) LIMIT 25"
+    },
+    {
+      "name": "authorize_gateway_get_requisition",
+      "description": "Persist a content-free, server-derived access outcome before the corresponding audited read. Missing and denied share not_found. Receipt expires after 60 seconds.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,outcome,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:__user_id,'gateway_get_requisition',:requisition_id,CASE WHEN EXISTS (SELECT 1 FROM (SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1) permitted) THEN 'authorized' ELSE 'not_found' END,:__now,:__now+60000 WHERE length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)"
+    },
+    {
+      "name": "audited_gateway_get_requisition",
+      "description": "Receipt-bound restricted read. Current grants and assignment are rechecked; authorize_gateway_get_requisition first.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT * FROM (SELECT r.id,r.title,r.status,r.created_at FROM hiring_requisitions r WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1) permitted WHERE EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.actor_user_id=:__user_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.action='gateway_get_requisition' AND x.target_id=:requisition_id AND x.outcome='authorized' AND x.expires_at>:__now) LIMIT 25"
+    },
+    {
+      "name": "request_candidate_export",
+      "description": "Passkey-gated brand-wide owner export after recorded identity review. Audits authorized or not_found without disclosing existence. Private handle expires in 15 minutes. No stored export copy or email.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_access(id,organization_id,brand_id,actor_user_id,action,target_id,context_id,outcome,created_at,expires_at) SELECT :request_id,:organization_id,:brand_id,:__user_id,'candidate_export',:application_id,:rights_request_id,CASE WHEN EXISTS (SELECT 1 FROM (SELECT a.* FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id) a WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:rights_request_id ORDER BY e.version DESC LIMIT 1) e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.application_id=:application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.organization_id=a.organization_id AND er.brand_id=a.brand_id AND er.candidate_id=a.candidate_id)) THEN 'authorized' ELSE 'not_found' END,:__now,:__now+900000 WHERE length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_privacy_access WHERE id=:request_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)",
+      "step_up": true
+    },
+    {
+      "name": "get_candidate_export",
+      "description": "Private receipt-bound core export; rechecks owner, verified processing request, expiry and erasure on every read. No full-export claim; file bytes and confidential material excluded.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "rights_request_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT c.id AS candidate_id,c.name,c.email,c.phone,COALESCE(c.linkedin_profile_url,NULLIF(c.linkedin_url,'')) AS profile_url,(SELECT json_group_array(json_object('application_id',a.id,'requisition_title',r.title,'stage',COALESCE(a.accepted_stage,a.stage_extension,a.stage),'created_at',a.created_at,'notice_version',a.notice_version)) FROM hiring_applications a JOIN hiring_requisitions r ON r.id=a.requisition_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS applications_json,(SELECT json_group_array(json_object('application_id',cr.application_id,'purpose',cr.purpose,'legal_basis',cr.legal_basis,'notice_version',cr.notice_version,'recorded_at',cr.recorded_at,'withdrawn_at',cr.withdrawn_at)) FROM hiring_consent_records cr JOIN hiring_applications a ON a.id=cr.application_id AND a.organization_id=cr.organization_id AND a.brand_id=cr.brand_id WHERE a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id) AS consent_json,'scoped_core_export' AS coverage,'confidential_review_material_and_file_bytes_excluded' AS exclusions FROM hiring_candidates c JOIN hiring_applications target ON target.candidate_id=c.id AND target.organization_id=c.organization_id AND target.brand_id=c.brand_id WHERE target.id=:application_id AND c.organization_id=:organization_id AND c.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:rights_request_id ORDER BY e.version DESC LIMIT 1) e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.application_id=:application_id AND e.request_type IN ('access','export') AND e.status='processing' AND length(trim(e.proof_reference)) BETWEEN 1 AND 128) AND EXISTS (SELECT 1 FROM hiring_privacy_access x WHERE x.id=:request_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.actor_user_id=:__user_id AND x.action='candidate_export' AND x.context_id=:rights_request_id AND x.target_id=:application_id AND x.outcome='authorized' AND x.expires_at>:__now) AND NOT EXISTS (SELECT 1 FROM erasure_requests er WHERE er.candidate_id=c.id AND er.organization_id=c.organization_id AND er.brand_id=c.brand_id) LIMIT 1"
+    },
+    {
+      "name": "list_privacy_access_events",
+      "description": "Content-free access authorization history for brand-wide owners/auditors. Includes missing/denied attempts. Keyset page of 50.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "before_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "before_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT id,actor_user_id,action,outcome,created_at,expires_at,EXISTS (SELECT 1 FROM hiring_privacy_read_failures f WHERE f.request_id=hiring_privacy_access.id) AS read_unconfirmed FROM hiring_privacy_access WHERE organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','auditor') AND p.requisition_id IS NULL) AND (:before_at IS NULL OR created_at<:before_at OR (created_at=:before_at AND id<:before_id)) ORDER BY created_at DESC,id DESC LIMIT 50"
+    },
+    {
+      "name": "record_privacy_read_failure",
+      "description": "Append caller-reported unconfirmed retrieval against an existing owned authorization. This is uncertainty evidence, never a provider or server failure verdict. No error text stored.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "request_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_privacy_read_failures(request_id,actor_user_id,created_at) SELECT x.id,:__user_id,:__now FROM hiring_privacy_access x WHERE x.id=:request_id AND x.actor_user_id=:__user_id AND NOT EXISTS (SELECT 1 FROM hiring_privacy_read_failures f WHERE f.request_id=x.id)"
     }
   ]
 }

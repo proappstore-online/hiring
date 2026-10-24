@@ -44,3 +44,11 @@ and exposes retained stores and blocked MAIL propagation. Its partial result is
 not fulfillment of a complete erasure request or approval to retain all existing
 content. Full rights verification, remaining-store cleanup and processor evidence
 remain outstanding.
+
+## Implemented request tracking and core export (#5)
+
+[Privacy operations](privacy-operations.md) adds owner/passkey-gated request receipt,
+identity case references, responsible owner, deadline and versioned decisions, plus
+private expiring core export. It does not infer a legal deadline or replace identity
+verification. Complete subject export, remaining erasure stores/processors and full
+legacy access/failure audit remain outstanding.

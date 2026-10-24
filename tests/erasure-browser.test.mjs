@@ -11,8 +11,11 @@ const { default: react } = await import(require.resolve('@vitejs/plugin-react'))
 const { default: tailwind } = await import(require.resolve('@tailwindcss/vite'))
 const web = new URL('../web/', import.meta.url).pathname
 const fixture = `import React from 'react';import{createRoot}from'react-dom/client';import{MemoryRouter}from'react-router-dom';import{RecruiterContext,ComplianceScreen}from'/src/RecruiterScreens.tsx';import'/src/index.css';
-window.calls=[];window.result=null;window.fail=false;
+window.calls=[];window.result=null;window.fail=false;window.rights=[];
 window.action=async(name,params)=>{window.calls.push({name,params});if(window.fail)throw Error('synthetic');
+if(name==='record_candidate_rights_event'){window.rights.push({...params,id:params.operation_id,version:params.expected_version+1});return{meta:{changes:1}};}
+if(name==='list_candidate_rights_events')return{rows:window.rights};
+if(name==='get_candidate_export')return{rows:[{candidate_id:'candidate',name:'Test',coverage:'scoped_core_export'}]};
 if(name==='request_candidate_erasure'){window.result={request_id:'request-1',operation_id:params.operation_id,application_id:params.application_id,created_at:1000,status:'partial',stores_json:JSON.stringify([{store:'candidate_core',remaining_records:0},{store:'hiring_outbox',remaining_records:1}]),verification_code:'files_indexes_exports_backups_require_verification',processor:'MAIL',processor_status:'blocked',processor_reason:'no_verified_deletion_route'};return{meta:{changes:1}};}
 return{rows:name==='get_candidate_erasure_status'&&window.result?[window.result]:[]};};
 const root=createRoot(document.getElementById('root'));let revision=0;
@@ -21,7 +24,7 @@ test('owner compliance screen wires real erasure API with confirmations, scoped 
   const cacheDir = mkdtempSync(join(tmpdir(), 'hiring-erasure-vite-'))
   const server = await createServer({ root:web,cacheDir,configFile:false,optimizeDeps:{entries:[],include:['react','react-dom/client','react-router-dom','@proappstore/sdk']},plugins:[react(),tailwind(),{
     name:'erasure-fixture',enforce:'pre',resolveId(id){if(id==='/fixture.jsx')return'\0erasure-fixture.jsx'},
-    load(id){if(id==='\0erasure-fixture.jsx')return fixture;if(id===web+'src/api.ts')return readFileSync(id,'utf8').replace("import { initPro } from '@proappstore/sdk'",'').replace("export const app = initPro({ appId: 'hiring' })",'export const app = { actions: { call: (...args) => window.action(...args) }, auth: {user: {id: "owner"}} }')},
+    load(id){if(id===web+'src/passkey.ts')return 'export async function verifyPublicationPasskey(){};export async function registerPublicationPasskey(){}';if(id==='\0erasure-fixture.jsx')return fixture;if(id===web+'src/api.ts')return readFileSync(id,'utf8').replace("import { initPro } from '@proappstore/sdk'",'').replace("export const app = initPro({ appId: 'hiring' })",'export const app = { actions: { call: (...args) => window.action(...args) }, auth: {user: {id: "owner"}} }')},
     configureServer(s){s.middlewares.use(async(req,res,next)=>{if(req.url==='/erasure-test'){res.setHeader('Content-Type','text/html');res.end(await s.transformIndexHtml('/erasure-test','<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/fixture.jsx"></script></body></html>'))}else next()})}
   }],server:{host:'127.0.0.1',port:0}})
   let browser
@@ -31,6 +34,20 @@ test('owner compliance screen wires real erasure API with confirmations, scoped 
     await page.goto(server.resolvedUrls.local[0]+'erasure-test')
     await expect(page.getByLabel('Application ID',{exact:true})).toBeVisible({timeout:30000})
     await expect(page.getByRole('button',{name:'Request deletion',exact:true})).toHaveCount(0)
+    await page.getByLabel('Subject application ID',{exact:true}).fill('app')
+    await page.getByLabel('Response deadline',{exact:true}).fill('2026-11-01T12:00')
+    await page.getByRole('button',{name:'Record request with passkey',exact:true}).click()
+    await expect(page.getByText(/State: received/)).toBeVisible()
+    await page.getByRole('button',{name:'Begin identity review',exact:true}).click()
+    await expect(page.getByText(/State: identity_verification/)).toBeVisible()
+    await page.getByLabel('Identity verification case reference',{exact:true}).fill('opaque-case')
+    await page.getByRole('button',{name:'Confirm verified identity with passkey',exact:true}).click()
+    await expect(page.getByText(/State: processing/)).toBeVisible()
+    const download=page.waitForEvent('download')
+    await page.getByRole('button',{name:'Download private core export',exact:true}).click()
+    assert.equal((await download).suggestedFilename(),'candidate-core-export.json')
+    await expect(page.getByText(/Core export downloaded/)).toBeVisible()
+
     await page.getByLabel('Application ID',{exact:true}).fill('app')
     await page.getByLabel("I have verified the candidate's identity and request scope.").check()
     await page.getByLabel('I have reviewed legal holds and confirmed that core redaction is permitted.').check()

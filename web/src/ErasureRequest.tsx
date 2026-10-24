@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as api from './api'
 import type { ErasureStatus, Role, Scope } from './api'
+import { PrivacyOperations } from './PrivacyOperations'
 import { ComplianceControls } from './ComplianceControls'
 import { button, panel } from './ui'
 
@@ -32,6 +33,7 @@ export function ErasureRequest({ scope, role }: { scope: Scope; role: Role }) {
   let stores: { store: string; remaining_records: number }[] = []
   try { stores = result ? JSON.parse(result.stores_json) : [] } catch { /* Unknown evidence never means complete. */ }
   return <div className="space-y-4">
+    {role === 'owner' && <PrivacyOperations key={JSON.stringify([scope.organization_id, scope.brand_id, api.app.auth.user?.id])} scope={scope} />}
     {role === 'owner' && <section className={panel} aria-label="Erasure scope">
       <h2 className="text-xl font-semibold">Candidate erasure</h2>
       <p>Use an application ID from this brand. This redacts the candidate and all their applications in this brand. Other brands and the independent worker account require separate requests.</p>
@@ -47,6 +49,6 @@ export function ErasureRequest({ scope, role }: { scope: Scope; role: Role }) {
         <ul>{stores.filter(s => s.remaining_records > 0).map(s => <li key={s.store}>{s.store}: {s.remaining_records} records require review</li>)}</ul>
       </section>}
     </section>}
-    <ComplianceControls role={role} onDelete={ready && !loading ? erase : undefined} />
+    <ComplianceControls role={role} exportGuidance onDelete={ready && !loading ? erase : undefined} />
   </div>
 }

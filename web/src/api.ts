@@ -31,7 +31,14 @@ type Rows<T> = { rows: T[] }
 type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: number } }[] }
 
 export const id = () => crypto.randomUUID()
-export const read = async <T,>(name: string, params: Params = {}) => (await app.actions.call<Rows<T>>(name, params)).rows
+import { auditedGatewayRead } from '../../scripts/privacy.mjs'
+const readAction = async <T,>(name: string, params: Params) => {
+  const result = name.startsWith('gateway_')
+    ? await auditedGatewayRead((action, values) => app.actions.call(action, values), name, params) as Rows<T>
+    : await app.actions.call<Rows<T>>(name, params)
+  return result
+}
+export const read = async <T,>(name: string, params: Params = {}) => (await readAction<T>(name, params)).rows
 const mutationReadbacks: Record<string, string> = {"reconcile_communication": "get_communication_reconciliation","record_acceptance": "get_acceptance_result","record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
 export const write = async (name: string, params: Params) => {
   const result = await app.actions.call<Write>(name, params)

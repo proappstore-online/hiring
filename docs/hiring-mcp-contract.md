@@ -195,3 +195,15 @@ This passkey-gated owner/recruiter action moves only a server-verified stale sen
 attempt to unknown, with atomic audit/history and preserved claim. It neither sends
 nor requeues. See [stranded sending recovery](audit-outbox.md#stranded-sending-recovery-4)
 for bounds, replay behavior and subsequent human reconciliation.
+
+## Privacy operations and audited read revision (#5)
+
+[Privacy operations](privacy-operations.md) defines the new versioned owner rights
+workflow, private 15-minute core export and `authorize_gateway_*` /
+`audited_gateway_*` pairs. The browser routes restricted gateway reads through those
+pairs. Authorization records server-derived denial/missing outcomes before retrieval;
+caller-reported read uncertainty has separate durable evidence. Direct legacy reads,
+platform-preexecution failures and broader mutation failures remain audit gaps.
+The core export excludes confidential review material and file bytes and does not
+satisfy the full async subject export contract. Full erasure/processor limitations
+remain unchanged; issue #5 still has acceptance gaps.
