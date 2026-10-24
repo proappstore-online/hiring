@@ -19,7 +19,7 @@ test('Communications browser interactions, scope isolation and mobile accessibil
  const live=await createServer({root:web,configFile:false,optimizeDeps:{entries:[]},plugins:[react(),tailwind(),{
  name:'email-fixture',enforce:'pre',
  resolveId(id){if(id==='/fixture.jsx')return '\0email-fixture.jsx'},
- load(id){if(id==='\0email-fixture.jsx')return fixture;if(id===web+'src/api.ts')return 'export const read=(...args)=>window.historyRead(...args)'},
+ load(id){if(id===web+'src/passkey.ts')return 'export const verifyPublicationPasskey=async()=>{window.verified=true}';if(id==='\0email-fixture.jsx')return fixture;if(id===web+'src/api.ts')return 'export const read=(...args)=>args[0]==="get_communication_reconciliation"?Promise.resolve(window.writes?[{replacement_draft_id:"replacement"}]:[]):window.historyRead(...args);export const id=()=>crypto.randomUUID();export const write=async(...args)=>{window.writes=args}'},
  configureServer(s){s.middlewares.use(async (req,res,next)=>{if(req.url==='/email-test'){res.setHeader('Content-Type','text/html');res.end(await s.transformIndexHtml('/email-test','<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/fixture.jsx"></script></body></html>'))}else next()})}
  }],server:{host:'127.0.0.1',port:0}})
  await live.listen()
@@ -61,6 +61,19 @@ test('Communications browser interactions, scope isolation and mobile accessibil
  await t.test('375px layout and touch target',async()=>{
  const box=await toggle.boundingBox();assert.ok(box.height>=44&&box.width>=44)
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
+ })
+ await t.test('unknown recovery requires explicit evidence and passkey and creates only an unsent replacement',async()=>{
+ await page.evaluate(()=>window.show({drafts:[{...window.props.drafts[0],delivery_state:'unknown',current_status:'unknown'}],communications:[]}))
+ await page.getByText('Reconcile: Synthetic subject',{exact:true}).click()
+ const recovery=page.getByRole('button',{name:'Confirm provider did not accept'})
+ await expect(recovery).toBeDisabled()
+ await page.getByRole('textbox',{name:'Provider evidence (no secrets)'}).fill('Provider investigation confirms no acceptance')
+ await recovery.click()
+ await expect(page.getByRole('status')).toContainText('One unsent replacement draft created')
+ assert.equal(await page.evaluate(()=>window.verified),true)
+ const [action,params]=await page.evaluate(()=>window.writes)
+ assert.equal(action,'reconcile_communication');assert.equal(params.outcome,'not_accepted');assert.equal(params.draft_id,'d');assert.equal(params.application_id,'app3')
+ await expect(recovery).toBeDisabled()
  })
  await t.test('detail loading and failure suppress empty state; retry returns to loading',async()=>{
  await page.evaluate(()=>window.show({drafts:[],communications:[],loading:true}));await expect(page.getByRole('status')).toHaveText('Loading communications…');await expect(page.getByText('No communications recorded yet.')).toHaveCount(0)

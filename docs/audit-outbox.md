@@ -172,3 +172,38 @@ removed. A tombstoned candidate cannot receive new content writes or dispatch
 claims. Sending/unknown jobs require reconciliation before the request is allowed.
 MAIL propagation remains blocked without a verified deletion route; retained stores
 are exposed in live status. This is partial erasure, not evidence of completion.
+
+## Human MAIL recovery (#4; migration 0029)
+
+`reconcile_communication` is a passkey-gated owner/recruiter action with the same
+current organization, brand and requisition checks as dispatch. It accepts only
+failed or unknown terminal attempts, an enumerated provider outcome (`accepted`
+or `not_accepted`), nonblank evidence (at most 2000 characters), and a unique
+operation ID. Active sending claims must first be resolved by their claimant;
+this action never steals a claim or assumes a timeout means failure.
+
+One immutable reconciliation per original draft records authenticated actor,
+server time, provider evidence and an optional replacement draft reference.
+Acceptance appends real reconciliation-time status evidence; it does not rewrite
+the original attempt or claim delivery. For applications without an offer, definitive non-acceptance creates exactly
+one new unsent draft with copied payload and a new logical identity, atomically
+with the reconciliation and redacted audit. Recorded acceptance blocks this retry.
+The replacement must independently pass existing queue, passkey, offer approval,
+recipient, terminal-application and erasure guards; it is never queued or sent by
+reconciliation. Offer attempts record non-acceptance without creating a replacement: migration
+0026 permits exactly one immutable authorized draft per offer, so safe offer
+resend needs a separately designed additive authorization/dispatch contract.
+The UI reports this limit and directs approved alternate contact.
+Audit failure rolls back the replacement and reconciliation together.
+
+The Communications panel exposes both choices with explicit evidence and passkey
+verification. `get_communication_reconciliation` reads scoped actor/time/evidence
+and replacement ID and confirms exact operation retries. Evidence is private
+recruiter detail, never copied into redacted audit. Do not include secrets in it.
+A duplicate reconciliation cannot create another replacement. To retry a later
+failed replacement, reconcile that distinct actual attempt with fresh evidence.
+
+This supersedes the earlier statement that all failed attempts are permanently
+terminal: original attempts remain terminal, and recovery uses explicit linked
+drafts. Unknown outcomes still have no automatic retry. No provider setup or live
+mail roundtrip is implied. The MAIL provider and FAS setup gates remain in force.

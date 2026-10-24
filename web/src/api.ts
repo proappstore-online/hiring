@@ -32,7 +32,7 @@ type Write = { meta?: { changes?: number }; results?: { meta?: { changes?: numbe
 
 export const id = () => crypto.randomUUID()
 export const read = async <T,>(name: string, params: Params = {}) => (await app.actions.call<Rows<T>>(name, params)).rows
-const mutationReadbacks: Record<string, string> = {"record_acceptance": "get_acceptance_result","record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
+const mutationReadbacks: Record<string, string> = {"reconcile_communication": "get_communication_reconciliation","record_acceptance": "get_acceptance_result","record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
 export const write = async (name: string, params: Params) => {
   const result = await app.actions.call<Write>(name, params)
   const changes = result.results?.at(-1)?.meta?.changes ?? result.meta?.changes ?? 0

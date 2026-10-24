@@ -3034,6 +3034,75 @@
         }
       },
       "sql": "SELECT a.id,a.version,COALESCE(a.accepted_stage,a.stage_extension,a.stage) AS stage,a.acceptance_evidence,x.operation_id FROM hiring_applications a JOIN hiring_acceptances x ON x.application_id=a.id WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=a.organization_id AND g.brand_id=a.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND x.operation_id=:operation_id AND x.actor_user_id=:__user_id AND x.expected_version=:expected_version AND x.acceptance_evidence=:acceptance_evidence"
+    },
+    {
+      "name": "reconcile_communication",
+      "description": "Human evidence-backed resolution of failed/unknown sends. Not accepted creates one unsent replacement; never sends or queues. Original evidence remains immutable. Offer attempts are reconciled without replacement because existing immutable offer authorization permits only one draft.",
+      "operation": "batch",
+      "requires_auth": true,
+      "step_up": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_outbox(id,organization_id,brand_id,application_id,recipient_email,subject,body,status,actor_user_id,created_at,operation_id,logical_email_id) SELECT :__uuid,o.organization_id,o.brand_id,o.application_id,o.recipient_email,o.subject,o.body,'draft',:__user_id,:__now,:operation_id,:__uuid FROM hiring_outbox o WHERE o.id=:draft_id AND o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.application_id=:application_id AND o.delivery_state IN ('failed','unknown') AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND :outcome IN ('accepted','not_accepted') AND length(trim(:evidence)) BETWEEN 1 AND 2000 AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_mail_reconciliations r WHERE r.original_draft_id=o.id) AND (:outcome='accepted' OR NOT EXISTS (SELECT 1 FROM email_status_events e WHERE e.logical_email_id=o.logical_email_id AND e.status IN ('accepted','sent'))) AND :outcome='not_accepted' AND NOT EXISTS (SELECT 1 FROM hiring_offers f WHERE f.application_id=o.application_id)",
+        "INSERT INTO hiring_mail_reconciliations(id,original_draft_id,replacement_draft_id,outcome,evidence,actor_user_id,created_at) SELECT :operation_id,o.id,CASE WHEN :outcome='not_accepted' AND NOT EXISTS (SELECT 1 FROM hiring_offers f WHERE f.application_id=o.application_id) THEN :__uuid END,:outcome,:evidence,:__user_id,:__now FROM hiring_outbox o WHERE o.id=:draft_id AND o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.application_id=:application_id AND o.delivery_state IN ('failed','unknown') AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND :outcome IN ('accepted','not_accepted') AND length(trim(:evidence)) BETWEEN 1 AND 2000 AND length(trim(:operation_id))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_mail_reconciliations r WHERE r.original_draft_id=o.id) AND (:outcome='accepted' OR NOT EXISTS (SELECT 1 FROM email_status_events e WHERE e.logical_email_id=o.logical_email_id AND e.status IN ('accepted','sent')))",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,request_id,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'outbox.reconciled',:__user_id,:operation_id,:__now,:operation_id,'outbox',:draft_id,'outbox.reconciled' WHERE changes()=1",
+        "INSERT INTO email_status_events(id,logical_email_id,status,timestamp,actor,attempt_number,metadata_json) SELECT :operation_id || '-reconciled',o.logical_email_id,CASE WHEN :outcome='accepted' THEN 'accepted' ELSE 'failed' END,:__now,:__user_id,o.attempt_count,'{\"evidence\":\"human_reconciliation\"}' FROM hiring_outbox o JOIN hiring_mail_reconciliations r ON r.original_draft_id=o.id WHERE r.id=:operation_id AND changes()=1 AND o.logical_email_id IS NOT NULL"
+      ]
+    },
+    {
+      "name": "get_communication_reconciliation",
+      "description": "Scoped readback of human mail recovery evidence; never returns claim credentials.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "draft_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string",
+          "optional": true
+        },
+        "outcome": {
+          "type": "string",
+          "optional": true
+        },
+        "evidence": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT r.id AS operation_id,r.outcome,r.evidence,r.actor_user_id,r.created_at,r.replacement_draft_id FROM hiring_mail_reconciliations r JOIN hiring_outbox o ON o.id=r.original_draft_id WHERE o.id=:draft_id AND o.organization_id=:organization_id AND o.brand_id=:brand_id AND o.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))) AND (:operation_id IS NULL OR (r.id=:operation_id AND r.actor_user_id=:__user_id AND r.outcome=:outcome AND r.evidence=:evidence))"
     }
   ]
 }

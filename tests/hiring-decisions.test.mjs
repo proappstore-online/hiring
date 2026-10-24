@@ -208,14 +208,34 @@ test('acceptance audit failure rolls back evidence, history and version',()=>{
 })
 test('additive acceptance upgrade preserves existing submitted and interview states without inferred evidence',()=>{
  const db=new DatabaseSync(':memory:');try{
- for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ const acceptanceIndex=migrations.migrations.findIndex(m=>m.name.startsWith('0028_'))
+ assert.ok(acceptanceIndex>0)
+ for(const m of migrations.migrations.slice(0,acceptanceIndex))db.exec(m.sql)
  // Seed via old-schema registered actions that do not reference new columns.
  db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1)")
  db.exec("INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1)")
  db.exec("INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req','org','brand','Role','draft',1)")
  db.exec("INSERT INTO hiring_candidates(id,organization_id,brand_id,name,email,phone,linkedin_url,created_by,created_at) VALUES('candidate','org','brand','Person','','','','owner',1)")
  for(const stage of ['submitted','interviewing','decision_pending'])db.prepare("INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,created_by,created_at,updated_at) VALUES(?,'org','brand','req','candidate','linkedin','source','basis','context','owner',?,'owner',1,1)").run(stage,stage)
- db.exec(migrations.migrations.at(-1).sql)
+ db.exec(migrations.migrations[acceptanceIndex].sql)
  for(const row of db.prepare('SELECT * FROM hiring_applications').all()){assert.equal(row.stage,row.id);assert.equal(row.accepted_stage,null);assert.equal(row.acceptance_evidence,null);assert.equal(row.version,1)}
  }finally{db.close()}
+})
+
+
+test('failed offer reconciliation preserves the immutable one-draft authorization gate',()=>{
+ const f=ready();try{
+ step(f,'submit_offer_for_approval');step(f,'approve_offer');communication(f)
+ step(f,'authorize_offer_dispatch',{draft_id:'message'})
+ const message={...scope,application_id:'app-a',draft_id:'message'}
+ f.call('queue_communication','staff-a',{...message,operation_id:'queue'})
+ f.call('claim_communication','staff-a',{...message,operation_id:'claim'})
+ f.call('complete_communication','staff-a',{...message,operation_id:'complete',claim_id:'claim',outcome:'failed'})
+ f.call('reconcile_communication','staff-a',{...message,operation_id:'recover',outcome:'not_accepted',evidence:'Provider rejected before acceptance'})
+ const recovery=f.call('get_communication_reconciliation','staff-a',message)[0]
+ assert.equal(recovery.replacement_draft_id,null)
+ assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,1)
+ assert.ok(f.call('claim_communication','staff-a',{...message,operation_id:'old-retry'}).every(n=>n===0))
+ assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_outbox WHERE delivery_state='sending'").get().n,0)
+ }finally{f.db.close()}
 })

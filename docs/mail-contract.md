@@ -84,3 +84,11 @@ processor has no copies. The earlier requirement to delete local outbox/body cop
 remains pending where immutable triggers protect those records. This implementation
 never records those copies as deleted or treats a missing provider API as successful
 propagation. Provider scope, retention and deletion evidence remain owner work.
+
+## Human recovery (#4)
+
+The [human recovery action](audit-outbox.md#human-mail-recovery-4-migration-0029)
+adds scoped, passkey-gated reconciliation and a single evidence-backed unsent
+replacement for definite non-acceptance. Provider acceptance and original attempts
+remain preserved. This is local recovery functionality, not provider provisioning
+or evidence that the remaining #25/#26/#58 live integration gates have passed.

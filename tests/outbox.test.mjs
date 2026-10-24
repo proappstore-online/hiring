@@ -125,3 +125,57 @@ test('draft creation and audit commit atomically',()=>{
  assert.equal(db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,before)
  db.close()
 })
+
+test('human reconciliation creates one safe replacement, requires scope and evidence, and audits atomically', () => {
+ for (const outcome of ['accepted','not_accepted']) {
+  const {db,call}=seeded()
+  call('queue_communication','owner',{...input,operation_id:'queue'})
+  call('claim_communication','owner',{...input,operation_id:'claim'})
+  call('complete_communication','owner',{...input,claim_id:'claim',outcome:'unknown',operation_id:'complete'})
+  const args={...input,operation_id:'recover',outcome,evidence:'Provider dashboard confirms final outcome; incident 123'}
+  for (const [user,extra] of [['outsider',{}],['owner',{brand_id:'other'}],['owner',{evidence:' '}],['owner',{outcome:'invented'}]]) {
+   assert.ok(call('reconcile_communication',user,{...args,...extra}).every(n=>n===0))
+  }
+  db.exec("CREATE TRIGGER recovery_audit_failure BEFORE INSERT ON hiring_audit_events BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+  assert.throws(()=>call('reconcile_communication','owner',args),/audit unavailable/)
+  assert.equal(db.prepare('SELECT count(*) n FROM hiring_mail_reconciliations').get().n,0)
+  assert.equal(db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,1)
+  db.exec('DROP TRIGGER recovery_audit_failure')
+  call('reconcile_communication','owner',args)
+  assert.ok(call('reconcile_communication','owner',args).every(n=>n===0))
+  assert.ok(call('reconcile_communication','owner',{...args,operation_id:'another'}).every(n=>n===0))
+  const r=db.prepare('SELECT * FROM hiring_mail_reconciliations').get()
+  assert.equal(call('get_communication_reconciliation','owner',args)[0].operation_id,'recover')
+  assert.deepEqual(call('get_communication_reconciliation','outsider',input),[])
+  assert.deepEqual(call('get_communication_reconciliation','owner',{...args,evidence:'Different'}),[])
+  assert.equal(r.actor_user_id,'owner'); assert.ok(r.created_at>0)
+  assert.equal(row(db).delivery_state,'unknown')
+  assert.ok(call('claim_communication','owner',{...input,operation_id:'retry-original'}).every(n=>n===0))
+  assert.throws(()=>db.exec('DELETE FROM hiring_mail_reconciliations'),/append-only/)
+  const audit=db.prepare("SELECT * FROM hiring_audit_events WHERE action='outbox.reconciled'").get()
+  assert.ok(!JSON.stringify(audit).includes('incident'))
+  if(outcome==='not_accepted') {
+   const replacement=db.prepare('SELECT * FROM hiring_outbox WHERE id=?').get(r.replacement_draft_id)
+   assert.equal(replacement.delivery_state,'draft')
+   assert.equal(replacement.body,row(db).body)
+   assert.notEqual(replacement.logical_email_id,row(db).logical_email_id)
+  } else assert.equal(r.replacement_draft_id,null)
+  db.close()
+ }
+})
+
+test('reconciliation cannot retry recorded acceptance, pending jobs or active claims',()=>{
+ for(const state of ['pending','sending','failed']) {
+  const {db,call}=seeded()
+  call('queue_communication','owner',{...input,operation_id:'queue'})
+  if(state!=='pending') call('claim_communication','owner',{...input,operation_id:'claim'})
+  if(state==='failed') {
+   call('complete_communication','owner',{...input,claim_id:'claim',outcome:'failed',operation_id:'complete'})
+   db.prepare("INSERT INTO email_status_events(id,logical_email_id,status,timestamp,actor) VALUES('proof',?,'accepted',1,'owner')").run(row(db).logical_email_id)
+  }
+  assert.ok(call('reconcile_communication','owner',{...input,operation_id:'recover',outcome:'not_accepted',evidence:'Evidence'}).every(n=>n===0))
+  assert.equal(db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,1)
+  db.close()
+ }
+ assert.equal(action('reconcile_communication').step_up,true)
+})

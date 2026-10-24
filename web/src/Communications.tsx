@@ -1,13 +1,14 @@
-import { useState } from 'react'
-import { read, type Communication, type Draft, type EmailStatusEvent, type Scope } from './api'
+import { useEffect, useState } from 'react'
+import { id, write, read, type Communication, type Draft, type EmailStatusEvent, type Scope } from './api'
 import { emailCards, statusLabel } from './email-model'
 import { date } from './ui'
+import { verifyPublicationPasskey } from './passkey'
 
 export function Communications({ scope, applicationId, drafts, communications, loading = false, error = '', onRetry, brandName }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[]; loading?: boolean; error?: string; onRetry?: () => void; brandName?: string }) {
   const cards = emailCards(drafts, communications)
   if (loading && !cards.length) return <p role="status" className="mt-4">Loading communications…</p>
   if (error) return <div role="alert" className="mt-4">Could not load communications. {onRetry && <button type="button" className="min-h-[44px] min-w-[44px] underline" onClick={onRetry}>Retry communications</button>}</div>
-  return <><section aria-label="Delivery reconciliation" className="my-3 border p-3"><h3 className="font-semibold">Delivery reconciliation</h3><p>{cards.filter(c => statusLabel(c.status) === 'Unknown').length} unresolved unknown outcomes in loaded records</p>{cards.some(c => statusLabel(c.status) === 'Unknown') && <p>Manual reconciliation required — check provider dashboard for delivery status. Compare the provider reference and status history below, then refresh records after evidence is recorded through the approved connector workflow. Do not resend while the outcome is unknown.</p>}<p>Provider acceptance does not confirm delivery. This page cannot record reconciliation decisions.</p></section>{cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, card.logicalId || card.key])} card={card} scope={scope} applicationId={applicationId} brandName={brandName} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>}</>
+  return <><section aria-label="Delivery reconciliation" className="my-3 border p-3"><h3 className="font-semibold">Delivery reconciliation</h3><p>{cards.filter(c => statusLabel(c.status) === 'Unknown').length} unresolved unknown outcomes in loaded records</p>{cards.some(c => statusLabel(c.status) === 'Unknown') && <p>Manual reconciliation required — check provider dashboard for delivery status. Compare the provider reference and status history below, then refresh records after evidence is recorded through the approved connector workflow. Do not resend while the outcome is unknown.</p>}<p>Provider acceptance does not confirm delivery. Record reconciliation only after checking definitive provider evidence.</p></section>{drafts.filter(d => ['failed','unknown'].includes(d.delivery_state)).map(d => <Recovery key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, d.id])} scope={scope} applicationId={applicationId} draft={d} onChanged={onRetry} />)}{cards.length ? <ul className="mt-4 space-y-3">{cards.map(card => <EmailCard key={JSON.stringify([scope.organization_id, scope.brand_id, applicationId, card.logicalId || card.key])} card={card} scope={scope} applicationId={applicationId} brandName={brandName} />)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No communications recorded yet.</p>}</>
 }
 function EmailCard({ card, scope, applicationId, brandName }: { card: ReturnType<typeof emailCards>[number]; scope: Scope; applicationId: string; brandName?: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -43,4 +44,34 @@ function EmailCard({ card, scope, applicationId, brandName }: { card: ReturnType
       {more && <button type="button" disabled={loading} className="mt-2 min-h-[44px] min-w-[44px] underline" onClick={() => void load()}>Load more history</button>}
     </div>}
   </li>
+}
+
+function Recovery({ scope, applicationId, draft, onChanged }: { scope: Scope; applicationId: string; draft: Draft; onChanged?: () => void }) {
+  const [evidence, setEvidence] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [recovered, setRecovered] = useState(false)
+  useEffect(() => {
+    let active = true
+    void read<{ outcome: string; replacement_draft_id: string | null }>('get_communication_reconciliation', { ...scope, application_id: applicationId, draft_id: draft.id }).then(rows => {
+      if (active && rows[0]) {
+        setRecovered(true)
+        setMessage(rows[0].outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0].replacement_draft_id ? `Reconciled as not accepted. Replacement draft: ${rows[0].replacement_draft_id}. Review before queueing.` : 'Reconciled as not accepted. Offer resend is blocked by the existing one-draft authorization contract; arrange approved alternate contact.')
+      }
+    }).catch(() => { if (active) setMessage('Could not load reconciliation. Refresh before recording a recovery.') })
+    return () => { active = false }
+  }, [scope.organization_id, scope.brand_id, applicationId, draft.id])
+  async function reconcile(outcome: string) {
+    setBusy(true); setMessage('')
+    try {
+      await verifyPublicationPasskey()
+      await write('reconcile_communication', { ...scope, application_id: applicationId, draft_id: draft.id, outcome, evidence, operation_id: id() })
+      const rows = await read<{ replacement_draft_id: string | null }>('get_communication_reconciliation', { ...scope, application_id: applicationId, draft_id: draft.id })
+      setRecovered(true)
+      setMessage(outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0]?.replacement_draft_id ? 'One unsent replacement draft created. Review before queueing; no message was sent.' : 'Non-acceptance recorded. Offer resend requires a new authorization contract; no replacement was created.')
+      onChanged?.()
+    } catch { setMessage('Recovery could not be confirmed. Refresh and check the recorded reconciliation before retrying.') }
+    finally { setBusy(false) }
+  }
+  return <details className="my-3 border p-3"><summary>Reconcile: {draft.subject}</summary><p>Check the provider outcome first. Never retry an uncertain send. Non-acceptance creates an unsent replacement only for applications without an offer. Offer resends remain blocked. Recovery preserves the original attempt and requires a passkey.</p><label>Provider evidence (no secrets)<textarea maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><fieldset disabled={busy || recovered || !evidence.trim()}><button type="button" className="min-h-[44px] underline mr-4" onClick={() => void reconcile('accepted')}>Confirm provider accepted</button><button type="button" className="min-h-[44px] underline" onClick={() => void reconcile('not_accepted')}>Confirm provider did not accept</button></fieldset>{message && <p role="status">{message}</p>}</details>
 }
