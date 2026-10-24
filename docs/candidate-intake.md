@@ -182,3 +182,6 @@ ownership-checked compatibility actions for authenticated clients; the detail UI
 uses the scoped actions. Tokens are private database credentials and must not be
 included in operational logs or exports. No anonymous endpoint, email token delivery
 or privileged worker is introduced.
+
+Talent-pool participation now has a fixed 180-day expiry and candidate self-service
+withdrawal. See [talent pool](talent-pool.md) for scope, consent and retention rules.

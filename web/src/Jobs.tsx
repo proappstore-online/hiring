@@ -131,7 +131,7 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
         <label className="block text-sm">Phone (optional)<input className={field} aria-label="Phone (optional)" name="phone" type="tel" autoComplete="tel" maxLength={100} aria-describedby={description} /></label>
         <label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} aria-describedby={description} /></label>
         <label className="block min-h-[44px] text-sm"><input name="notice_acknowledged" type="checkbox" required aria-describedby={description} /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label>
-        <label className="block min-h-[44px] text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future talent-pool participation described in the notice.</label>
+        <label className="block min-h-[44px] text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future contact by this brand for 180 days, as described in the notice. I can withdraw talent-pool consent in My Applications.</label>
         <label className="block min-h-[44px] text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label>
       </fieldset>
       <button className={button} aria-label={busy ? 'Submitting…' : 'Submit application'} disabled={busy} type="submit">{busy ? 'Submitting…' : 'Submit application'}</button>

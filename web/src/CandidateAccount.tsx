@@ -1,3 +1,4 @@
+import { TalentPool } from './TalentPool'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { id, read, write, stageLabel, TERMINAL_STAGES, type CandidateApplication } from './api'
@@ -47,7 +48,7 @@ export function CandidateApplicationCard({ application: a, userId, detail = fals
       {a.stage === 'withdrawn' && <p role="status">Application withdrawn. Your records remain subject to the retention and explicit deletion policy.</p>}
       {error && <p role="alert">Withdrawal could not be confirmed. Refresh to check the current status or retry the same request.</p>}
       {confirm && <ConfirmDialog title="Withdraw this application?" body="This stops further active-stage changes for this application. It does not delete your records or recall messages already in progress." confirmLabel="Confirm withdrawal" onCancel={() => setConfirm(false)} onConfirm={() => void withdraw()} />}
-      <CandidateRights key={userId + a.application_id} application={a} /><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></>}
+      <TalentPool key={userId + a.application_id + ":pool"} scope={a} applicationId={a.application_id} /><CandidateRights key={userId + a.application_id} application={a} /><Attachments key={a.application_id} scope={a} applicationId={a.application_id} userId={userId} /></>}
   </article>
 }
 

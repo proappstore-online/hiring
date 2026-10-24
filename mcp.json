@@ -1075,7 +1075,7 @@
         "INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,version,created_by,created_at,updated_at,submitted_snapshot_json,notice_version,idempotency_key) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:candidate_id,'linkedin','Direct application',:notice_version,'Candidate supplied', (SELECT user_id FROM hiring_effective_access WHERE organization_id=:organization_id AND brand_id=:brand_id AND role='owner' AND requisition_id IS NULL ORDER BY created_at,user_id LIMIT 1),'submitted',1,:__user_id,:__now,:__now,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:notice_version,:idempotency_key WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_candidates WHERE id=:candidate_id AND worker_user_id=:__user_id AND organization_id=:organization_id AND brand_id=:brand_id)",
         "INSERT INTO hiring_intake_receipts(application_id,organization_id,brand_id,requisition_id,worker_user_id,idempotency_key,payload_json,created_at) SELECT :application_id,:organization_id,:brand_id,:requisition_id,:__user_id,:idempotency_key,json_object('name',:candidate_name,'email',lower(trim(:email)),'phone',:phone,'statement',:statement,'notice_version',:notice_version,'publication_version',:expected_version,'notice_acknowledged',:notice_acknowledged,'talent_pool_consent',:talent_pool_consent,'communications_consent',:communications_consent,'requisition_id',:requisition_id,'brand_id',:brand_id,'organization_id',:organization_id),:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_applications WHERE id=:application_id AND created_by=:__user_id)",
         "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application_notice','contract',:notice_version,json_object('affirmative_action','application_submit','notice_text',j.notice_text,'publication_version',j.version),:__user_id,:__now FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND changes()=1",
-        "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id||':'||p.purpose,:organization_id,:brand_id,:application_id,p.purpose,'consent',:notice_version,'Optional unchecked checkbox selected at submission',:__user_id,:__now FROM (SELECT 'talent_pool' AS purpose,:talent_pool_consent AS selected UNION ALL SELECT 'communications',:communications_consent) p WHERE p.selected=1 AND EXISTS (SELECT 1 FROM hiring_consent_records WHERE id=:operation_id AND actor_user_id=:__user_id AND application_id=:application_id)",
+        "INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) SELECT :operation_id||':'||p.purpose,:organization_id,:brand_id,:application_id,p.purpose,'consent',:notice_version,CASE WHEN p.purpose='talent_pool' THEN 'Optional unchecked checkbox selected: future contact by this brand for 180 days, withdraw in My Applications' ELSE 'Optional unchecked checkbox selected at submission' END,:__user_id,:__now FROM (SELECT 'talent_pool' AS purpose,:talent_pool_consent AS selected UNION ALL SELECT 'communications',:communications_consent) p WHERE p.selected=1 AND EXISTS (SELECT 1 FROM hiring_consent_records WHERE id=:operation_id AND actor_user_id=:__user_id AND application_id=:application_id)",
         "INSERT INTO hiring_stage_events(id,organization_id,brand_id,application_id,from_stage,to_stage,version,reason,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,NULL,'submitted',1,'Candidate submitted',:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_consent_records WHERE id=:operation_id AND actor_user_id=:__user_id AND application_id=:application_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'application.submitted',:__user_id,:operation_id,:__now WHERE changes()=1"
       ]
@@ -5314,6 +5314,67 @@
         }
       },
       "sql": "INSERT INTO hiring_receipt_templates(organization_id,brand_id,template_id,template_version,configured_by,configured_at) SELECT t.organization_id,t.brand_id,t.id,t.version,:__user_id,:__now FROM hiring_communication_templates t JOIN hiring_template_approvals ap ON ap.template_id=t.id AND ap.version=t.version JOIN hiring_brands b ON b.id=t.brand_id AND b.organization_id=t.organization_id WHERE t.id=:template_id AND t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.version=:expected_version AND ap.organization_id=t.organization_id AND ap.brand_id=t.brand_id AND ap.subject=t.subject AND ap.body=t.body AND instr(t.subject,b.name)>0 AND instr(t.body,b.name)>0 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) ON CONFLICT(organization_id,brand_id) DO UPDATE SET template_id=excluded.template_id,template_version=excluded.template_version,configured_by=excluded.configured_by,configured_at=excluded.configured_at"
+    },
+    {
+      "name": "list_talent_pool",
+      "description": "Current separately consented brand talent pool; expired or erased participation is excluded.",
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "after_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT c.id,c.name,c.email,MAX(t.expires_at) AS expires_at FROM hiring_talent_pool_terms t JOIN hiring_consent_records cr ON cr.id=t.consent_id JOIN hiring_applications a ON a.id=cr.application_id AND a.organization_id=cr.organization_id AND a.brand_id=cr.brand_id JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND cr.purpose='talent_pool' AND cr.legal_basis='consent' AND cr.withdrawn_at IS NULL AND t.expires_at>:__now AND NOT EXISTS(SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS(SELECT 1 FROM hiring_deletion_tombstones e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS(SELECT 1 FROM hiring_restore_tombstones e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND EXISTS(SELECT 1 FROM hiring_organizations o WHERE o.id=a.organization_id AND o.status='active') AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND c.id>COALESCE(:after_id,'') GROUP BY c.id,c.name,c.email ORDER BY c.id LIMIT 50"
+    },
+    {
+      "name": "get_my_talent_pool",
+      "description": "Current separately consented brand talent pool; expired or erased participation is excluded.",
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "sql": "SELECT cr.id AS consent_id,t.expires_at FROM hiring_talent_pool_terms t JOIN hiring_consent_records cr ON cr.id=t.consent_id JOIN hiring_applications a ON a.id=cr.application_id AND a.organization_id=cr.organization_id AND a.brand_id=cr.brand_id JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND cr.purpose='talent_pool' AND cr.legal_basis='consent' AND cr.withdrawn_at IS NULL AND t.expires_at>:__now AND NOT EXISTS(SELECT 1 FROM erasure_requests e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS(SELECT 1 FROM hiring_deletion_tombstones e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND NOT EXISTS(SELECT 1 FROM hiring_restore_tombstones e WHERE e.candidate_id=c.id AND e.organization_id=c.organization_id AND e.brand_id=c.brand_id) AND a.id=:application_id AND c.worker_user_id=:__user_id ORDER BY cr.id LIMIT 50"
+    },
+    {
+      "name": "withdraw_my_talent_pool",
+      "description": "Withdraw all future-contact talent-pool consent for your candidate in this brand. Application processing and communications consent are separate.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_consent_records SET withdrawn_at=:__now WHERE organization_id=:organization_id AND brand_id=:brand_id AND purpose='talent_pool' AND withdrawn_at IS NULL AND application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.worker_user_id=:__user_id AND EXISTS(SELECT 1 FROM hiring_applications selected JOIN hiring_candidates own ON own.id=selected.candidate_id AND own.organization_id=selected.organization_id AND own.brand_id=selected.brand_id WHERE selected.id=:application_id AND selected.organization_id=:organization_id AND selected.brand_id=:brand_id AND own.worker_user_id=:__user_id)) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'privacy.talent_pool.withdrawn',:__user_id,:operation_id,:__now WHERE changes()>0"
+      ]
     }
   ]
 }

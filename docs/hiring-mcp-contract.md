@@ -342,3 +342,9 @@ owner/auditor keyset inspection of unresolved mail and retention jobs (100/page)
 It grants no dispatch or worker capability. Recovery uses existing passkey human
 reconciliation and hold-aware retention claims; see
 [monitoring, alert bindings and runbooks](operational-monitoring.md).
+
+Talent-pool actions: `list_talent_pool` requires current full-brand owner/recruiter
+access and supports `after_id` pages of 50. `get_my_talent_pool` and
+`withdraw_my_talent_pool` require the signed-in candidate's ownership of the selected
+application and explicit organization/brand scope. Withdrawal uses `operation_id`
+for atomic audit and replay protection. See [talent pool](talent-pool.md).

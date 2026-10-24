@@ -29,10 +29,12 @@ Platform `app.roles` gates app-level administration. Hiring must also enforce or
 
 **MVP:** public organization sign-up, brand setup and worker account/profile self-registration; membership/grants; requisition drafting and publishing; accessible brand-specific application form; candidate/application records; duplicate suggestions with human-controlled merge; stage pipeline; recruiter review; interview scheduling metadata and scorecards; human decision and offer tracking (no signature); consent, retention and audit; MAIL-mediated transactional messages; constrained MCP tools; export/deletion requests. Each form identifies the organization and brand and displays the approved privacy notice.
 
-**Next:** separately consented talent pools, configurable templates, suppressed-small-cell analytics, calendar integration, structured offer approval, import and webhooks.
+**Next:** configurable templates, suppressed-small-cell analytics, calendar integration, structured offer approval, import and webhooks.
 
 **Conditional:** job-board syndication, AI assistance, background checks and agency workflows require their own security, fairness and commercial review; legal review is not currently required.
 
 Hiring is not payroll, HRIS, contract signing, immigration advice or an automated hiring decision maker. No ranking, rejection or offer may be made solely by AI. Candidate data is not a shared cross-brand talent pool by default. Unpaid trials, internships and volunteer roles follow ordinary role publishing without a legal-review gate at this stage.
 
 Launch requires two distinct brands to run end-to-end without cross-brand access, resilient messaging, working subject rights, accessibility/security evidence and approved public legal identity and copy; no separate legal review is required. Until then marketing and legal pages remain placeholders.
+
+Brand-scoped talent pools support separate opt-in, a 180-day participation expiry and candidate withdrawal; see [talent pool](talent-pool.md).

@@ -58,3 +58,5 @@ Owner identity editors, scoped member management, and immutable public identity 
 - [Incident response and breach decisions](incident-response.md): versioned command, containment, evidence, processor escalation and notification records; synthetic [tabletops](incident-tabletops.json) and remaining readiness holds (#48).
 
 [Compliance and policy verification matrix (#54)](compliance-verification.md) maps approved policy clauses and every release-register requirement to gates, owner, pass criteria, evidence, existing workflow checks and backlog handoffs.
+
+- [Separately consented talent pool](talent-pool.md): brand-only future contact, fixed expiry and candidate withdrawal.
