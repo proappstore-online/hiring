@@ -184,6 +184,11 @@ grants merely to repair an email connection.
 
 ## Read budget and application audit
 
+The [Hiring orchestration helpers](bounded-email-orchestration.md) implement
+durable local send/read reservations and archive→readback→checkpoint ordering
+for a trusted integration host. Their regression tests use actual Hiring SQL
+and synthetic provider callbacks; they do not establish live connector acceptance.
+
 Instance rules require metadata first, at most ten summaries and three relevant body reads
 per run, at most 4,000 body characters each. These are the tighter operating limits, not
 the connector's maximums. The candidate CF connector defaults to ten summaries, caps each list
