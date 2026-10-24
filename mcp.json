@@ -4422,6 +4422,127 @@
         "INSERT INTO hiring_restore_hold_events(restore_id,ledger,sequence,organization_id,brand_id,candidate_id,state,reason_reference,review_at,actor_user_id,created_at,operation_id) SELECT :restore_id,:ledger,MAX(COALESCE((SELECT MAX(sequence) FROM hiring_restore_hold_events WHERE ledger=:ledger),0),CASE WHEN :ledger='legacy' THEN COALESCE((SELECT MAX(sequence) FROM erasure_hold_events),0) ELSE COALESCE((SELECT MAX(sequence) FROM hiring_store_holds),0) END)+1,:organization_id,:brand_id,a.candidate_id,'released',:reason_reference,:review_at,:__user_id,:__now,:operation_id FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :ledger IN ('legacy','stores') AND EXISTS(SELECT 1 FROM hiring_restore_hold_events WHERE restore_id=:restore_id AND candidate_id=a.candidate_id AND organization_id=:organization_id AND brand_id=:brand_id AND ledger=:ledger) AND NOT EXISTS(SELECT 1 FROM hiring_deletion_steps s JOIN hiring_deletion_requests r ON r.id=s.request_id WHERE r.candidate_id=a.candidate_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND s.state IN ('running','unknown')) AND NOT EXISTS(SELECT 1 FROM hiring_restore_hold_events WHERE operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,'retention.restored_hold_released',:__user_id,:operation_id,:__now WHERE changes()=1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
       ]
+    },
+    {
+      "name": "submit_my_rights_request",
+      "description": "Submit access, correction, withdrawal or erasure (deletion) request for an application owned by the authenticated candidate. No email lookup. Retry with the same request ID and confirm through list_my_rights_requests. Identity review and deadline assignment follow separately.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "request_type": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_rights_intake(id,organization_id,brand_id,application_id,request_type,actor_user_id,created_at) SELECT :request_id,i.organization_id,i.brand_id,i.application_id,:request_type,:__user_id,:__now FROM hiring_intake_receipts i WHERE i.organization_id=:organization_id AND i.brand_id=:brand_id AND i.application_id=:application_id AND i.worker_user_id=:__user_id AND :request_type IN ('access','correction','withdrawal','deletion') AND length(trim(:request_id)) BETWEEN 1 AND 128 AND NOT EXISTS(SELECT 1 FROM hiring_rights_intake WHERE id=:request_id) AND NOT EXISTS(SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:request_id OR operation_id=:request_id)"
+    },
+    {
+      "name": "list_my_rights_requests",
+      "description": "Scoped rights receipts and latest status. No identity or decision case references. Missing and unauthorized return identical empty rows. Newest first, 50 per page.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "before_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "before_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT i.id AS request_id,i.application_id,i.request_type,i.created_at,COALESCE(e.status,'received') AS status,e.deadline_at,e.owner_user_id,e.version FROM hiring_rights_intake i LEFT JOIN hiring_rights_events e ON e.request_id=i.id AND e.version=(SELECT MAX(v.version) FROM hiring_rights_events v WHERE v.request_id=i.id) WHERE i.organization_id=:organization_id AND i.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_intake_receipts r WHERE r.application_id=i.application_id AND r.organization_id=i.organization_id AND r.brand_id=i.brand_id AND r.worker_user_id=:__user_id) AND i.application_id=:application_id AND i.actor_user_id=:__user_id AND (:before_at IS NULL OR i.created_at<:before_at OR (i.created_at=:before_at AND i.id<:before_id)) ORDER BY i.created_at DESC,i.id DESC LIMIT 50"
+    },
+    {
+      "name": "list_brand_rights_intake",
+      "description": "Scoped rights receipts and latest status. No identity or decision case references. Missing and unauthorized return identical empty rows. Newest first, 50 per page.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "before_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "before_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT i.id AS request_id,i.application_id,i.request_type,i.created_at,COALESCE(e.status,'received') AS status,e.deadline_at,e.owner_user_id,e.version FROM hiring_rights_intake i LEFT JOIN hiring_rights_events e ON e.request_id=i.id AND e.version=(SELECT MAX(v.version) FROM hiring_rights_events v WHERE v.request_id=i.id) WHERE i.organization_id=:organization_id AND i.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=i.organization_id AND p.brand_id=i.brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND (:before_at IS NULL OR i.created_at<:before_at OR (i.created_at=:before_at AND i.id<:before_id)) ORDER BY i.created_at DESC,i.id DESC LIMIT 50"
+    },
+    {
+      "name": "attest_candidate_rights_completion",
+      "description": "Owner/passkey human attestation of reviewed correction, withdrawal or deletion completion. Requires verified processing and opaque evidence of all applicable execution/processor steps. Does not execute deletion or correction.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "request_type": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "owner_user_id": {
+          "type": "string"
+        },
+        "deadline_at": {
+          "type": "integer"
+        },
+        "proof_reference": {
+          "type": "string",
+          "optional": true
+        },
+        "decision_reference": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "INSERT INTO hiring_rights_events(id,organization_id,brand_id,application_id,request_id,request_type,version,status,owner_user_id,deadline_at,proof_reference,decision_reference,actor_user_id,created_at) SELECT :operation_id,:organization_id,:brand_id,:application_id,:request_id,:request_type,:expected_version+1,:status,:owner_user_id,:deadline_at,:proof_reference,:decision_reference,:__user_id,:__now FROM hiring_applications a WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND length(trim(:request_id)) BETWEEN 1 AND 128 AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND length(trim(:owner_user_id)) BETWEEN 1 AND 128 AND :deadline_at>0 AND :deadline_at=CAST(:deadline_at AS INTEGER) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:owner_user_id AND p.role='owner' AND p.requisition_id IS NULL) AND :request_type IN ('access','correction','withdrawal','deletion','export','objection') AND :status IN ('received','identity_verification','processing','fulfilled','denied_with_reason') AND (:proof_reference IS NULL OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:decision_reference IS NULL OR length(trim(:decision_reference)) BETWEEN 1 AND 128) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND ((:expected_version=0 AND :status='received' AND :proof_reference IS NULL AND :decision_reference IS NULL AND NOT EXISTS (SELECT 1 FROM hiring_rights_events WHERE request_id=:request_id)) OR EXISTS (SELECT 1 FROM (SELECT e.* FROM hiring_rights_events e WHERE e.request_id=:request_id ORDER BY e.version DESC LIMIT 1) old WHERE old.organization_id=:organization_id AND old.brand_id=:brand_id AND old.application_id=:application_id AND old.request_type=:request_type AND old.version=:expected_version AND ((old.status='received' AND :status IN ('identity_verification','denied_with_reason')) OR (old.status='identity_verification' AND :status IN ('processing','denied_with_reason')) OR (old.status='processing' AND :status IN ('fulfilled','denied_with_reason'))) AND (:status NOT IN ('processing','fulfilled') OR length(trim(:proof_reference)) BETWEEN 1 AND 128) AND (:status NOT IN ('fulfilled','denied_with_reason') OR length(trim(:decision_reference)) BETWEEN 1 AND 128))) AND :status='fulfilled' AND :request_type IN ('correction','withdrawal','deletion')",
+      "step_up": true
     }
   ]
 }

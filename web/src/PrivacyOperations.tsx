@@ -14,6 +14,7 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
   const [deadline, setDeadline] = useState('')
   const [proof, setProof] = useState('')
   const [decision, setDecision] = useState('')
+  const [inbox, setInbox] = useState<(RightsEvent & { application_id: string })[]>([])
   const [latest, setLatest] = useState<RightsEvent>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -36,7 +37,7 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
     const key=JSON.stringify(values)
     if (pending.current?.key!==key) pending.current={key,operation:id()}
     const operation=pending.current.operation
-    try { await app.actions.call('record_candidate_rights_event', { ...values, operation_id:operation }) } catch { /* Read durable history after an uncertain response. */ }
+    try { await app.actions.call(status === 'fulfilled' && !['access','export'].includes(values.request_type) ? 'attest_candidate_rights_completion' : 'record_candidate_rights_event', { ...values, operation_id:operation }) } catch { /* Read durable history after an uncertain response. */ }
     const current=await history();setLatest(current)
     if (current?.id!==operation) throw new Error('Change could not be confirmed. Check current history and retry with the same request.')
     pending.current=null;setMessage('Rights request recorded.')
@@ -53,7 +54,9 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
     setMessage('Core export downloaded. File bytes and confidential review material are excluded. Full rights fulfillment still requires review.')
   }
   return <section className={panel} aria-label="Subject rights requests"><h2 className="text-xl font-semibold">Subject rights requests and export</h2>
-    <p>Record receipt, assigned owner, deadline and identity-review evidence. Use opaque case references; never enter identity documents. Deletion, correction and withdrawal require separate execution and cannot be marked complete here.</p>
+    <p>Record receipt, assigned owner, deadline and identity-review evidence. Use opaque case references; never enter identity documents. Completion is a human attestation: first review execution and processor evidence. A partial core erasure is not complete deletion.</p>
+    <button className={button} onClick={()=>void run(async()=>setInbox(await read('list_brand_rights_intake', scope)))}>Load candidate rights inbox</button>
+    <ul>{inbox.map(row=><li className="break-words" key={row.request_id}>{row.request_type} · {row.status} · {row.deadline_at ? new Date(row.deadline_at).toLocaleString() : 'Needs owner and deadline'} <button className={button} onClick={()=>void run(async()=>{reset();setApplication(row.application_id);setRequest(row.request_id);setKind(row.request_type);const events=await read<RightsEvent>('list_candidate_rights_events',{...scope,application_id:row.application_id,rights_request_id:row.request_id});setLatest(events.sort((a,b)=>b.version-a.version)[0])})}>Review request {row.request_id}</button></li>)}</ul>
     <fieldset disabled={busy} className="space-y-3 mt-3">
       <label className="block">Subject application ID<input className={field} value={application} onChange={e=>{setApplication(e.target.value);reset()}} /></label>
       <label className="block">Rights request ID<input className={field} value={request} onChange={e=>{setRequest(e.target.value);reset()}} /></label>
@@ -68,6 +71,7 @@ export function PrivacyOperations({ scope }: { scope: Scope }) {
       {latest?.status==='received' && <button className={button} onClick={()=>void run(()=>record('identity_verification'))}>Begin identity review</button>}
       {latest?.status==='identity_verification' && <button className={button} disabled={!proof.trim()} onClick={()=>void run(()=>record('processing'))}>Confirm verified identity with passkey</button>}
       {latest?.status==='processing' && ['access','export'].includes(latest.request_type) && <><button className={button} onClick={()=>void run(download)}>Download private core export</button><button className={button} onClick={()=>{handle.current=null;setMessage('Next download will request a new 15-minute authorization.')}}>Request fresh export authorization</button><button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Record reviewed fulfillment</button></>}
+      {latest?.status==='processing' && ['correction','withdrawal','deletion'].includes(latest.request_type) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('fulfilled'))}>Attest reviewed execution completion</button>}
       {latest && !['fulfilled','denied_with_reason'].includes(latest.status) && <button className={button} disabled={!decision.trim()} onClick={()=>void run(()=>record('denied_with_reason'))}>Record denial with passkey</button>}
     </fieldset><p role="status" className="break-words">{message}</p>
   </section>

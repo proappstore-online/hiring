@@ -40,7 +40,7 @@ Owner identity editors, scoped member management, and immutable public identity 
 - [Scoped core erasure](erasure.md): owner-only redaction, explicit holds, durable
   partial status and remaining store/processor blockers (#31, not yet complete).
 
-- [Privacy operations](privacy-operations.md): versioned subject rights requests,
+- [Privacy operations](privacy-operations.md): candidate intake, scoped identity review, versioned subject rights requests,
   private core exports, audited restricted MCP access and remaining #5 gaps.
 
 - [Duplicate review and merge](candidate-duplicates.md): scoped suggestions, owner/passkey

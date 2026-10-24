@@ -251,3 +251,14 @@ imports and restore readiness actions are `callers: ["worker"]` only and check t
 platform worker identity. They must never be exposed through a user-supplied action
 proxy. [Retention contract](retention.md) defines claim interlocks, uncertain-outcome
 reconciliation, signed checkpoint/gate requirements and remaining integration limits.
+
+### Subject rights intake (#29)
+
+Candidates use authenticated `submit_my_rights_request` and
+`list_my_rights_requests` with exact receipt ownership. Owners use
+`list_brand_rights_intake` then adopt the unchanged receipt via
+`record_candidate_rights_event`, assigning deadline and owner. Verification is
+human-reviewed and scoped; private evidence references never appear in candidate
+status. `attest_candidate_rights_completion` records owner/passkey-reviewed
+completion of correction, withdrawal or deletion after processing; it performs no
+data mutation beyond lifecycle/audit evidence. See [privacy operations](privacy-operations.md).

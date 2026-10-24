@@ -239,3 +239,13 @@ Restore sessions import signed tombstone/hold ledgers before creating fresh repl
 attempts. Access stays closed until operator verification; protected D1 content and
 unavailable adapters remain blockers. See [retention contract](retention.md) for
 exact interfaces, private manifest handling and deployment/inventory limits.
+
+## Subject rights intake revision (#29)
+
+`0038_subject_rights_intake` adds immutable candidate receipts, keyed by request ID
+and exact application scope. Account association is derived from the authenticated
+intake principal. Owner adoption binds the existing versioned rights events to the
+receipt's original scope and type. Human identity review, assignment and deadline
+precede processing; human completion attestation for correction, withdrawal and
+deletion requires private decision/execution evidence. Candidate status projects
+no identity/decision case references. See [privacy operations](privacy-operations.md).
