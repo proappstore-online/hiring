@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "playbook_version": 1,
+  "exercises": [
+    {
+      "id": "cross-brand-exposure",
+      "date": "2026-10-24",
+      "mode": "synthetic-desk-walkthrough",
+      "facilitator": "Repository implementation agent",
+      "operator_participants": [],
+      "detection": "Synthetic Brand A recruiter receives a Brand B application response.",
+      "containment": "Revoke every overlapping staff grant; request platform containment if owner access is involved; verify fresh Brand A reads, search and exports deny Brand B.",
+      "candidate_impact": "Assume both brands potentially affected until audit time range and successful reads/exports bound the subjects and copies.",
+      "evidence": "Synthetic identifiers only; inspect append-only audit and scoped request references in a restricted live drill. No production evidence collected.",
+      "notification_decision": "Unresolved: commander must confirm jurisdiction, authority, earliest awareness clock and notification threshold; no notice sent.",
+      "remediation": "Repair scope enforcement; rerun search-scoping and permissions tests; commander reviews isolated denial evidence before reopening.",
+      "follow_up": "Serge to confirm backup/contact register and jurisdiction authority, schedule isolated operator drill and attach restricted evidence before launch.",
+      "outcome": "unverified",
+      "live_evidence": null
+    },
+    {
+      "id": "lost-candidate-token",
+      "date": "2026-10-24",
+      "mode": "synthetic-desk-walkthrough",
+      "facilitator": "Repository implementation agent",
+      "operator_participants": [],
+      "detection": "Synthetic candidate reports a lost status token; inject possible session theft.",
+      "containment": "Token alone still requires candidate authentication; no revoke-token action exists. Escalate session invalidation to platform; verify old session and compatibility actions deny access.",
+      "candidate_impact": "Assess status disclosure and unauthorized withdrawal; expiry is insufficient if an authenticated session can mint fresh tokens.",
+      "evidence": "Synthetic identifiers only; inspect append-only audit and scoped request references in a restricted live drill. No production evidence collected.",
+      "notification_decision": "Unresolved: commander must confirm jurisdiction, authority, earliest awareness clock and notification threshold; no notice sent.",
+      "remediation": "Verify purpose, ownership, expiry and withdrawal replay guards; prove platform session containment before resuming.",
+      "follow_up": "Serge to confirm backup/contact register and jurisdiction authority, schedule isolated operator drill and attach restricted evidence before launch.",
+      "outcome": "unverified",
+      "live_evidence": null
+    }
+  ]
+}

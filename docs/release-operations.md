@@ -37,6 +37,11 @@ is unavailable, escalate to the platform owner and keep release held.
 
 ## Incident playbook
 
+The canonical versioned procedure and decision templates are in
+[incident response and breach decisions](incident-response.md). Its contact,
+jurisdiction and exercise holds remain in effect. The steps below summarize it.
+
+
 1. Record incident ID, UTC detection time, reporter, deployed SHA and commander.
    Page the owner and confirmed backup through the agreed private channel.
 2. Contain the smallest verified scope: revoke affected grants/sessions or token

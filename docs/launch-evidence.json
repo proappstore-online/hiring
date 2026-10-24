@@ -157,11 +157,14 @@
       "reviewer": null,
       "reviewed_at": null,
       "repository_evidence": [
-        "docs/release-operations.md"
+        "docs/release-operations.md",
+        "docs/incident-response.md",
+        "docs/incident-tabletops.json",
+        "tests/incident-response.test.mjs"
       ],
       "blocker": {
         "kind": "owner_action",
-        "reason": "The incident runbook exists; backup, escalation contacts, notification authority and executed tabletops are unconfirmed.",
+        "reason": "Versioned playbook and synthetic desk walkthroughs exist; named backup, verified escalation contacts, jurisdiction/notification authority and operator-executed containment evidence remain unconfirmed.",
         "next_action": "Owner supplies contacts and records the two exercises in #48."
       },
       "revision": null,
