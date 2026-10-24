@@ -44,8 +44,7 @@ export function ApplicationsScreen() {
   const { space } = useWorkspace(); const scope = scopeOf(space)
   const staff = space.role === 'owner' || space.role === 'recruiter'
   const requisitions = useRows<Requisition>(staff ? 'list_requisitions' : null, scope); const members = useRows<Member>(staff ? 'list_workspace_members' : null, scope)
-  const query = '?' + new URLSearchParams(scope)
-  return <Screen title="Applications"><div className="mb-5 flex flex-wrap items-center gap-4">{staff && <Link className={button} to={'/recruiter/applications/new' + query}>Add candidate</Link>}<Link className={staff ? 'underline' : button} to={'/recruiter/search' + query}>Search records</Link>{staff && <Link className="underline" to={'/recruiter/talent-pool' + query}>Talent pool</Link>}</div><RowsState key={JSON.stringify(scope)} loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} /></RowsState></Screen>
+  return <RowsState key={JSON.stringify(scope)} loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><ApplicationFilters key={space.brand_id + space.role} space={space} requisitions={requisitions.rows} members={members.rows} /></RowsState>
 }
 export function CreateCandidateScreen() {
   const { space, userId } = useWorkspace(); const scope = scopeOf(space); const navigate = useNavigate()
