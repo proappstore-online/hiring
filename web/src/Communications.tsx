@@ -56,7 +56,7 @@ function Recovery({ scope, applicationId, draft, onChanged }: { scope: Scope; ap
     void read<{ outcome: string; replacement_draft_id: string | null }>('get_communication_reconciliation', { ...scope, application_id: applicationId, draft_id: draft.id }).then(rows => {
       if (active && rows[0]) {
         setRecovered(true)
-        setMessage(rows[0].outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0].replacement_draft_id ? `Reconciled as not accepted. Replacement draft: ${rows[0].replacement_draft_id}. Review before queueing.` : 'Reconciled as not accepted. Offer resend is blocked by the existing one-draft authorization contract; arrange approved alternate contact.')
+        setMessage(rows[0].outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0].replacement_draft_id ? `Reconciled as not accepted. Replacement draft: ${rows[0].replacement_draft_id}. Review before queueing.` : 'Reconciled as not accepted. Resend is blocked by the one-job receipt or offer authorization contract; arrange approved alternate contact.')
       }
     }).catch(() => { if (active) setMessage('Could not load reconciliation. Refresh before recording a recovery.') })
     return () => { active = false }
@@ -68,12 +68,12 @@ function Recovery({ scope, applicationId, draft, onChanged }: { scope: Scope; ap
       await write('reconcile_communication', { ...scope, application_id: applicationId, draft_id: draft.id, outcome, evidence, operation_id: id() })
       const rows = await read<{ replacement_draft_id: string | null }>('get_communication_reconciliation', { ...scope, application_id: applicationId, draft_id: draft.id })
       setRecovered(true)
-      setMessage(outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0]?.replacement_draft_id ? 'One unsent replacement draft created. Review before queueing; no message was sent.' : 'Non-acceptance recorded. Offer resend requires a new authorization contract; no replacement was created.')
+      setMessage(outcome === 'accepted' ? 'Provider acceptance recorded.' : rows[0]?.replacement_draft_id ? 'One unsent replacement draft created. Review before queueing; no message was sent.' : 'Non-acceptance recorded. Resend is blocked by the receipt or offer authorization contract; no replacement was created. Arrange approved alternate contact.')
       onChanged?.()
     } catch { setMessage('Recovery could not be confirmed. Refresh and check the recorded reconciliation before retrying.') }
     finally { setBusy(false) }
   }
-  return <details className="my-3 border p-3"><summary>Reconcile: {draft.subject}</summary>{draft.delivery_reason && <p>{deliveryGuidance(draft.delivery_reason)}</p>}<p>Check the provider outcome first. Never retry an uncertain send. Non-acceptance creates an unsent replacement only for applications without an offer. Offer resends remain blocked. Recovery preserves the original attempt and requires a passkey.</p><label>Provider evidence (no secrets)<textarea maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><fieldset disabled={busy || recovered || !evidence.trim()}><button type="button" className="min-h-[44px] underline mr-4" onClick={() => void reconcile('accepted')}>Confirm provider accepted</button><button type="button" className="min-h-[44px] underline" onClick={() => void reconcile('not_accepted')}>Confirm provider did not accept</button></fieldset>{message && <p role="status">{message}</p>}</details>
+  return <details className="my-3 border p-3"><summary>Reconcile: {draft.subject}</summary>{draft.delivery_reason && <p>{deliveryGuidance(draft.delivery_reason)}</p>}<p>Check the provider outcome first. Never retry an uncertain send. Non-acceptance creates an unsent replacement only for messages other than application receipts and offers. Receipt and offer resends remain blocked. Recovery preserves the original attempt and requires a passkey.</p><label>Provider evidence (no secrets)<textarea maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><fieldset disabled={busy || recovered || !evidence.trim()}><button type="button" className="min-h-[44px] underline mr-4" onClick={() => void reconcile('accepted')}>Confirm provider accepted</button><button type="button" className="min-h-[44px] underline" onClick={() => void reconcile('not_accepted')}>Confirm provider did not accept</button></fieldset>{message && <p role="status">{message}</p>}</details>
 }
 
 function deliveryGuidance(reason: string) {

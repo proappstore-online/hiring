@@ -85,6 +85,21 @@ test('candidate account and application journey', async t => {
    await expect.poll(()=>page.evaluate(()=>typeof window.finishSubmit)).toBe('function');await page.evaluate(()=>window.finishSubmit())
    await expect(page.getByText(/Application saved for Brand a/)).toBeVisible();await page.getByRole('link',{name:'View application status'}).click();await expect(page).toHaveURL(/my-applications\/app-a$/)
   })
+  await t.test('receipt email state is separate from saved application and refresh never resubmits',async()=>{
+   await go('/vacancies/job-a/apply');await fillForm()
+   await page.getByRole('button',{name:'Submit application',exact:true}).click()
+   await expect(page.getByText(/Receipt email: pending/)).toBeVisible()
+   for (const [state,text] of [['failed','Receipt email: failed'],['unknown','Receipt email: awaiting confirmation'],['accepted','Receipt email: accepted by the email provider; delivery is not confirmed']]) {
+    await page.evaluate(state=>window.receipt.receipt_delivery_state=state,state)
+    await page.getByRole('button',{name:'Refresh receipt email status'}).click()
+    await expect(page.getByText(text,{exact:false})).toBeVisible()
+    await expect(page.getByText(/Application saved for Brand a/)).toBeVisible()
+   }
+   await page.evaluate(()=>window.fail=true)
+   await page.getByRole('button',{name:'Refresh receipt email status'}).click()
+   await expect(page.getByRole('alert')).toContainText('Your application remains saved')
+   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='submit_job_application').length),1)
+  })
   await t.test('uncertain responses reconcile on retry with stable identifiers',async()=>{
    await go('/vacancies/job-a/apply');await fillForm();await page.evaluate(()=>{window.uncertain=true;window.receiptFail=true})
    await page.getByRole('button',{name:'Submit application',exact:true}).click();await expect(page.getByRole('alert')).toContainText('retry with the same form values')

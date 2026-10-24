@@ -203,3 +203,38 @@ withdrawal, erasure, scope and current sender-access guards still apply.
 Delivery history continues to use application/brand-scoped reads and distinguishes
 queued, sending, provider acceptance, failure and unknown outcomes. Unknown
 outcomes require reconciliation before another attempt.
+
+## Transactional application receipts (#47)
+
+Migration 0042 creates one receipt outbox job in the same transaction as a new
+candidate intake receipt. Its unique application marker prevents a second job on
+submission replay, changed retry keys or a lost response. It uses the submitted
+snapshot's recipient, never staff contact information. Optional communications
+consent is unrelated to this transactional receipt.
+
+In Communication templates, the brand-wide owner approves a reviewed receipt
+subject/body and selects **Use for automatic application receipts** with passkey
+confirmation. Both must identify the brand. `configure_application_receipt` pins
+that exact approved brand/version; it is standing authorization for submission
+receipts only. Do not include staff information or candidate variables. Editing a
+selected template invalidates automatic queueing until approved and selected again.
+The existing trusted dispatcher and MAIL adapter still verify current approval,
+recipient, suppression, sender and connector before external transport. Queueing
+does not establish delivery or provision a connector.
+
+Without approved configuration, application submission still succeeds and the one
+receipt remains an unsent draft (`pending_setup` to the candidate). Staff can review
+its brand-only fallback text in Communications, create/approve an exactly matching
+template and explicitly queue that same draft. Configuring a template alone does
+not silently send earlier drafts. Staff inspect pending, failed and unknown
+outcomes and reason codes through the existing scoped Communications history.
+
+The confirmation separates “Application saved” from pending, failed, uncertain or
+provider-accepted email and offers a read-only refresh. Provider acceptance is not
+proof of inbox delivery. Candidates should check their application status, never
+resubmit to recover email. A failed/unknown receipt is not automatically retried;
+reconciliation records provider evidence but deliberately creates no replacement
+receipt job. Staff can use an approved alternate contact route after checking
+provider evidence. This maintains one job/one exclusive transport attempt even
+where the connector cannot guarantee idempotency. The live connector/sender gates
+in #58 continue to apply.

@@ -90,7 +90,7 @@ test('every legacy application child rejects mismatched scope on insert and upda
   db.exec("INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES ('brand-other','org-a','Other',0)")
   for (const table of ['hiring_stage_events','hiring_notes','hiring_outbox','hiring_assignment_events','hiring_communication_events','hiring_agent_activity','hiring_audit_events']) {
     const values = { id: table, organization_id: 'org-a', brand_id: 'brand-a', application_id: 'app-a', direction: 'inbound', channel: 'gmail', activity_type: 'email_thread_scanned', delivery_reason: 'quota' }
-    const columns = db.prepare(`PRAGMA table_info(${table})`).all().filter(c => c.dflt_value === null && c.name !== 'logical_email_id')
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().filter(c => c.dflt_value === null && !['logical_email_id','receipt_application_id'].includes(c.name))
     const params = columns.map(c => values[c.name] ?? (c.type === 'INTEGER' ? 1 : 'value'))
     const sql = `INSERT INTO ${table} (${columns.map(c => c.name).join(',')}) VALUES (${columns.map(() => '?').join(',')})`
     db.prepare(sql).run(...params)

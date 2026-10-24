@@ -93,7 +93,7 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
   const submitting = useRef(false)
   const formId = useId()
   useEffect(() => { if (error) feedback.current?.focus() }, [error])
-  useEffect(() => { if (receipt) confirmation.current?.focus() }, [receipt])
+  useEffect(() => { if (receipt) confirmation.current?.focus() }, [receipt?.application_id])
   async function submit(f: FormData) {
     if (submitting.current) return
     submitting.current = true
@@ -113,7 +113,7 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
       setReceipt(saved); await onSaved()
     } catch (e) { setError((e instanceof Error ? e.message : 'Application could not be confirmed.') + ' If the result is uncertain, retry with the same form values; your receipt will be checked before success is shown.') } finally { submitting.current = false; setBusy(false) }
   }
-  if (receipt) return <div className="mt-4"><p ref={confirmation} tabIndex={-1} role="status" aria-live="polite">Application saved for {job.brand_name}. Reference: {receipt.application_id}.</p><Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(receipt.application_id)}>View application status</Link></div>
+  if (receipt) return <div className="mt-4"><p ref={confirmation} tabIndex={-1} role="status" aria-live="polite">Application saved for {job.brand_name}. Reference: {receipt.application_id}.</p><p role="status">Receipt email: {receipt.receipt_delivery_state === 'accepted' ? 'accepted by the email provider; delivery is not confirmed' : receipt.receipt_delivery_state === 'failed' ? 'failed. Your application is saved; contact the hiring team if you need help' : receipt.receipt_delivery_state === 'unknown' || receipt.receipt_delivery_state === 'sending' ? 'awaiting confirmation. Your application is saved; do not resubmit' : 'pending. Your application is saved; you do not need to submit again'}.</p><Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(receipt.application_id)}>View application status</Link><button className={button} onClick={async () => { setError(''); try { const rows = await read<IntakeReceipt>('get_my_requisition_receipt', { organization_id: job.organization_id, brand_id: job.brand_id, requisition_id: job.requisition_id }); if (rows[0]) setReceipt({ ...rows[0] }) } catch { setError('Email status is unavailable. Your application remains saved. Try checking again later.') } }}>Refresh receipt email status</button>{error && <p role="alert">{error}</p>}</div>
   const description = `${formId}-help${error ? ` ${formId}-error` : ''}`
   return <div className="mt-5">
     <h3 id={`${formId}-title`} className="font-semibold">Apply to {job.brand_name}</h3>
