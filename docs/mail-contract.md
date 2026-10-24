@@ -131,3 +131,47 @@ acceptance before any resend. ATS business state stays committed on mail failure
 Local tests verify the adapter and SQL dispatcher; they do not establish live
 connector configuration, approved sender readiness or a successful roundtrip.
 Those existing #58 deployment gates remain in force.
+
+## Signed callbacks and reply quarantine (#26)
+
+`scripts/mail-callbacks.mjs` provides a trusted server-side callback handler. This
+is a provider-neutral implementation, not a deployed public receiver. The approved
+connector must translate its verified webhook into this envelope server-side; do
+not expose it as a browser action or register SQL write tools for callback claims.
+The bridge and live roundtrip gates above still apply.
+
+Configure a per-connector secret of at least 32 characters through server secret
+storage. Sign the exact UTF-8 `timestamp.body` with HMAC-SHA256, using a millisecond
+epoch timestamp and lowercase hex signature. Requests outside a five-minute window
+are rejected. Body is bounded to 100,000 bytes. Events require `event_id`,
+`operation_id`, `message_id`, `type`, and millisecond `occurred_at`. Replies also
+require plain `text`; optional `attachments` contains at most 20 opaque private
+references, never URLs or downloaded bytes. No callback data is logged.
+
+The injected trusted `resolve` must look up the connector's durable outbound
+operation/message mapping, verify reply parent references and sender evidence with
+the connector, and return the exact message/operation IDs, draft and tenant scope.
+For replies it supplies `sender_verified` and `unambiguous`. These flags must never
+come from the webhook JSON. Unknown mappings fail closed; preserve them in the
+connector's restricted dead-letter queue for operator investigation and redelivery.
+No matching by subject, display name or email address alone is allowed.
+
+The injected database implements `batch` with atomic SQL execution and returns
+`[{meta:{changes}}]`. Migration 0035 stores scoped receipts and projects delivery
+in the same transaction. Connector/event IDs deduplicate retries, including after a
+lost response. Delivery progress only advances (accepted → sent → delivered);
+bounce, complaint and failure evidence are independent sticky flags, so late
+acceptance cannot erase them. This projection does not reinterpret outbox `sent`
+as delivered, clear suppression, retry a send or change candidate disposition.
+
+Replies with unverified senders, ambiguous correlation or any attachment receive
+`quarantined` classification. Safely correlated plain replies are informational
+only. Authorized operators must inspect quarantine through trusted scoped tooling
+(`organization_id`, `brand_id`, `classification='quarantined'`), with current Hiring
+membership/assignment checks; no public or unrestricted MCP read is installed.
+Render reply text as escaped text. Attachment references remain private and
+quarantined pending the trusted scanning/download controls in #18; this handler
+never fetches them or marks them clean. Triage cannot change disposition; any
+subsequent decision uses the existing authorized decision workflow. Retention is
+indefinite until explicit deletion; this table adds a local store that erasure
+operators must account for, without claiming processor deletion.
