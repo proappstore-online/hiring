@@ -104,10 +104,11 @@ test('internal LinkedIn workflow is scoped, audited, and never sends', () => {
   assert.equal(call('list_communication_drafts', 'outsider', draft).length, 0)
   assert.equal(call('list_application_audit', 'staff-a', draft).length, 4)
   assert.equal(call('list_application_audit', 'outsider', draft).length, 0)
-  // Explicit human authorization may enqueue approved content; no general send tool.
+  // An authorized recruiter explicitly confirms the approved content in the UI;
+  // role, scope, recipient, template and audit controls are server-enforced.
   const sendActions = tools.filter(t => /send|dispatch/i.test(t.name) && t.operation !== 'query')
   assert.deepEqual(sendActions.map(t => t.name).sort(), ['authorize_offer_dispatch', 'hiring_v1_send_approved_message'])
-  assert.ok(sendActions.every(t => t.requires_auth && t.step_up))
+  assert.ok(sendActions.every(t => t.requires_auth && t.step_up === undefined))
 })
 
 test('authorized LinkedIn create accepts the bare host and makes an application visible', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
 import { id, read, write, type Application, type Scope } from './api'
 import { button, field, panel } from './ui'
@@ -29,6 +29,9 @@ export function DecisionsOffers({ scope, application, onChanged }: { scope: Scop
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  // Preserve an idempotency key after an uncertain confirmation so a retry
+  // can retrieve the first result instead of creating a second record.
+  const pendingOperations = useRef(new Map<string, string>())
   const params = useMemo(() => ({ tenant_id: scope.organization_id, brand_id: scope.brand_id, application_id: application.id }), [scope.organization_id, scope.brand_id, application.id])
 
   useEffect(() => {
@@ -48,14 +51,19 @@ export function DecisionsOffers({ scope, application, onChanged }: { scope: Scop
 
   async function run(action: string, values: Record<string, unknown>) {
     setBusy(true); setError('')
+    const operationId = typeof values.operation_id === 'string' ? values.operation_id : id()
     try {
-      await write(action, { ...params, ...values, operation_id: id() })
+      await write(action, { ...params, ...values, operation_id: operationId })
+      for (const [key, value] of pendingOperations.current) if (value === operationId) pendingOperations.current.delete(key)
       setRationale(''); setDisposition(''); setAcceptanceEvidence(''); setRevision(value => value + 1); onChanged()
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'This change could not be confirmed. Refresh and try again.') }
     finally { setBusy(false); setPending(null) }
   }
   function confirm(action: string, values: Record<string, unknown>, title: string, bodyText: string, label: string, variant: PendingAction['variant'] = 'warning') {
-    setPending({ action, values, title, body: bodyText, label, variant })
+    const key = `${action}:${JSON.stringify(values)}`
+    const operationId = pendingOperations.current.get(key) ?? id()
+    pendingOperations.current.set(key, operationId)
+    setPending({ action, values: { ...values, operation_id: operationId }, title, body: bodyText, label, variant })
   }
   const terms = offer ? parseTerms(offer.terms_json) : null
   const canDecide = Boolean(application.requisition_id && disposition && rationale.trim() && !terminal.has(application.stage))
