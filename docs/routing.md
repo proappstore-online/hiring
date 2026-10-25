@@ -29,8 +29,10 @@ no route scans a paginated list to infer scope. Missing, removed, cross-scope,
 and unauthorized staff records all show the same 404 view.
 
 List query parameters carry only non-sensitive transient state: public vacancy
-`q`, `filter_brand`, `arrangement`; staff application `requisition`, `stage`,
-`source`, `assignee`, `date_from`, `date_to`; and the staff workspace scope.
+`q`, `filter_brand`, `arrangement`, `engagement_basis`, `programme_kind`,
+`compensation_type`; staff application `requisition`, `stage`, `source`,
+`assignee`, `date_from`, `date_to`, `onboarding`, `invited_from`, `invited_to`;
+staff vacancy terms filters and `needs_review`; and the staff workspace scope.
 Candidate names and source-detail search stay in memory. Detail links may carry
 a `back` pointer to a whitelisted list path with allowed filters; it is
 validated again before rendering a back link. Copy/share actions omit `back` and
@@ -120,3 +122,19 @@ Settings contains organization/brand administration and grants; requisition crea
 is no longer part of workspace setup. Playbook has one page title and policy only.
 All new routes retain the validated workspace scope and use the existing guarded
 actions. Navigation highlights Applications for its entry, search and pool tasks.
+
+## Stateful navigation (#92)
+
+Public and managed vacancy terms filters are URL state, so opening a record,
+returning via its list link, refreshing, and browser back/forward restore them.
+Filter edits replace the current vacancy list history entry; opening a detail or
+application pushes a new entry. Return pointers keep only allowed list filters
+and reject a different staff workspace. Applicant text search remains in memory
+and is intentionally absent from return links and shared URLs.
+
+Public navigation has a single Vacancies destination, including the Hiring home
+link. Applying shows the vacancy title and brand alongside a return to vacancy
+details. Candidate status links back to My Applications and its canonical public
+vacancy (which may be unavailable if closed). Authentication redirects replace
+the protected/sign-in entry rather than adding a redirect loop to browser history.
+Browser tests cover these journeys, including sign-in followed by back/forward.

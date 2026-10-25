@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { parsePD, PD_FIELDS, PositionDescription } from './position-description'
 import { DiscoveryFilters } from './DiscoveryFilters'
 import { button, field, panel } from './ui'
-import { applyUrl, safeBack, vacancyUrl, withBack } from './routes'
+import { applyUrl, safeBack, vacancyUrl, withBack, termFilterKeys } from './routes'
 
 type Vacancy = PublicJob & { pd_json: string | null; pd_version: number | null; status: 'published' }
 export const vacancyLink = (v: Pick<Vacancy, 'requisition_id'>) => vacancyUrl(v.requisition_id)
@@ -15,7 +15,7 @@ export function VacanciesIndexPage() {
   const navigationType = useNavigationType()
   const querySearch = () => new URL(safeBack('/vacancies?' + query, 'vacancies'), 'https://hiring.invalid').searchParams.get('q') ?? ''
   const [search, setSearch] = useState(querySearch)
-  const [termFilters,setTermFilters] = useState<Record<string,string>>({})
+  const termFilters = Object.fromEntries(termFilterKeys.map(key => [key, query.get(key) ?? '']))
   const [rows, setRows] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -47,11 +47,17 @@ export function VacanciesIndexPage() {
     const pd = parsePD(r.pd_json)
     return matchesTerms(r.terms_json,termFilters) && (!brand || r.brand_id === brand) && (!arrangement || (pd.workingArrangement || r.arrangement) === arrangement) && `${r.title} ${pd.overview || r.description || ''}`.toLowerCase().includes(search.toLowerCase())
   })
-  function filter(key: string, value: string) { setQuery(old => { const next = new URLSearchParams(old); if (value) next.set(key, value); else next.delete(key); return next }, { replace: true }) }
+  function filter(key: string, value: string) {
+    // BrowserRouter updates history before React renders. Read that latest query
+    // so quick edits to different controls cannot overwrite a pending filter.
+    const next = new URLSearchParams(window.location.search)
+    if (value) next.set(key, value); else next.delete(key)
+    setQuery(next, { replace: true })
+  }
   return <div className="mx-auto max-w-5xl space-y-5 py-6"><h1 className="text-2xl font-semibold">Vacancies</h1><p>Explore open roles and their position descriptions.</p>
     <DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={value => { const next = value.slice(0, 100); setSearch(next); filter('q', next) }} onBrand={value => filter('filter_brand', value)} />
     <label className="block">Working arrangement<select className={field} value={arrangement} onChange={e => filter('arrangement', e.target.value)}><option value="">All arrangements</option>{arrangements.map(a => <option key={a}>{a}</option>)}</select></label>
-    <TermsFilters values={termFilters} onChange={(key,value) => setTermFilters(old => ({...old,[key]:value}))} />
+    <TermsFilters values={termFilters} onChange={filter} />
     <p className="text-sm">Showing published, open vacancies only. Search and filters apply to loaded results.</p>
     {loading && <LoadingState>Loading vacancies…</LoadingState>}{error && <ErrorState retry={() => void load()}>Vacancies could not be loaded.</ErrorState>}
     {!loading && !error && !filtered.length && <EmptyState>{rows.length ? 'No vacancies match these filters.' : 'No vacancies currently open'}</EmptyState>}
@@ -112,7 +118,7 @@ export function VacancyDetailPage() {
   }
   return <article className="mx-auto max-w-3xl space-y-6 py-6"><Link className="underline" to={safeBack(query.get('back'), 'vacancies')}>All vacancies</Link><h1 className="text-3xl font-semibold">{row.title}</h1><p>{row.organization_name} / {row.brand_name} · {row.location}</p>
     <div className="flex flex-wrap gap-2"><button className={button} onClick={() => void copyJD()}>Copy job description</button><button className={button} onClick={() => void copyLink()}>Copy vacancy link</button></div><p role="status">{feedback}</p>
-    <VacancyTerms value={row.terms_json} /><PositionDescription pd={Object.keys(pd).length ? pd : { overview: row.description, workingArrangement: row.arrangement, compensation: row.compensation, privacyContact: row.contact }} />
+    <VacancyTerms value={row.terms_json} /><PositionDescription pd={{ overview: row.description, workingArrangement: row.arrangement, compensation: row.compensation, privacyContact: row.contact, ...pd }} />
     <p>Contact: {row.contact}</p><section><h2 className="text-lg font-semibold">Candidate privacy notice — {row.notice_version}</h2><p className="whitespace-pre-wrap">{row.notice_text}</p></section>
     {available ? <Link className={button + ' inline-flex min-h-[44px] items-center'} to={withBack(applyUrl(row.requisition_id), safeBack(query.get('back'), 'vacancies'))}>Apply for this vacancy</Link> : <p role="status">Applications are not open yet. Please check back later.</p>}
   </article>

@@ -7,7 +7,7 @@ import { Attachments } from './attachments'
 import { EmptyState, ErrorState, LoadingState, NotFound } from './route-ui'
 import { button, date, panel } from './ui'
 import { ConfirmDialog } from './ConfirmDialog'
-import { candidateApplicationUrl, safeBack } from './routes'
+import { candidateApplicationUrl, safeBack, vacancyUrl } from './routes'
 import { useSearchParams } from 'react-router-dom'
 
 export const applicationLink = candidateApplicationUrl
@@ -40,6 +40,7 @@ export function CandidateApplicationCard({ application: a, userId, detail = fals
   }
   return <article className={panel + ' space-y-3 break-words'}>
     <h2 className="text-lg font-semibold">{detail ? a.title : <Link className="inline-flex min-h-[44px] items-center underline" to={applicationLink(a.application_id)}>{a.title}</Link>}</h2>
+    {detail && <Link className="underline" to={vacancyUrl(a.requisition_id)}>Vacancy details</Link>}
     <p>{a.organization_name ? a.organization_name + ' / ' : ''}{a.brand_name}</p>
     <p>Status: {stageLabel(a.stage)}</p>
     <p>Submitted: {date(a.created_at)}</p>

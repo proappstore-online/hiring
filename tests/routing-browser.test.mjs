@@ -15,7 +15,7 @@ const web = new URL('../web/', import.meta.url).pathname
 const sdk = `import React from 'react'; export const initPro=()=>({auth:{user:null}}); export const useAuth=()=>window.auth; export const ProShell=({children,nav,renderNav})=><div data-testid="staff-shell"><header>{nav?.length ? renderNav?.({items:nav,currentPath:location.pathname,onNavigate:()=>{}}) : null}</header>{children}</div>; export const PageHeader=({title})=><h1>{title}</h1>; export const SignInButton=({label})=><button>{label}</button>;`
 const fixture = `import React from 'react';import {createRoot} from 'react-dom/client';import App from '/src/App.tsx';import {RouteBoundary} from '/src/route-ui.tsx';import '/src/index.css';
 window.role='recruiter';window.auth={user:null,loading:false};window.calls=[];window.fail=false;window.gate='closed';window.pending=[];
-const job={requisition_id:'job',organization_id:'org',brand_id:'brand',title:'Engineer',brand_name:'Brand',organization_name:'Org',location:'Remote',notice_text:'Notice',notice_version:'v1',description:'Job description'};
+const job={requisition_id:'job',organization_id:'org',brand_id:'brand',terms_json:JSON.stringify({engagement_basis:'employment',programme_kind:'other',compensation_type:'salary',weekly_hours_min:20,weekly_hours_max:40}),title:'Engineer',brand_name:'Brand',organization_name:'Org',location:'Remote',notice_text:'Notice',notice_version:'v1',description:'Job description'};
 window.write=async(name,p)=>{window.savedParams=p;if(window.saveFails)throw Error('synthetic');window.saved={...p,id:p.application_id,requisition_title:'Engineer',stage:'submitted'};};
 window.read=async(name,p)=>{window.calls.push({name,p});if(name==='list_workspace_members')return [{user_id:'staff',role:'recruiter'}];if(name==='get_application'&&window.saved&&p.application_id===window.saved.id)return [window.saved];if(window.fail)throw Error('synthetic');if(window.hold)return new Promise(resolve=>window.pending.push({name,p,resolve}));if(name==='list_public_jobs'||name==='list_vacancies')return [job];if(name==='get_public_job'||name==='get_vacancy_detail')return p.requisition_id==='job'&&(!p.organization_id||p.organization_id==='org')&&(!p.brand_id||p.brand_id==='brand')?[job]:[];if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='get_my_workspace')return p.organization_id==='org'&&(!p.brand_id||p.brand_id==='brand')&&(!p.owner_only||window.role==='owner')?[{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0}]:p.organization_id==='other'&&(!p.brand_id||p.brand_id==='other')&&!p.owner_only?[{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}]:[];if(name==='list_my_workspaces'&&window.noSpaces)return [];if(name==='list_my_workspaces')return [{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0},{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}];if(name==='list_applications'&&location.search.includes('visual=1'))return [{id:'full',candidate_name:'Alex Morgan',requisition_title:'Senior Software Engineer',stage:'in_review',source:'referral',assignee_user_id:'staff',created_at:1700000000000}];if(name==='list_vacancy_management')return location.search.includes('visual=1')?[{id:'req',title:'Senior Software Engineer',state:'draft',updated_at:1700000000000}]:[];if(name==='get_vacancy_management')return p.brand_id==='brand'&&p.requisition_id==='req'&&!window.denyVacancy?[{id:'req',title:'Engineer',status:'open',state:'published',updated_at:1,can_publish:1,review_state:'pending_review',publication_version:2,published_description:'Published FGS Developer role',published_location:'Melbourne',published_arrangement:'Hybrid',published_compensation:'Salary',published_contact:'hiring@example.test',published_notice_version:'v2',published_notice_text:'Privacy notice'}]:[];if(name==='get_requisition_review')return [{version:1,payload:JSON.stringify({description:'Approved FGS Developer role',arrangement:'Hybrid',compensation:'Salary'})}];if(name==='list_requisitions')return p.brand_id==='brand'?[{id:'req',title:'Engineer',status:'draft'}]:[];if(name==='get_admin_settings')return [{organization_name:'Org',verified_contact:null,brand_name:'Brand',slug:null,notice_version:null,reply_identity:null,can_manage_organization:1}];if(name==='get_application')return p.application_id==='full'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'full',candidate_name:'Older full candidate',requisition_title:'Engineer',stage:window.candidateStage||'in_review',version:1,email:'older@example.com',phone:'',source:'referral',source_detail:'Referral',basis_reference:'Policy',contact_context:'Direct',assignee_user_id:'staff',updated_at:1}]:[];if(name==='gateway_get_application')return p.application_id==='old'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'old',candidate_name:'Restricted candidate',requisition_title:'Engineer',stage:'submitted'}]:[];return []};
 const root=createRoot(document.getElementById('root'));window.render=()=>root.render(<App/>);function Crash(){throw Error('synthetic render error')}window.crash=()=>root.render(<RouteBoundary><Crash/></RouteBoundary>);window.render();`
@@ -36,6 +36,46 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    await go('/');await expect(page).toHaveURL(/\/vacancies$/);await expect(page.getByRole('heading',{name:'Vacancies',exact:true})).toBeVisible();await expect(page.getByRole('navigation',{name:'Public navigation'})).toBeVisible();await expect(page.getByTestId('staff-shell')).toHaveCount(0)
    const link=page.getByRole('link',{name:'Engineer',exact:true});await link.focus();await page.keyboard.press('Enter');await expect(page).toHaveURL(/\/vacancies\/job\?back=/);await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toBeVisible();await expect(page.locator('#route-content')).toBeFocused();await page.reload();await expect(page.getByText('Job description',{exact:true})).toBeVisible();await page.getByRole('link',{name:'All vacancies'}).click();await expect(page.getByRole('heading',{name:'Vacancies',exact:true})).toBeVisible()
    await go('/vacancies/job');await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toBeVisible();assert.ok(await page.evaluate(()=>window.calls.some(c=>c.name==='get_vacancy_detail'&&c.p.requisition_id==='job'&&!c.p.organization_id)))
+  })
+  await t.test('structured discovery filters survive detail, apply, sign-in and browser history',async()=>{
+   await go('/vacancies?filter_brand=brand&engagement_basis=employment&compensation_type=salary')
+   await expect(page.getByLabel('engagement basis',{exact:true})).toHaveValue('employment')
+   const list=page.url()
+   await page.getByRole('link',{name:'Engineer',exact:true}).click()
+   await page.evaluate(()=>window.gate='open')
+   await page.getByRole('link',{name:'All vacancies',exact:true}).click()
+   await page.getByRole('link',{name:'Engineer',exact:true}).click()
+   await page.getByRole('link',{name:'Apply for this vacancy',exact:true}).click()
+   await expect(page.getByText('Apply for Engineer · Brand',{exact:true})).toBeVisible()
+   await page.getByRole('link',{name:'Sign in to continue',exact:true}).click()
+   await page.evaluate(()=>{window.auth={user:{id:'candidate'},loading:false};window.render()})
+   await expect(page.getByLabel('Your name')).toBeVisible()
+   await page.goBack();await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toBeVisible()
+   await page.goForward();await expect(page.getByLabel('Your name')).toBeVisible()
+   await page.getByRole('link',{name:'Vacancy details',exact:true}).click()
+   await page.getByRole('link',{name:'All vacancies',exact:true}).click()
+   assert.equal(page.url(),list)
+   await expect(page.getByLabel('compensation type',{exact:true})).toHaveValue('salary')
+   await page.reload();await expect(page.getByLabel('engagement basis',{exact:true})).toHaveValue('employment')
+  })
+  await t.test('recruiter return links retain onboarding and vacancy terms filters without private query data',async()=>{
+   const list='/recruiter/applications?organization_id=org&brand_id=brand&onboarding=invited&invited_from=2026-01-01&invited_to=2026-10-01'
+   await go('/recruiter/applications/full?organization_id=org&brand_id=brand&back='+encodeURIComponent(list+'&q=PrivateCandidate&email=private@example.test'))
+   await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()})
+   await expect(page.getByRole('link',{name:'All applications',exact:true})).toHaveAttribute('href',list)
+   await page.getByRole('link',{name:'All applications',exact:true}).click()
+   await page.getByRole('button',{name:'Filters',exact:true}).click()
+   await expect(page.getByLabel('Onboarding status',{exact:true})).toHaveValue('invited')
+   await expect(page.getByLabel('Invited from (UTC)',{exact:true})).toHaveValue('2026-01-01')
+   assert.ok(!page.url().includes('PrivateCandidate'))
+   const vacancies='/recruiter/vacancies?organization_id=org&brand_id=brand&engagement_basis=employment&needs_review=1'
+   await go('/recruiter/vacancies/req?organization_id=org&brand_id=brand&back='+encodeURIComponent(vacancies))
+   await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()})
+   await expect(page.getByRole('link',{name:'All managed vacancies',exact:true})).toHaveAttribute('href',vacancies)
+   await page.getByRole('link',{name:'All managed vacancies',exact:true}).click()
+   await page.getByText('Terms filters, report and backfill review',{exact:true}).click()
+   await expect(page.getByLabel('engagement basis',{exact:true}).first()).toHaveValue('employment')
+   await expect(page.getByRole('checkbox',{name:/Needs explicit terms review/})).toBeChecked()
   })
   await t.test('legacy public routes validate scope then redirect; invalid scopes do not open records',async()=>{
    await go('/apply/job?organization_id=org&brand_id=brand');await expect(page).toHaveURL(/\/vacancies\/job\/apply/);await expect(page.getByText('Applications are not open yet. Please check back later.')).toBeVisible();await expect(page.getByLabel('Your name')).toHaveCount(0)

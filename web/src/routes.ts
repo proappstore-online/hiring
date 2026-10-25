@@ -10,8 +10,9 @@ export const recruiterApplicationUrl = (id: string, scope: Scope) => `/recruiter
 export const brandSettingsUrl = (scope: Scope) => `/recruiter/organizations/${encodeURIComponent(scope.organization_id)}/brands/${encodeURIComponent(scope.brand_id)}/settings`
 export const organizationSettingsUrl = (organizationId: string) => `/recruiter/organizations/${encodeURIComponent(organizationId)}/settings`
 
-const publicKeys = ['q', 'filter_brand', 'arrangement']
-const staffKeys = ['requisition', 'stage', 'source', 'assignee', 'date_from', 'date_to']
+export const termFilterKeys = ['engagement_basis', 'programme_kind', 'compensation_type'] as const
+const publicKeys = ['q', 'filter_brand', 'arrangement', ...termFilterKeys]
+const staffKeys = ['requisition', 'stage', 'source', 'assignee', 'date_from', 'date_to', 'onboarding', 'invited_from', 'invited_to']
 export function safeBack(raw: string | null, destination: 'vacancies' | 'applications' | 'my-applications'): string {
   const fallback = destination === 'vacancies' ? '/vacancies' : destination === 'applications' ? '/recruiter/applications' : '/my-applications'
   if (!raw || raw.length > 1500 || !raw.startsWith('/') || raw.startsWith('//')) return fallback
@@ -39,7 +40,7 @@ export function staffBack(raw: string | null, scope: Scope, list: 'applications'
     const parsed = new URL(raw, 'https://hiring.invalid')
     if (parsed.origin !== 'https://hiring.invalid' || parsed.pathname !== `/recruiter/${list}` || parsed.searchParams.get('organization_id') !== scope.organization_id || parsed.searchParams.get('brand_id') !== scope.brand_id) return fallback
     const next = new URLSearchParams(scope)
-    for (const key of list === 'applications' ? staffKeys : []) {
+    for (const key of list === 'applications' ? staffKeys : [...termFilterKeys, 'needs_review']) {
       const value = parsed.searchParams.get(key)
       if (value && value.length <= 100 && !/[\x00-\x1f]/.test(value)) next.set(key, value)
     }

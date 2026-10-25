@@ -25,7 +25,7 @@ function RouteFocus() {
 }
 function PublicShell() {
   const { user } = useAuth(app)
-  return <><header className="border-b border-[var(--line)] p-4"><Link to="/" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink>{user && <NavLink to="/my-applications">My Applications</NavLink>}<NavLink to="/recruiter/overview">Switch to Recruiter Workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
+  return <><header className="border-b border-[var(--line)] p-4"><Link to="/vacancies" className="text-xl font-semibold">Hiring</Link><nav aria-label="Public navigation" className="flex flex-wrap gap-5"><NavLink to="/vacancies">Vacancies</NavLink>{user && <NavLink to="/my-applications">My Applications</NavLink>}<NavLink to="/recruiter/overview">Switch to Recruiter Workspace</NavLink></nav></header><main id="route-content" tabIndex={-1} className="mx-auto max-w-7xl p-4"><Outlet /></main></>
 }
 function ProtectedShell() {
   const { user, loading } = useAuth(app)
