@@ -32,6 +32,27 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
  try {
   browser=await chromium.launch();const page=await browser.newPage({viewport:{width:375,height:812},locale:'en-US',timezoneId:'UTC'});page.setDefaultTimeout(10000);const base=server.resolvedUrls.local[0].replace(/\/$/,'')
   const go=path=>page.goto(base+path)
+  await t.test('direct lifecycle routes expose valid controls, completion evidence and persistent stage filters',async()=>{
+   for(const stage of ['accepted','onboarding','onboarded','active']){
+    await go('/recruiter/applications/full?organization_id=org&brand_id=brand&view=lifecycle')
+    await page.evaluate(stage=>{window.candidateStage=stage;window.auth={user:{id:'staff'},loading:false};window.render()},stage)
+    await expect(page.getByRole('heading',{name:'Candidate lifecycle',exact:true})).toBeVisible()
+    if(stage==='active')await expect(page.getByLabel('Next lifecycle stage')).toHaveCount(0)
+    else {
+     await expect(page.getByLabel('Next lifecycle stage')).toHaveValue({accepted:'onboarding',onboarding:'onboarded',onboarded:'active'}[stage])
+     if(stage==='onboarding')for(const label of ['Completed registration evidence','Requirements acknowledgement evidence','Completed team / Discord handoff evidence'])await expect(page.getByLabel(label,{exact:true})).toBeVisible()
+    }
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+   }
+   await go('/recruiter/applications?organization_id=org&brand_id=brand&stage=onboarded')
+   await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()})
+   await page.getByRole('button',{name:'Filters',exact:true}).click()
+   await expect(page.getByLabel('Stage',{exact:true})).toHaveValue('onboarded')
+   await go('/recruiter/applications/full?organization_id=org&brand_id=other&view=lifecycle')
+   await page.evaluate(()=>{window.auth={user:{id:'staff'},loading:false};window.render()})
+   await expect(page.getByRole('heading',{name:'Candidate lifecycle',exact:true})).toHaveCount(0)
+   await page.evaluate(()=>{window.candidateStage=undefined;window.auth={user:null,loading:false};window.render()})
+  })
   await t.test('canonical public list/detail, copied URL, refresh, back and keyboard',async()=>{
    await go('/');await expect(page).toHaveURL(/\/vacancies$/);await expect(page.getByRole('heading',{name:'Vacancies',exact:true})).toBeVisible();await expect(page.getByRole('navigation',{name:'Public navigation'})).toBeVisible();await expect(page.getByTestId('staff-shell')).toHaveCount(0)
    const link=page.getByRole('link',{name:'Engineer',exact:true});await link.focus();await page.keyboard.press('Enter');await expect(page).toHaveURL(/\/vacancies\/job\?back=/);await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toBeVisible();await expect(page.locator('#route-content')).toBeFocused();await page.reload();await expect(page.getByText('Job description',{exact:true})).toBeVisible();await page.getByRole('link',{name:'All vacancies'}).click();await expect(page.getByRole('heading',{name:'Vacancies',exact:true})).toBeVisible()

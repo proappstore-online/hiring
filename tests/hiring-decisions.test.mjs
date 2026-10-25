@@ -271,3 +271,73 @@ test('unapproved offers fail with an explicit approval error and preserve applic
   }finally{f.db.close()}
  }
 })
+
+const lifecycleArgs={...scope,requisition_id:'req-a',application_id:'app-a',operation_id:'lifecycle-1',expected_version:2,from_stage:'accepted',to_stage:'onboarding',evidence:'Setup handoff started',registration_evidence:'',requirements_evidence:'',handoff_evidence:''}
+function lifecycleReady(){const f=acceptanceReady();f.call('record_acceptance','staff-a',acceptanceArgs);return f}
+test('lifecycle progresses with completion evidence, scoped reads and exact immutable retries',()=>{
+ const f=lifecycleReady();try{
+ let args={...lifecycleArgs}
+ for(const stage of ['onboarding','onboarded','active']){
+ args={...args,to_stage:stage,operation_id:'lifecycle-'+stage,...(stage==='onboarded'?{registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined; team introduction #3'}:{})}
+ assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],1)
+ assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],0)
+ assert.equal(f.call('get_lifecycle_result','staff-a',args)[0].actor_user_id,'staff-a')
+ assert.deepEqual(f.call('get_lifecycle_result','staff-a',{...args,evidence:'changed'}),[])
+ for(const name of ['get_application','gateway_get_application'])assert.equal(f.call(name,'staff-a',args)[0].stage,stage)
+ for(const name of ['list_applications','gateway_list_applications'])assert.equal(f.call(name,'staff-a',{...args,stage})[0].stage,stage)
+ args={...args,from_stage:stage,expected_version:args.expected_version+1}
+ }
+ assert.equal(f.call('list_lifecycle_events','staff-a',args).length,3)
+ assert.equal(f.call('get_application','staff-a',args)[0].acceptance_evidence,acceptanceArgs.acceptance_evidence)
+ assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_stage_events WHERE application_id='app-a'").get().n,5)
+ assert.throws(()=>f.db.exec("UPDATE hiring_lifecycle_events SET evidence='forged'"),/immutable/)
+ assert.throws(()=>f.db.exec('DELETE FROM hiring_lifecycle_events'),/immutable/)
+ assert.throws(()=>f.db.exec("UPDATE hiring_applications SET lifecycle_stage='onboarding'"),/Controlled/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'onboarding',operation_id:'back'}),/Invalid/)
+ }finally{f.db.close()}
+})
+test('lifecycle rejects skips, stale versions, missing completion evidence and unauthorized scope',()=>{
+ const f=lifecycleReady();try{
+ for(const patch of [{to_stage:'active'},{expected_version:1},{application_id:'other'},{brand_id:'other'},{organization_id:'other'},{requisition_id:'other'},{evidence:' '}])assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,...patch}))
+ f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'reviewer',role:'reviewer',requisition_id:'req-a',grant_id:'life-reviewer',operation_id:'life-review-grant'})
+ f.db.exec("INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req-other','org-a','brand-a','Other','draft',1)")
+ f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'other-req',role:'recruiter',requisition_id:'req-other',grant_id:'life-other',operation_id:'life-other-grant'})
+ for(const user of ['outsider','reviewer','other-req','system:worker']){
+ assert.throws(()=>f.call('record_lifecycle_transition',user,lifecycleArgs))
+ assert.deepEqual(f.call('list_lifecycle_events',user,lifecycleArgs),[])
+ }
+ f.call('record_lifecycle_transition','staff-a',lifecycleArgs)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,expected_version:3,from_stage:'onboarding',to_stage:'onboarded',operation_id:'incomplete'}),/evidence are required/)
+ assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].version,3)
+ }finally{f.db.close()}
+})
+test('lifecycle terminal boundaries and audit rollback preserve prior records',()=>{
+ for(const terminal of ['rejected','withdrawn']){
+ const f=lifecycleReady();try{
+ f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,to_stage:terminal})
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,operation_id:'reopen',expected_version:3,from_stage:terminal}),/Invalid/)
+ assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].stage,terminal)
+ assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,1)
+ }finally{f.db.close()}
+ }
+ const f=lifecycleReady();try{
+ f.db.exec("CREATE TRIGGER fail_lifecycle BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.lifecycle_changed' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',lifecycleArgs),/audit unavailable/)
+ assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].stage,'accepted')
+ assert.equal(f.call('list_lifecycle_events','staff-a',lifecycleArgs).length,0)
+ }finally{f.db.close()}
+})
+
+test('additive lifecycle migration preserves all existing stages, versions and histories',()=>{
+ const db=new DatabaseSync(':memory:');try{
+ for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1); INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1); INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req','org','brand','Role','draft',1); INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES('candidate','org','brand','Person','','owner',1)")
+ for(const stage of ['submitted','interviewing','hired','rejected','withdrawn'])db.prepare("INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,created_by,created_at,updated_at) VALUES(?,'org','brand','req','candidate','linkedin','source','basis','context','owner',?,'owner',1,1)").run(stage,stage)
+ const before=db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
+ db.exec(migrations.migrations.at(-1).sql)
+ for(const [i,row] of db.prepare('SELECT * FROM hiring_applications ORDER BY id').all().entries()){
+ assert.equal(row.lifecycle_stage,null);delete row.lifecycle_stage;assert.deepEqual(row,before[i])
+ }
+ assert.equal(db.prepare('SELECT count(*) n FROM hiring_lifecycle_events').get().n,0)
+ }finally{db.close()}
+})

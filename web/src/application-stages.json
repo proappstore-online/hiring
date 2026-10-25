@@ -26,5 +26,20 @@
     "rejected"
   ],
   "withdrawn": [],
-  "accepted": []
+  "accepted": [
+    "onboarding",
+    "rejected",
+    "withdrawn"
+  ],
+  "onboarding": [
+    "onboarded",
+    "rejected",
+    "withdrawn"
+  ],
+  "onboarded": [
+    "active",
+    "rejected",
+    "withdrawn"
+  ],
+  "active": []
 }

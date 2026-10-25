@@ -382,3 +382,29 @@ storage, unlinked conflict/readback and contact preservation) and
 the manifest SQL against all canonical migrations and use synthetic correspondence;
 no real candidate mail is sent. Local SQL readback is not proof of live provider
 delivery. Push-triggered `Deploy to R2` supplies migration/action deployment evidence.
+
+### Candidate lifecycle (#102)
+
+Acceptance remains independent from onboarding. `record_acceptance` records explicit
+agreement only. `record_lifecycle_transition` advances `accepted → onboarding →
+onboarded → active`; accepted, onboarding and onboarded may also move to rejected
+or withdrawn. Active, hired, rejected and withdrawn have no outgoing transitions.
+Historical hired records are not reclassified and historical internship progress
+is retained independently; it does not imply canonical onboarding completion.
+
+Every lifecycle operation requires organization, brand, requisition, application,
+expected application version, prior/next stage, operation ID and transition evidence.
+Supply empty strings for registration_evidence, requirements_evidence and
+handoff_evidence except when completing onboarding: all three must then contain
+references proving registration, requirements acknowledgement and team/Discord
+handoff completion. Actor and time are recorded by the server. Only scoped owners
+and recruiters may write/read detailed lifecycle evidence.
+
+Writes are atomic with immutable stage and audit events. Retry with the same
+operation ID and identical payload, then confirm with `get_lifecycle_result`.
+A conflicting retry cannot confirm success. `list_lifecycle_events` reads the
+scoped evidence history; canonical application reads and stage filters return the
+latest lifecycle stage. Candidate workspace URLs support `view=lifecycle` using
+the existing organization/brand query scope. Acceptance evidence remains visible
+through subsequent stages. Migration `0050_candidate_lifecycle` adds nullable
+state and new tables/triggers without rewriting historical records.

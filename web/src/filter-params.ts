@@ -1,4 +1,4 @@
-export const FILTER_STAGES = ['submitted', 'in_review', 'shortlisted', 'interviewing', 'decision_pending', 'offered', 'accepted', 'hired', 'rejected', 'withdrawn'] as const
+export const FILTER_STAGES = ['submitted', 'in_review', 'shortlisted', 'interviewing', 'decision_pending', 'offered', 'accepted', 'onboarding', 'onboarded', 'active', 'hired', 'rejected', 'withdrawn'] as const
 export const ONBOARDING_STATUSES = ['sourced', 'invited', 'onboarding_pending', 'active', 'exception'] as const
 export const FILTER_KEYS = ['requisition', 'stage', 'source', 'assignee', 'date_from', 'date_to', 'onboarding', 'invited_from', 'invited_to'] as const
 export type FilterKey = typeof FILTER_KEYS[number]
