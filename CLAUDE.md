@@ -163,3 +163,9 @@ How the workflows follow this: every workflow starts with a `router` job calling
 `needs: router` and `runs-on: ${{ fromJSON(needs.router.outputs.runner) }}`. Never hard-code a
 runner label (`ubuntu-latest`, `self-hosted`, anything else) on a job, and never add a job that
 skips the router.
+
+## Hiring UI conventions
+
+Read [the design system and route budgets](docs/design-system.md) before changing
+recruiter screens. Reuse `web/src/design-system.tsx` primitives and review the
+mobile/desktop visual baselines when changing hierarchy or density.

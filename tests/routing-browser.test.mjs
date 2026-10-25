@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -17,7 +17,7 @@ const fixture = `import React from 'react';import {createRoot} from 'react-dom/c
 window.role='recruiter';window.auth={user:null,loading:false};window.calls=[];window.fail=false;window.gate='closed';window.pending=[];
 const job={requisition_id:'job',organization_id:'org',brand_id:'brand',title:'Engineer',brand_name:'Brand',organization_name:'Org',location:'Remote',notice_text:'Notice',notice_version:'v1',description:'Job description'};
 window.write=async(name,p)=>{window.savedParams=p;if(window.saveFails)throw Error('synthetic');window.saved={...p,id:p.application_id,requisition_title:'Engineer',stage:'submitted'};};
-window.read=async(name,p)=>{window.calls.push({name,p});if(name==='list_workspace_members')return [{user_id:'staff',role:'recruiter'}];if(name==='get_application'&&window.saved&&p.application_id===window.saved.id)return [window.saved];if(window.fail)throw Error('synthetic');if(window.hold)return new Promise(resolve=>window.pending.push({name,p,resolve}));if(name==='list_public_jobs'||name==='list_vacancies')return [job];if(name==='get_public_job'||name==='get_vacancy_detail')return p.requisition_id==='job'&&(!p.organization_id||p.organization_id==='org')&&(!p.brand_id||p.brand_id==='brand')?[job]:[];if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='get_my_workspace')return p.organization_id==='org'&&(!p.brand_id||p.brand_id==='brand')&&(!p.owner_only||window.role==='owner')?[{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0}]:p.organization_id==='other'&&(!p.brand_id||p.brand_id==='other')&&!p.owner_only?[{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}]:[];if(name==='list_my_workspaces'&&window.noSpaces)return [];if(name==='list_my_workspaces')return [{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0},{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}];if(name==='list_vacancy_management')return [];if(name==='get_vacancy_management')return p.brand_id==='brand'&&p.requisition_id==='req'&&!window.denyVacancy?[{id:'req',title:'Engineer',status:'open',state:'published',updated_at:1,can_publish:1,review_state:'pending_review',publication_version:2,published_description:'Published FGS Developer role',published_location:'Melbourne',published_arrangement:'Hybrid',published_compensation:'Salary',published_contact:'hiring@example.test',published_notice_version:'v2',published_notice_text:'Privacy notice'}]:[];if(name==='get_requisition_review')return [{version:1,payload:JSON.stringify({description:'Approved FGS Developer role',arrangement:'Hybrid',compensation:'Salary'})}];if(name==='list_requisitions')return p.brand_id==='brand'?[{id:'req',title:'Engineer',status:'draft'}]:[];if(name==='get_admin_settings')return [{organization_name:'Org',verified_contact:null,brand_name:'Brand',slug:null,notice_version:null,reply_identity:null,can_manage_organization:1}];if(name==='get_application')return p.application_id==='full'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'full',candidate_name:'Older full candidate',requisition_title:'Engineer',stage:window.candidateStage||'in_review',version:1,email:'older@example.com',phone:'',source:'referral',source_detail:'Referral',basis_reference:'Policy',contact_context:'Direct',assignee_user_id:'staff',updated_at:1}]:[];if(name==='gateway_get_application')return p.application_id==='old'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'old',candidate_name:'Restricted candidate',requisition_title:'Engineer',stage:'submitted'}]:[];return []};
+window.read=async(name,p)=>{window.calls.push({name,p});if(name==='list_workspace_members')return [{user_id:'staff',role:'recruiter'}];if(name==='get_application'&&window.saved&&p.application_id===window.saved.id)return [window.saved];if(window.fail)throw Error('synthetic');if(window.hold)return new Promise(resolve=>window.pending.push({name,p,resolve}));if(name==='list_public_jobs'||name==='list_vacancies')return [job];if(name==='get_public_job'||name==='get_vacancy_detail')return p.requisition_id==='job'&&(!p.organization_id||p.organization_id==='org')&&(!p.brand_id||p.brand_id==='brand')?[job]:[];if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='get_my_workspace')return p.organization_id==='org'&&(!p.brand_id||p.brand_id==='brand')&&(!p.owner_only||window.role==='owner')?[{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0}]:p.organization_id==='other'&&(!p.brand_id||p.brand_id==='other')&&!p.owner_only?[{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}]:[];if(name==='list_my_workspaces'&&window.noSpaces)return [];if(name==='list_my_workspaces')return [{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:window.role,can_create_requisition:window.role==='owner'?1:0,can_create_brand:window.role==='owner'?1:0},{organization_id:'other',brand_id:'other',organization_name:'Other',brand_name:'Other',role:'recruiter'}];if(name==='list_applications'&&location.search.includes('visual=1'))return [{id:'full',candidate_name:'Alex Morgan',requisition_title:'Senior Software Engineer',stage:'in_review',source:'referral',assignee_user_id:'staff',created_at:1700000000000}];if(name==='list_vacancy_management')return location.search.includes('visual=1')?[{id:'req',title:'Senior Software Engineer',state:'draft',updated_at:1700000000000}]:[];if(name==='get_vacancy_management')return p.brand_id==='brand'&&p.requisition_id==='req'&&!window.denyVacancy?[{id:'req',title:'Engineer',status:'open',state:'published',updated_at:1,can_publish:1,review_state:'pending_review',publication_version:2,published_description:'Published FGS Developer role',published_location:'Melbourne',published_arrangement:'Hybrid',published_compensation:'Salary',published_contact:'hiring@example.test',published_notice_version:'v2',published_notice_text:'Privacy notice'}]:[];if(name==='get_requisition_review')return [{version:1,payload:JSON.stringify({description:'Approved FGS Developer role',arrangement:'Hybrid',compensation:'Salary'})}];if(name==='list_requisitions')return p.brand_id==='brand'?[{id:'req',title:'Engineer',status:'draft'}]:[];if(name==='get_admin_settings')return [{organization_name:'Org',verified_contact:null,brand_name:'Brand',slug:null,notice_version:null,reply_identity:null,can_manage_organization:1}];if(name==='get_application')return p.application_id==='full'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'full',candidate_name:'Older full candidate',requisition_title:'Engineer',stage:window.candidateStage||'in_review',version:1,email:'older@example.com',phone:'',source:'referral',source_detail:'Referral',basis_reference:'Policy',contact_context:'Direct',assignee_user_id:'staff',updated_at:1}]:[];if(name==='gateway_get_application')return p.application_id==='old'&&p.organization_id==='org'&&p.brand_id==='brand'?[{id:'old',candidate_name:'Restricted candidate',requisition_title:'Engineer',stage:'submitted'}]:[];return []};
 const root=createRoot(document.getElementById('root'));window.render=()=>root.render(<App/>);function Crash(){throw Error('synthetic render error')}window.crash=()=>root.render(<RouteBoundary><Crash/></RouteBoundary>);window.render();`
 
 test('routing renders real public/protected pages and preserves URL scope', async t => {
@@ -30,7 +30,7 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
  }],server:{host:'127.0.0.1',port:0}})
  await server.listen();let browser
  try {
-  browser=await chromium.launch();const page=await browser.newPage({viewport:{width:375,height:812}});page.setDefaultTimeout(10000);const base=server.resolvedUrls.local[0].replace(/\/$/,'')
+  browser=await chromium.launch();const page=await browser.newPage({viewport:{width:375,height:812},locale:'en-US',timezoneId:'UTC'});page.setDefaultTimeout(10000);const base=server.resolvedUrls.local[0].replace(/\/$/,'')
   const go=path=>page.goto(base+path)
   await t.test('canonical public list/detail, copied URL, refresh, back and keyboard',async()=>{
    await go('/');await expect(page).toHaveURL(/\/vacancies$/);await expect(page.getByRole('heading',{name:'Vacancies',exact:true})).toBeVisible();await expect(page.getByRole('navigation',{name:'Public navigation'})).toBeVisible();await expect(page.getByTestId('staff-shell')).toHaveCount(0)
@@ -57,6 +57,39 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    for(const [route,heading] of routes){await go('/recruiter/'+route+'?organization_id=org&brand_id=brand');await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'owner'},loading:false};window.render()});await expect(page.getByRole('heading',{name:heading,exact:true}).first()).toBeVisible();await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toBeVisible()}
    await go('/recruiter/vacancies/req?organization_id=org&brand_id=brand');await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'owner'},loading:false};window.render()});await expect(page.getByRole('heading',{name:'Manage Engineer'})).toBeVisible()
    await page.setViewportSize({width:375,height:812});await expect(page.getByRole('heading',{name:'Manage Engineer'})).toBeVisible();await expect(page.getByRole('combobox',{name:'Workspace',exact:true})).toBeVisible();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:'/tmp/hiring-recruiter-mobile.png',fullPage:true})
+  })
+  await t.test('screen budgets and visual regression for core recruiter routes', async()=>{
+   const baselines = new URL('./visual/hiring/', import.meta.url)
+   mkdirSync(baselines,{recursive:true})
+   for(const width of [375,1280]) for(const [name,route,ready] of [
+    ['applications','applications','Alex Morgan'],
+    ['candidate','applications/full','Next action'],
+    ['vacancies','vacancies','Senior Software Engineer'],
+    ['settings','organizations/org/brands/brand/settings','Brand settings'],
+   ]) {
+    await page.setViewportSize({width,height:812})
+    await go('/recruiter/'+route+'?organization_id=org&brand_id=brand&visual=1')
+    await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'owner'},loading:false};window.render()})
+    await expect(page.getByText(ready,{exact:true})).toBeVisible()
+    await expect(page.locator('#route-content h1')).toHaveCount(1)
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
+    const content=page.locator('#route-content')
+    assert.ok(await content.locator('details[open]').count()===0,'Help starts collapsed')
+    if(name==='applications') {
+     const add=page.getByRole('link',{name:'Add candidate',exact:true})
+     assert.ok((await add.boundingBox()).height>=44,'Primary action target is at least 44px')
+     if(width===1280)await expect(page.getByRole('button',{name:'Filters',exact:true})).toBeHidden()
+     await add.focus();await expect(add).toBeFocused()
+     assert.notEqual(await add.evaluate(el=>getComputedStyle(el).outlineStyle),'none')
+     if(width===375){await page.getByRole('button',{name:'Filters',exact:true}).click();await expect(page.getByLabel('Stage',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Filters',exact:true}).click()}
+    }
+    await page.locator('#route-content').focus()
+    await page.evaluate(()=>document.fonts.ready)
+    const screenshot=await content.screenshot({animations:'disabled'})
+    const path=new URL(name+'-'+width+'.png',baselines)
+    if(process.env.UPDATE_HIRING_VISUALS==='1')writeFileSync(path,screenshot)
+    assert.deepEqual(screenshot,readFileSync(path),'Visual changed: '+path.pathname+'; review and regenerate with UPDATE_HIRING_VISUALS=1')
+   }
   })
   await t.test('first workspace setup is confined to Settings',async()=>{
    await go('/recruiter/applications');await page.evaluate(()=>{window.noSpaces=true;window.auth={user:{id:'new-owner'},loading:false};window.render()})

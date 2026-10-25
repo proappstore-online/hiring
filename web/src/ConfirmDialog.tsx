@@ -1,3 +1,4 @@
+import { secondaryButton } from './design-system'
 import { useEffect, useId, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { button, panel } from './ui'
@@ -20,5 +21,5 @@ export function ConfirmDialog({ title, body, confirmLabel = 'Confirm', cancelLab
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
     }
-  }}><h2 id={titleId} className="text-xl font-semibold">{title}</h2><div className="my-4">{body}</div><div className="flex flex-wrap gap-3"><button type="button" data-cancel="true" aria-label={cancelLabel} className={button} onClick={onCancel}>{cancelLabel}</button><button type="button" aria-label={confirmLabel} className={button} onClick={onConfirm}>{confirmLabel}</button></div></dialog>
+  }}><h2 id={titleId} className="text-xl font-semibold">{title}</h2><div className="my-4">{body}</div><div className="flex flex-wrap gap-3"><button type="button" data-cancel="true" aria-label={cancelLabel} className={secondaryButton} onClick={onCancel}>{cancelLabel}</button><button type="button" aria-label={confirmLabel} className={variant === 'danger' ? secondaryButton : button} onClick={onConfirm}>{confirmLabel}</button></div></dialog>
 }

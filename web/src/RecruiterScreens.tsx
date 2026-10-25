@@ -3,7 +3,7 @@ import { FunnelAnalytics } from './FunnelAnalytics'
 import { TalentPool } from './TalentPool'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { PageHeader } from '@proappstore/sdk'
+import { Page, Section, Toolbar } from './design-system'
 import { id, read, write, stageLabel, type AgentActivity, type Application, type Audit, type AssignmentEvent, type Communication, type Draft, type Member, type Note, type Requisition, type Run, type StageEvent, type Workspace } from './api'
 import { ApplicationFilters } from './ApplicationFilters'
 import { WorkspaceSearch } from './WorkspaceSearch'
@@ -24,7 +24,7 @@ type Context = { space: Workspace; userId: string; reloadSpaces: () => Promise<v
 export const RecruiterContext = createContext<Context | null>(null)
 function useWorkspace() { const value = useContext(RecruiterContext); if (!value) throw Error('Workspace context missing'); return value }
 function scopeOf(space: Workspace) { return { organization_id: space.organization_id, brand_id: space.brand_id } }
-function Screen({ title, children }: { title: string; children: ReactNode }) { return <><PageHeader title={title} /><div className="mt-5">{children}</div></> }
+function Screen({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) { return <Page title={title} action={action}>{children}</Page> }
 function useRows<T>(name: string | null, params: Record<string, string>) {
   const [state, setState] = useState<{ rows: T[]; loading: boolean; error: boolean }>({ rows: [], loading: true, error: false })
   const [revision, setRevision] = useState(0)
@@ -33,12 +33,12 @@ function useRows<T>(name: string | null, params: Record<string, string>) {
   return { ...state, retry: () => setRevision(value => value + 1) }
 }
 function RowsState({ loading, error, retry, children }: { loading: boolean; error: boolean; retry: () => void; children: ReactNode }) { return loading ? <LoadingState /> : error ? <ErrorState retry={retry} /> : <>{children}</> }
-export function OverviewScreen() { const { space } = useWorkspace(); return <Screen title="Overview"><section className={panel}><h2 className="text-xl font-semibold">Overview</h2><p className="mt-2">{space.organization_name} / {space.brand_name}</p><p className="mt-2">Your role: {space.role}</p></section><CurrentPipeline key={"pipeline:" + JSON.stringify(space)} scope={scopeOf(space)} role={space.role} /><FunnelAnalytics key={JSON.stringify(space)} scope={scopeOf(space)} /></Screen> }
+export function OverviewScreen() { const { space } = useWorkspace(); return <Screen title="Overview"><Section title="Workspace"><p className="mt-2">{space.organization_name} / {space.brand_name}</p><p className="mt-2">Your role: {space.role}</p></Section><CurrentPipeline key={"pipeline:" + JSON.stringify(space)} scope={scopeOf(space)} role={space.role} /><FunnelAnalytics key={JSON.stringify(space)} scope={scopeOf(space)} /></Screen> }
 export function VacanciesScreen() {
   const { space } = useWorkspace(); const { requisitionId = '' } = useParams(); const scope = scopeOf(space)
   const detail = useRows<ManagedVacancy>(requisitionId ? 'get_vacancy_management' : null, { ...scope, requisition_id: requisitionId })
   if (requisitionId && !detail.loading && !detail.error && !detail.rows.length) return <NotFound />
-  return <Screen title="Vacancies">{!requisitionId && Boolean(space.can_create_requisition) && <Link className={button + ' mb-5 inline-block'} to={'/recruiter/vacancies/new?' + new URLSearchParams(scope)}>Add requisition</Link>}<RowsState {...detail}><VacancyManagement key={space.brand_id + requisitionId} scope={scope} role={space.role as 'owner' | 'recruiter'} requisitions={detail.rows.map(({ id, title, status }) => ({ id, title, status }))} selectedRequisitionId={requisitionId} selectedVacancy={detail.rows[0]} /></RowsState></Screen>
+  return <Screen title="Vacancies" action={!requisitionId && Boolean(space.can_create_requisition) && <Link className={button} to={'/recruiter/vacancies/new?' + new URLSearchParams(scope)}>Add requisition</Link>}><RowsState {...detail}><VacancyManagement key={space.brand_id + requisitionId} scope={scope} role={space.role as 'owner' | 'recruiter'} requisitions={detail.rows.map(({ id, title, status }) => ({ id, title, status }))} selectedRequisitionId={requisitionId} selectedVacancy={detail.rows[0]} /></RowsState></Screen>
 }
 export function ApplicationsScreen() {
   const { space } = useWorkspace(); const scope = scopeOf(space)
@@ -89,7 +89,7 @@ function FullApplicationScreen({ application, applicationId, retryApplication }:
   const retryDetail = () => { notes.retry(); activities.retry(); events.retry(); assignments.retry(); audit.retry(); drafts.retry(); communications.retry() }
   if (members.loading) return <LoadingState>Loading application…</LoadingState>
   if (members.error) return <ErrorState retry={members.retry}>Could not load application.</ErrorState>
-  return <Screen title="Application details"><Link className="underline" to={staffBack(query.get('back'), scope, 'applications')}>All applications</Link><button className="ml-3 underline" onClick={() => void navigator.clipboard.writeText(new URL(recruiterApplicationUrl(applicationId, scope) + (query.get('view') ? '&view=' + encodeURIComponent(query.get('view')!) : ''), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button><p role="status">{copyMessage}</p>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} drafts={drafts.rows} communications={communications.rows} busy={busy} run={run} />}</Screen>
+  return <Screen title="Application details"><Toolbar label="Application navigation"><Link className="underline" to={staffBack(query.get('back'), scope, 'applications')}>All applications</Link><button className="ml-3 underline" onClick={() => void navigator.clipboard.writeText(new URL(recruiterApplicationUrl(applicationId, scope) + (query.get('view') ? '&view=' + encodeURIComponent(query.get('view')!) : ''), window.location.origin).href).then(() => setCopyMessage('Internal link copied.')).catch(() => setCopyMessage('Could not copy the link.'))}>Copy internal link</button></Toolbar>{copyMessage && <p role="status">{copyMessage}</p>}{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}{history.some(row => row.loading) ? <LoadingState>Loading application history…</LoadingState> : history.some(row => row.error) ? <ErrorState retry={retryDetail}>Could not load application history.</ErrorState> : <ApplicationDetail key={applicationId} role={space.role} retryDetail={retryDetail} a={application} scope={scope} members={members.rows} notes={notes.rows} activities={activities.rows} events={events.rows} assignments={assignments.rows} audit={audit.rows} drafts={drafts.rows} communications={communications.rows} busy={busy} run={run} />}</Screen>
 }
 export function CommunicationsScreen() {
   const { space } = useWorkspace(); const scope = scopeOf(space); const { applicationId = '' } = useParams()
@@ -100,7 +100,7 @@ export function CommunicationsScreen() {
   return <RowsState loading={data.loading || exact.loading} error={data.error || exact.error} retry={() => { data.retry(); exact.retry() }}><AdminCommunications scope={scope} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /></RowsState>
 }
 export function PlaybookScreen() { const { space } = useWorkspace(); return <Screen title="Playbook"><PlaybookEditor organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /></Screen> }
-export function OperationsScreen() { const { space } = useWorkspace(); return <><PageHeader title="Settings" /><SettingsNavigation /><OperationalDiagnostics scope={scopeOf(space)} /></> }
+export function OperationsScreen() { const { space } = useWorkspace(); return <Page title="Settings"><SettingsNavigation /><OperationalDiagnostics scope={scopeOf(space)} /></Page> }
 export function ComplianceScreen() { const { space } = useWorkspace(); return <ErasureRequest key={space.organization_id + ':' + space.brand_id} scope={scopeOf(space)} role={space.role} /> }
 export function SettingsScreen() {
   const { space, reloadSpaces } = useWorkspace(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')

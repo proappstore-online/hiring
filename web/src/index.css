@@ -196,3 +196,35 @@ a:focus-visible {
 }
 
 } /* end @layer base */
+
+/* Hiring screen budgets: docs/design-system.md */
+@layer components {
+:root {
+  --hiring-space-1: .25rem;
+  --hiring-space-2: .5rem;
+  --hiring-space-3: .75rem;
+  --hiring-space-4: 1rem;
+  --hiring-space-6: 1.5rem;
+  --hiring-page-title: 1.5rem;
+  --hiring-section-title: 1.125rem;
+  --hiring-target: 2.75rem;
+}
+.hiring-page { display: grid; gap: var(--hiring-space-4); min-width: 0; }
+.hiring-page-header, .hiring-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--hiring-space-3); }
+.hiring-page-header { justify-content: space-between; }
+.hiring-page-header h1 { font-size: var(--hiring-page-title); font-weight: 600; }
+.hiring-section, .hiring-empty { border: 1px solid var(--line-strong); border-radius: var(--radius); padding: var(--hiring-space-4); min-width: 0; }
+.hiring-section h2 { font-size: var(--hiring-section-title); font-weight: 600; }
+.hiring-filters { gap: var(--hiring-space-3); padding: var(--hiring-space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: .875rem; }
+.hiring-record-row { display: grid; min-height: var(--hiring-target); align-items: center; gap: var(--hiring-space-2) var(--hiring-space-4); padding: var(--hiring-space-2) var(--hiring-space-3); font-size: .875rem; overflow-wrap: anywhere; }
+.hiring-record-row:hover { background: var(--panel); }
+.hiring-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: var(--hiring-target); padding: var(--hiring-space-2) var(--hiring-space-3); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font-size: .875rem; }
+.hiring-help { font-size: .875rem; }
+summary { cursor: pointer; min-height: var(--hiring-target); padding-block: var(--hiring-space-2); }
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--sky-deep); outline-offset: 3px; }
+:where(input:not([type=checkbox]):not([type=radio]), select, button) { min-height: var(--hiring-target); }
+@media (min-width: 768px) { .hiring-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .hiring-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+} /* end Hiring components */
