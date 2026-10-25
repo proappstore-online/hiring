@@ -9,6 +9,11 @@ const tools = JSON.parse(readFileSync(new URL('../mcp.json', import.meta.url))).
 const gateway = tools.filter(t => t.name.startsWith('gateway_'))
 const find = name => { const t = tools.find(x => x.name === name); assert.ok(t, name); return t }
 
+function sqlStatements(tool) { return tool.statements ?? [tool.sql] }
+function declaredSqlParams(statement) {
+  return new Set([...statement.matchAll(/:([a-z_][a-z0-9_]*)/gi)].map(match => match[1]).filter(name => !name.startsWith('__')))
+}
+
 function fixture() {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys=ON')
@@ -64,6 +69,25 @@ test('gateway tools are schema-coherent and accept no identity or role parameter
     }
     for (const key of Object.keys(t.params)) assert.ok(!/user|role|actor|grant/i.test(key), `${t.name}: forged-claim param ${key}`)
   }
+})
+
+test('current workspace, requisition and application reads replace template item reads', () => {
+  const direct = ['list_my_workspaces', 'get_my_workspace', 'list_requisitions', 'list_applications', 'get_application'].map(find)
+  for (const tool of direct) {
+    assert.equal(tool.requires_auth, true, `${tool.name}: authenticated`)
+    assert.equal(tool.operation, 'query', `${tool.name}: read-only`)
+    for (const statement of sqlStatements(tool)) {
+      assert.doesNotMatch(statement, /\b(?:INSERT|UPDATE|DELETE|DROP|ALTER|CREATE)\b/i, `${tool.name}: read SQL only`)
+      const declared = [...declaredSqlParams(statement)].sort()
+      assert.deepEqual(declared, Object.keys(tool.params ?? {}).sort(), `${tool.name}: action parameters match SQL`)
+    }
+    for (const name of Object.keys(tool.params ?? {})) assert.doesNotMatch(name, /user|role|actor|grant/i, `${tool.name}: no forged-claim input`)
+  }
+  for (const tool of direct.filter(tool => tool.name !== 'list_my_workspaces')) {
+    assert.match(sqlStatements(tool).join('\n'), /hiring_effective_access/, `${tool.name}: current scoped grant`)
+  }
+  assert.match(sqlStatements(find('list_my_workspaces')).join('\n'), /hiring_effective_access/, 'workspace discovery is grant-scoped')
+  for (const retired of ['list_items', 'get_item', 'list_brands', 'get_brand', 'get_requisition', 'get_candidate']) assert.equal(tools.some(tool => tool.name === retired), false, `${retired}: not registered`)
 })
 
 test('forged user_id and role arguments are ignored by the SQL actions', () => {

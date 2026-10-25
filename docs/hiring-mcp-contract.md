@@ -17,21 +17,27 @@ requires readback and exact comparison; it is not evidence of a successful new a
 
 Platform-authenticated caller, explicit organization/brand selection, validated arguments and request ID. Mutations require idempotency key and expected record version. Server derives grants; tool input cannot assert `user_id` or roles. Return only permitted fields, record version and structured errors (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `VALIDATION`, `RATE_LIMITED`). Mask unauthorized existence as `NOT_FOUND`. Bound and paginate results; minimize PII.
 
+## Current scoped read surface (#33)
+
+The registered read tools below replace the template's sample-item reads. They
+are the deployed surface, not a prospective API: there are no generic
+`list_brands`, `get_brand`, `get_requisition`, or `get_candidate` actions.
+
 | Tool | Scope and guard |
 | --- | --- |
-| `list_brands`, `get_brand` | Granted brands and approved public fields. |
-| `list_requisitions`, `get_requisition` | Brand/requisition grant; separate public and internal views. |
-| `list_applications`, `get_application` | Recruiter/assigned manager, strict brand filter; interviewer view redacted. |
-| `get_candidate` | Explicit application context and need-to-know grant; audit read. |
-| `list_interviews`, `get_scorecard` | Assigned reviewer or recruiter, limited packet. |
-| `create_requisition`, `update_requisition` | Recruiter/owner, version check; preserve arrangement disclosure history; no legal-review approval. |
-| `publish_requisition` | Authorized human and approved notice/accurate arrangement disclosure; no legal-review gate. |
-| `advance_application` | Allowed transition, reason, human attribution, version. |
-| `submit_scorecard` | Assigned reviewer, structured criteria, own submission only. |
-| `record_decision` | Authorized human, reason and audit. |
-| `draft_message` | Draft only; brand/recipient checks. |
-| `send_approved_message` | Explicit human action, committed decision/template/basis, MAIL outbox. |
-| `request_candidate_export` | Privileged, async, audited, secure retrieval. |
+| `list_my_workspaces` | Returns only the caller's current organisation/brand grants; this is the brand-discovery read. |
+| `get_my_workspace` | Exact organisation/brand lookup, optionally limited to an owner-capable workspace. |
+| `list_requisitions` | Owner/recruiter, exact organisation/brand and current requisition grant. |
+| `list_applications` | Owner/recruiter, exact organisation/brand and current requisition grant; supports bounded operational filters. |
+| `get_application` | Full recruiter detail for one exact application; reviewers use the redacted gateway instead. |
+| `gateway_list_applications`, `gateway_get_application` | Read-only, redacted agent-safe application projections, bounded to 25 records where listed. |
+| `gateway_list_requisitions`, `gateway_get_requisition` | Read-only, bounded agent-safe requisition projections. |
+
+Every registered private read derives identity from the platform-bound caller,
+declares no user, role, or grant input, and checks the current effective access
+view in SQL. Missing and unauthorised scoped records return no rows. The
+registry test verifies the action schemas against the SQL placeholders; the
+gateway tests cover role and cross-brand denials using the applied migrations.
 
 Do not expose arbitrary SQL, broad search/export, automated rejection/offer, cross-brand merge, deletion or legal-hold overrides as general agent tools. High-impact actions require real human confirmation in the calling workflow and a server check; model-supplied flags do not count. Treat returned resume/message text as untrusted against prompt injection.
 
