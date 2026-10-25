@@ -12,7 +12,7 @@ const {default:react}=await import(require.resolve('@vitejs/plugin-react'))
 const web=new URL('../web/',import.meta.url).pathname
 const fixture=`import React from 'react';import{createRoot}from'react-dom/client';import{InternshipProgress}from'/src/InternshipIntake.tsx';import{PublishJob}from'/src/Jobs.tsx';
 window.calls=[];window.historyRows=[];window.fail=false;
-window.read=async(name,p)=>{window.calls.push({name,p});if(name==='get_vacancy_management')return [{terms_version:1,terms_json:JSON.stringify({engagement_basis:'volunteer',programme_kind:'internship',compensation_type:'unpaid',compensation_amount:null,compensation_currency:null,weekly_hours_min:8,weekly_hours_max:8,programme_weeks:10,weeks_basis:'approved'})}];if(name==='get_requisition_review')return [{version:1,payload:JSON.stringify({compensation_type:'internship'})}];return name==='get_internship_policy'?[{onboarding_url:'https://interns.freeappstore.online/onboarding',template_id:'approved-interns',template_version:1}]:window.historyRows};
+window.read=async(name,p)=>{window.calls.push({name,p});if(name==='get_vacancy_management')return [{terms_version:1,terms_json:JSON.stringify({engagement_basis:'volunteer',programme_kind:'internship',compensation_type:'unpaid',compensation_amount:null,compensation_currency:null,weekly_hours_min:8,weekly_hours_max:8,programme_weeks:10,weeks_basis:'approved'})}];if(name==='get_requisition_review')return [{version:1,payload:JSON.stringify({compensation_type:'internship'})}];return name==='get_internship_policy'?[{onboarding_url:'https://interns.proappstore.online/onboarding',template_id:'approved-interns',template_version:1}]:window.historyRows};
 window.write=async(name,p)=>{window.calls.push({name,p});if(window.fail)throw Error('Sent direct invitation required');window.historyRows=[{...p,version:p.expected_version+1}]};
 const root=createRoot(document.getElementById('root'));root.render(<><PublishJob scope={{organization_id:'org',brand_id:'a'}} requisitions={[{id:'req-73'}]}/><InternshipProgress scope={{organization_id:'org',brand_id:'a'}} application={{id:'candidate-73',requisition_id:'req-73'}}/></>);`
 test('internship onboarding form uses scoped versioned evidence and reports rejected invitations',async()=>{
@@ -31,7 +31,7 @@ test('internship onboarding form uses scoped versioned evidence and reports reje
   await page.getByRole('button',{name:'Publish & open applications'}).click()
   await expect(page.getByText('Published as an unlisted internship. Use controlled sourcing and direct Interns onboarding.')).toBeVisible()
   assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='set_hiring_runtime_gate').length),0)
-  await expect(page.getByRole('link',{name:'Open direct Interns onboarding'})).toHaveAttribute('href','https://interns.freeappstore.online/onboarding')
+  await expect(page.getByRole('link',{name:'Open direct Interns onboarding'})).toHaveAttribute('href','https://interns.proappstore.online/onboarding')
   await page.getByRole('textbox',{name:'Evidence reference (Interns application/onboarding or exception)'}).fill('Source verified by recruiter')
   await page.getByRole('button',{name:'Save form'}).click()
   await expect(page.locator('section').filter({has:page.getByRole('heading',{name:'Direct Interns onboarding'})}).getByRole('status')).toHaveText('Onboarding evidence saved.')

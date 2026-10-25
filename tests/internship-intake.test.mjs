@@ -36,7 +36,7 @@ const scope = { organization_id: 'org-a', brand_id: 'brand-a' }
 const bootstrap = { ...scope, requisition_id: 'req-a', organization_name: 'Org A', brand_name: 'Brand A', requisition_title: 'Engineer', operation_id: 'bootstrap-a' }
 const candidate = { ...scope, requisition_id: 'req-a', candidate_id: 'cand-a', application_id: 'app-a', operation_id: 'create-a', candidate_name: 'A Person', email: 'a@example.com', phone: '', linkedin_url: 'https://www.linkedin.com/in/a-person', source_detail: 'LinkedIn search on 2026-10-20', basis_reference: 'recruitment legitimate interests assessment v1', contact_context: 'Public profile; email supplied directly', assignee_user_id: 'staff-a' }
 
-const url='https://interns.freeappstore.online/onboarding'
+const url='https://interns.proappstore.online/onboarding'
 const config={...scope,requisition_id:'req-a',onboarding_url:url,template_id:'intern-template',template_version:1}
 function setup(){
  const f=fixture();f.call('create_workspace','staff-a',bootstrap)
@@ -49,7 +49,7 @@ const intake={...candidate,source:'recruiter_sourced',profile_url:''}
 const progress={...scope,requisition_id:'req-a',application_id:'app-a',expected_version:0,status:'sourced',reason_code:'source_verified',evidence:'Source and lawful basis verified',discord_status:'invite_pending',discord_username:'',operation_id:'progress-1'}
 test('internship configuration requires owner, exact direct Interns origin and approved matching template',()=>{
  const f=setup();try{
-  for(const patch of [{onboarding_url:'https://evil.test/'},{onboarding_url:'https://interns.freeappstore.online.evil.test/'},{onboarding_url:url+'?other'},{template_version:2},{brand_id:'brand-b'}])assert.deepEqual(f.call('configure_internship_requisition','staff-a',{...config,...patch}),[0])
+  for(const patch of [{onboarding_url:'https://evil.test/'},{onboarding_url:'https://interns.proappstore.online.evil.test/'},{onboarding_url:url+'?other'},{template_version:2},{brand_id:'brand-b'}])assert.deepEqual(f.call('configure_internship_requisition','staff-a',{...config,...patch}),[0])
   assert.deepEqual(f.call('configure_internship_requisition','outsider',config),[0])
   assert.deepEqual(f.call('configure_internship_requisition','staff-a',config),[1])
   assert.deepEqual(f.call('get_internship_policy','outsider',config),[])

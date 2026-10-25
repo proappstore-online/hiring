@@ -8,7 +8,7 @@ reads require the current scoped owner/recruiter grant. No anonymous candidate
 creation, cross-brand campaign, or generic `linkedin` source bypass is supported.
 
 An owner first approves an invitation template through Communications. It must
-contain the exact direct onboarding URL under `https://interns.freeappstore.online/`.
+contain the exact direct onboarding URL under `https://interns.proappstore.online/`.
 Use the actual Interns onboarding route supplied by the programme owner; Hiring
 does not invent a route, provision an Interns account, or transfer candidate data.
 Configure its template ID/version and URL under Vacancy Management → Restricted

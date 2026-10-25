@@ -86,7 +86,7 @@ test('requisition-scoped grants cannot cross requisitions and internship onboard
   assert.deepEqual(call('create_working_interview_invitation','scoped',invitation),[1])
   assert.deepEqual(call('get_working_interview_records','other-recruiter',scope),[])
   assert.deepEqual(call('record_working_interview_outcome','other-recruiter',outcome),[0])
-  db.exec("INSERT INTO hiring_internship_requisitions VALUES('req-a','a','brand-a','https://interns.freeappstore.online/','template',1,'owner-a',0)")
+  db.exec("INSERT INTO hiring_internship_requisitions VALUES('req-a','a','brand-a','https://interns.proappstore.online/','template',1,'owner-a',0)")
   assert.deepEqual(call('create_working_interview_invitation','owner-a',{...invitation,record_id:'new',operation_id:'new'}),[0])
   assert.equal(call('get_working_interview_records','owner-a',scope).length,1)
  } finally {db.close()}
