@@ -17,7 +17,7 @@ const fixture = `import React from 'react';import {createRoot} from 'react-dom/c
 window.auth={user:null,loading:false};window.calls=[];window.gate='open';window.fail=false;window.empty=false;window.pdVersion=0;
 const pd={overview:'Build reliable products',rolePurpose:'<script>window.pwned=true</script>',responsibilities:['Ship safely','Review changes'],requirements:['Engineering experience'],workingArrangement:'Remote',compensation:'AUD 100,000',benefits:'Annual leave',applicationProcess:'Apply online',privacyContact:'hiring@example.com'};
 const job={requisition_id:'job',organization_id:'org',brand_id:'brand',title:'Engineer',brand_name:'Brand',organization_name:'Org',location:'Melbourne',notice_text:'Approved privacy notice',notice_version:'v1',description:'Legacy description',arrangement:'Remote',compensation:'Paid',contact:'Hiring team',version:1,pd_json:JSON.stringify(pd),status:'published',candidate_name:'PRIVATE_CANDIDATE',internal_notes:'PRIVATE_NOTES'};
-window.read=async(name,p)=>{window.calls.push({name,p});if(window.fail)throw Error('synthetic');if(window.hold)return new Promise(resolve=>window.pending=resolve);if(name==='list_vacancies'||name==='list_public_jobs')return window.empty?[]:[job];if(name==='get_vacancy_detail'||name==='get_public_job')return p.requisition_id==='job'&&(!p.organization_id||p.organization_id==='org')&&(!p.brand_id||p.brand_id==='brand')?[{...job,pd_json:window.partial?'{}':job.pd_json}]:[];if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='get_my_workspace')return p.organization_id==='org'&&(!p.brand_id||p.brand_id==='brand')?[{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:'owner',can_create_brand:1}]:[];if(name==='list_my_workspaces')return [{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:'owner',can_create_brand:1}];if(name==='list_requisitions')return [{id:'job',title:'Engineer',status:'draft'}];if(name==='list_vacancy_management')return [{id:'job',title:'Engineer',state:'draft',updated_at:1000}];if(name==='get_vacancy_management')return p.requisition_id==='job'?[{id:'job',title:'Engineer',status:'draft',state:'draft',updated_at:1000}]:[];if(name==='get_pd_draft'||name==='preview_pd')return window.pdVersion?[{payload:JSON.stringify(pd),version:window.pdVersion,updated_at:1000}]:[];return []};
+window.read=async(name,p)=>{window.calls.push({name,p});if(window.fail)throw Error('synthetic');if(window.hold)return new Promise(resolve=>window.pending=resolve);if(name==='list_vacancies'||name==='list_public_jobs')return window.empty?[]:[{...job,terms_json:window.showTerms?JSON.stringify({engagement_basis:'volunteer',programme_kind:'internship',compensation_type:'unpaid',compensation_amount:null,compensation_currency:null,weekly_hours_min:8,weekly_hours_max:8,programme_weeks:10,weeks_basis:'approved'}):null}];if(name==='get_vacancy_detail'||name==='get_public_job')return p.requisition_id==='job'&&(!p.organization_id||p.organization_id==='org')&&(!p.brand_id||p.brand_id==='brand')?[{...job,terms_json:window.showTerms?JSON.stringify({engagement_basis:'volunteer',programme_kind:'internship',compensation_type:'unpaid',compensation_amount:null,compensation_currency:null,weekly_hours_min:8,weekly_hours_max:8,programme_weeks:10,weeks_basis:'approved'}):null,pd_json:window.partial?'{}':job.pd_json}]:[];if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='get_my_workspace')return p.organization_id==='org'&&(!p.brand_id||p.brand_id==='brand')?[{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:'owner',can_create_brand:1}]:[];if(name==='list_my_workspaces')return [{organization_id:'org',brand_id:'brand',organization_name:'Org',brand_name:'Brand',role:'owner',can_create_brand:1}];if(name==='list_requisitions')return [{id:'job',title:'Engineer',status:'draft'}];if(name==='list_vacancy_management')return [{id:'job',title:'Engineer',state:'draft',updated_at:1000}];if(name==='get_vacancy_management')return p.requisition_id==='job'?[{id:'job',title:'Engineer',status:'draft',state:'draft',updated_at:1000}]:[];if(name==='get_pd_draft'||name==='preview_pd')return window.pdVersion?[{payload:JSON.stringify(pd),version:window.pdVersion,updated_at:1000}]:[];return []};
 window.write=async(name,p)=>{window.calls.push({name,p});if(name==='save_pd_draft')window.pdVersion++;};
 createRoot(document.getElementById('root')).render(<App/>);`
 
@@ -56,6 +56,22 @@ test('vacancies routes, PD rendering, discovery, share, gates and recruiter edit
    await go('/vacancies/job?organization_id=wrong&brand_id=brand');await expect(page.getByRole('heading',{name:'404 — Not found'})).toBeVisible()
    await go('/jobs/job?organization_id=org&brand_id=brand');await expect(page).toHaveURL(/\/vacancies\/job/);await expect(page.getByRole('heading',{name:'Engineer',exact:true})).toBeVisible()
   })
+  await t.test('public structured filters and copy preserve unpaid internship terms over legacy salary prose',async()=>{
+   await page.evaluate(()=>window.showTerms=true)
+   await page.getByRole('link',{name:'All vacancies'}).click()
+   await page.getByRole('combobox',{name:'engagement basis',exact:true}).selectOption('employment')
+   await expect(page.getByText('No vacancies match these filters.')).toBeVisible()
+   await page.getByRole('combobox',{name:'engagement basis',exact:true}).selectOption('volunteer')
+   await page.getByRole('combobox',{name:'programme kind',exact:true}).selectOption('internship')
+   await page.getByRole('combobox',{name:'compensation type',exact:true}).selectOption('unpaid')
+   await page.getByRole('link',{name:'Engineer',exact:true}).click()
+   await expect(page.getByText('AUD 100,000',{exact:true})).toHaveCount(0)
+   await expect(page.getByText(/10 approved weeks/).first()).toBeVisible()
+   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.copied=value}}}))
+   await page.getByRole('button',{name:'Copy job description',exact:true}).click()
+   assert.match(await page.evaluate(()=>window.copied),/volunteer.*internship.*unpaid.*8–8 hours\/week.*10 approved weeks/)
+   assert.doesNotMatch(await page.evaluate(()=>window.copied),/AUD 100,000/)
+  })
   await t.test('missing sections are omitted, empty index and copy failure are recoverable',async()=>{
    await go('/vacancies');await page.evaluate(()=>window.partial=true);await page.getByRole('link',{name:'Engineer',exact:true}).click();await expect(page.getByRole('heading',{name:'Overview',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Requirements',exact:true})).toHaveCount(0)
    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('denied')}}}));await page.getByRole('button',{name:'Copy vacancy link'}).click();await expect(page.getByText('Could not copy the link. Copy the address from your browser.')).toBeVisible()
@@ -68,6 +84,23 @@ test('vacancies routes, PD rendering, discovery, share, gates and recruiter edit
   await t.test('owner vacancy management loads draft, saves and previews server PD',async()=>{
    await page.evaluate(()=>window.auth={user:{id:'owner'},loading:false});await page.getByRole('link',{name:'Switch to Recruiter Workspace'}).click();await page.getByRole('button',{name:'Toggle primary navigation'}).click();await page.getByRole('navigation',{name:'Primary navigation'}).getByRole('link',{name:'Vacancies',exact:true}).first().click();await expect(page.getByRole('heading',{name:'Vacancies',level:1,exact:true})).toBeVisible();await page.getByRole('link',{name:/Engineer.*draft/}).click();await expect(page.getByRole('heading',{name:'Structured Position Description'})).toBeVisible();await page.getByLabel('Overview',{exact:true}).fill('Draft overview');await page.getByRole('button',{name:'Save PD Draft'}).click();await expect(page.getByText(/PD draft saved, version 1/)).toBeVisible();await page.getByRole('button',{name:'Save and preview PD'}).click();await expect(page.getByRole('region',{name:'Position Description preview'})).toBeVisible();await expect(page.getByRole('heading',{name:'Preview — version 2'})).toBeVisible()
    const calls=await page.evaluate(()=>window.calls);assert.ok(calls.some(c=>c.name==='save_pd_draft'&&c.p.expected_version===0&&c.p.overview==='Draft overview'));assert.ok(calls.some(c=>c.name==='get_pd_draft'));assert.ok(calls.some(c=>c.name==='preview_pd'))
+  })
+  await t.test('structured terms editor submits explicit volunteer internship without changing PD',async()=>{
+   await page.getByText('Review structured terms',{exact:true}).click()
+   await page.getByLabel('engagement basis',{exact:true}).selectOption('volunteer')
+   await page.getByLabel('programme kind',{exact:true}).selectOption('internship')
+   await page.getByLabel('compensation type',{exact:true}).selectOption('unpaid')
+   await expect(page.getByLabel('Compensation amount',{exact:true})).toHaveCount(0)
+   await page.getByLabel('weekly hours min',{exact:true}).fill('8')
+   await page.getByLabel('weekly hours max',{exact:true}).fill('8')
+   await page.getByLabel('programme weeks',{exact:true}).fill('10')
+   await page.getByLabel('Weeks basis (for example approved)',{exact:true}).fill('approved')
+   await page.getByRole('button',{name:'Save reviewed terms',exact:true}).click()
+   await expect(page.getByText('Reviewed terms for 1 vacancies.')).toBeVisible()
+   const saved=await page.evaluate(()=>window.calls.find(c=>c.name==='save_vacancy_terms').p)
+   assert.equal(saved.engagement_basis,'volunteer');assert.equal(saved.programme_kind,'internship');assert.equal(saved.compensation_type,'unpaid');assert.equal(saved.compensation_amount,null);assert.equal(saved.weekly_hours_min,8);assert.equal(saved.weekly_hours_max,8);assert.equal(saved.programme_weeks,10);assert.equal(saved.weeks_basis,'approved');assert.equal(saved.expected_version,0)
+   assert.equal('description' in saved,false)
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
   })
  } finally { await browser?.close();await server.close();rmSync(cacheDir,{recursive:true,force:true}) }
 })

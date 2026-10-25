@@ -1,3 +1,4 @@
+import { TermsFields, termsFromForm } from './vacancy-terms'
 import { CurrentPipeline } from './CurrentPipeline'
 import { FunnelAnalytics } from './FunnelAnalytics'
 import { TalentPool } from './TalentPool'
@@ -61,7 +62,7 @@ export function CreateVacancyScreen() {
   const { space } = useWorkspace(); const scope = scopeOf(space); const navigate = useNavigate()
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   if (!space.can_create_requisition) return <NotFound />
-  return <Screen title="Add requisition"><Link className="underline" to={'/recruiter/vacancies?' + new URLSearchParams(scope)}>All managed vacancies</Link>{error && <p role="alert">{error}</p>}<Form busy={busy} submitLabel="Create requisition" onSubmit={async f => { setBusy(true); setError(''); const requisitionId = id(); try { await write('create_requisition', { ...scope, requisition_id: requisitionId, title: val(f, 'title'), operation_id: id() }); navigate('/recruiter/vacancies/' + encodeURIComponent(requisitionId) + '?' + new URLSearchParams(scope)) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }}><TextField name="title" label="Role title" /></Form></Screen>
+  return <Screen title="Add requisition"><Link className="underline" to={'/recruiter/vacancies?' + new URLSearchParams(scope)}>All managed vacancies</Link>{error && <p role="alert">{error}</p>}<Form busy={busy} submitLabel="Create requisition" onSubmit={async f => { setBusy(true); setError(''); const requisitionId = id(); try { await write('create_vacancy_with_terms', { ...scope, ...termsFromForm(f), requisition_id: requisitionId, title: val(f, 'title'), operation_id: id() }); navigate('/recruiter/vacancies/' + encodeURIComponent(requisitionId) + '?' + new URLSearchParams(scope)) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }}><TextField name="title" label="Role title" /><TermsFields /></Form></Screen>
 }
 export function ApplicationScreen() {
   const { space } = useWorkspace(); const { applicationId = '' } = useParams(); const scope = scopeOf(space); const params = { ...scope, application_id: applicationId }

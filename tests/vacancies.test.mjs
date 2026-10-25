@@ -165,3 +165,108 @@ test('exact vacancy detail resolves beyond the recent list and masks denied IDs'
     assert.deepEqual(call('get_vacancy_management', 'staff-a', { ...A, requisition_id: 'missing' }), [])
   } finally { db.close() }
 })
+
+const volunteerTerms = (overrides = {}) => ({ ...A, engagement_basis:'volunteer', programme_kind:'internship', compensation_type:'unpaid', compensation_amount:null, compensation_currency:null, weekly_hours_min:8, weekly_hours_max:8, programme_weeks:10, weeks_basis:'approved', expected_version:0, operation_id:crypto.randomUUID(), ...overrides })
+test('structured terms explicitly backfill legacy records, enforce scope, versions and immutable audit history', () => {
+  const { db,call } = fixture()
+  try {
+    assert.equal(call('get_vacancy_management','owner',A)[0].terms_json,null)
+    for (const user of ['worker','outsider','staff-b']) assert.deepEqual(call('save_vacancy_terms',user,volunteerTerms()),[0])
+    assert.deepEqual(call('save_vacancy_terms','owner',volunteerTerms({ brand_id:'b' })),[0])
+    assert.deepEqual(call('save_vacancy_terms','staff-a',volunteerTerms()),[1])
+    const row = call('get_vacancy_management','owner',A)[0]
+    assert.equal(row.terms_version,1)
+    assert.equal(JSON.parse(row.terms_json).weekly_hours_min,8)
+    assert.equal(JSON.parse(row.terms_json).weeks_basis,'approved')
+    assert.equal(call('get_vacancy_management','owner',B)[0].terms_version,0)
+    assert.deepEqual(call('save_vacancy_terms','owner',volunteerTerms()),[0])
+    assert.deepEqual(call('save_vacancy_terms','owner',volunteerTerms({ expected_version:1 })),[1])
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE action='requisition.terms_reviewed'").get().n,2)
+    assert.throws(() => db.exec("UPDATE hiring_vacancy_terms SET weekly_hours_min=1"),/immutable/)
+    assert.equal(db.prepare('SELECT title FROM hiring_requisitions WHERE id=?').get(A.requisition_id).title,'Engineer')
+  } finally { db.close() }
+})
+test('structured terms reject invalid and incompatible combinations at database boundary', () => {
+  const { db,call } = fixture()
+  try {
+    for (const change of [
+      {engagement_basis:'unknown'}, {programme_kind:'unknown'}, {compensation_type:'paid'},
+      {compensation_type:'salary',compensation_amount:100,compensation_currency:'AUD'},
+      {compensation_amount:100}, {compensation_currency:'AUD'},
+      {engagement_basis:'employment',compensation_type:'hourly'},
+      {engagement_basis:'employment',compensation_type:'hourly',compensation_amount:20,compensation_currency:'aud'},
+      {weekly_hours_min:0}, {weekly_hours_max:7}, {weekly_hours_max:169},
+      {programme_weeks:null,weeks_basis:null}, {weeks_basis:null}, {weeks_basis:''}, {programme_weeks:1.5},
+    ]) assert.throws(() => call('save_vacancy_terms','owner',volunteerTerms(change)),/CHECK/,JSON.stringify(change))
+    assert.equal(db.prepare('SELECT count(*) n FROM hiring_vacancy_terms').get().n,0)
+  } finally { db.close() }
+})
+test('reviewed volunteer internship publishes exact public terms and blocks incompatible compensation', () => {
+  const { db,call } = fixture()
+  try {
+    call('save_vacancy_terms','owner',volunteerTerms())
+    assert.throws(() => call('publish_job_requisition','owner',{ ...publication(),compensation_type:'paid' }),/conflicts/)
+    call('publish_job_requisition','owner',{ ...publication(),compensation_type:'internship',compensation:'unpaid' })
+    const snapshot = db.prepare('SELECT * FROM hiring_published_vacancy_terms').get()
+    assert.equal(snapshot.engagement_basis,'volunteer')
+    assert.equal(snapshot.programme_weeks,10)
+    assert.equal(snapshot.compensation_type,'unpaid')
+    assert.throws(() => call('save_vacancy_terms','owner',volunteerTerms({ expected_version:1 })),/immutable/)
+    assert.throws(() => db.exec("UPDATE hiring_published_vacancy_terms SET compensation_type='salary'"),/immutable/)
+  } finally { db.close() }
+})
+test('terms edits invalidate review; legacy published terms require explicit backfill and then remain frozen', () => {
+  const { db,call,publish } = fixture()
+  try {
+    call('save_requisition_review','owner',{ ...publication(),compensation_type:'paid',state:'pending_review',expected_version:0,operation_id:'review-terms' })
+    call('save_vacancy_terms','owner',volunteerTerms())
+    assert.equal(call('get_requisition_review','owner',A)[0].state,'draft')
+    // The other legacy vacancy is not guessed from title or publication text.
+    call('publish_job_requisition','owner',publication(B))
+    assert.equal(call('get_vacancy_detail',null,B)[0].terms_json,null)
+    call('save_vacancy_terms','owner',volunteerTerms({ ...B,programme_kind:'ongoing contribution',programme_weeks:null,weeks_basis:null }))
+    assert.equal(JSON.parse(call('get_vacancy_detail',null,B)[0].terms_json).engagement_basis,'volunteer')
+    assert.throws(() => call('save_vacancy_terms','owner',volunteerTerms({ ...B,expected_version:1 })),/immutable/)
+  } finally { db.close() }
+})
+test('terms audit failure rolls back both terms and publication review reset', () => {
+  const { db,call } = fixture()
+  try {
+    db.exec("CREATE TRIGGER fail_terms BEFORE INSERT ON hiring_audit_events WHEN NEW.action='requisition.terms_reviewed' BEGIN SELECT RAISE(ABORT,'audit failed'); END")
+    assert.throws(() => call('save_vacancy_terms','owner',volunteerTerms()),/audit failed/)
+    assert.equal(call('get_vacancy_management','owner',A)[0].terms_version,0)
+  } finally { db.close() }
+})
+test('creation with explicit terms is atomic and preserves a terms-free title', () => {
+  const { db,call } = fixture()
+  try {
+    const args = volunteerTerms({ requisition_id:'new-role', title:'Community developer' })
+    assert.throws(() => call('create_vacancy_with_terms','owner',{...args, weekly_hours_max:2}),/CHECK/)
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_requisitions WHERE id='new-role'").get().n,0)
+    assert.deepEqual(call('create_vacancy_with_terms','owner',args),[1,1,1])
+    const row=call('get_vacancy_management','owner',{...A,requisition_id:'new-role'})[0]
+    assert.equal(row.title,'Community developer')
+    assert.equal(JSON.parse(row.terms_json).programme_weeks,10)
+    assert.deepEqual(call('create_vacancy_with_terms','owner',args),[0,0,0])
+  } finally { db.close() }
+})
+test('publication rejects a stale structured terms review version', () => {
+  const { db,call } = fixture()
+  try {
+    call('save_vacancy_terms','owner',volunteerTerms())
+    call('save_vacancy_terms','owner',volunteerTerms({expected_version:1,programme_weeks:12}))
+    assert.deepEqual(call('publish_job_requisition','owner',{...publication(),compensation_type:'internship',expected_terms_version:1}),[0,0])
+    assert.equal(db.prepare('SELECT count(*) n FROM hiring_job_publications').get().n,0)
+    assert.deepEqual(call('publish_job_requisition','owner',{...publication(),compensation_type:'internship',expected_terms_version:2}),[1,1])
+  } finally { db.close() }
+})
+test('other compensation remains explicitly unspecified rather than silently paid', () => {
+  const { db,call } = fixture()
+  try {
+    call('save_vacancy_terms','owner',volunteerTerms({engagement_basis:'other',programme_kind:'ongoing contribution',compensation_type:'other',programme_weeks:null,weeks_basis:null}))
+    const p={...publication(),compensation_type:'unspecified'}
+    assert.deepEqual(call('save_requisition_review','owner',{...p,state:'pending_review',expected_version:0}),[1,1])
+    assert.deepEqual(call('publish_job_requisition','owner',{...p,operation_id:crypto.randomUUID(),expected_terms_version:1}),[1,1])
+    assert.equal(JSON.parse(call('get_vacancy_detail',null,A)[0].terms_json).compensation_type,'other')
+  } finally { db.close() }
+})

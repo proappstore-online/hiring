@@ -950,11 +950,15 @@
         "compensation_type": {
           "type": "string",
           "optional": true
+        },
+        "expected_terms_version": {
+          "type": "number",
+          "optional": true
         }
       },
       "requires_auth": true,
       "statements": [
-        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,compensation_type,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,coalesce(:compensation_type,'unspecified'),:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id) AND coalesce(:compensation_type,'unspecified') IN ('unspecified','paid','unpaid','internship','volunteer') AND NOT EXISTS (SELECT 1 FROM hiring_requisition_reviews v WHERE v.requisition_id=r.id AND (v.state!='pending_review' OR v.payload!=json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified'))))",
+        "INSERT INTO hiring_job_publications(requisition_id,organization_id,brand_id,description,location,arrangement,compensation,notice_version,notice_text,contact,compensation_type,actor_user_id,operation_id,created_at) SELECT :requisition_id,:organization_id,:brand_id,:description,:location,:arrangement,:compensation,:notice_version,:notice_text,:contact,coalesce(:compensation_type,'unspecified'),:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 300 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 128 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 300 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=:requisition_id) AND coalesce(:compensation_type,'unspecified') IN ('unspecified','paid','unpaid','internship','volunteer') AND NOT EXISTS (SELECT 1 FROM hiring_requisition_reviews v WHERE v.requisition_id=r.id AND (v.state!='pending_review' OR v.payload!=json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')))) AND (:expected_terms_version IS NULL OR :expected_terms_version=(SELECT version FROM hiring_current_vacancy_terms WHERE requisition_id=r.id))",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.published',:__user_id,:operation_id,:__now WHERE changes()=1"
       ]
     },
@@ -996,7 +1000,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_published_vacancy_terms vt WHERE vt.requisition_id=j.requisition_id) AS terms_json,j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
     },
     {
       "name": "get_public_job",
@@ -1016,7 +1020,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_published_vacancy_terms vt WHERE vt.requisition_id=j.requisition_id) AS terms_json,j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version FROM hiring_job_publications j JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
     },
     {
       "name": "save_my_worker_profile",
@@ -1646,7 +1650,7 @@
         }
       },
       "statements": [
-        "INSERT INTO hiring_requisition_reviews(requisition_id,state,payload,actor_user_id) SELECT :requisition_id,:state,json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')),:__user_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :state IN ('draft','pending_review') AND :compensation_type IN ('paid','unpaid','internship','volunteer') AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 2000 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 2000 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 2000 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT version FROM hiring_requisition_reviews WHERE requisition_id=r.id),0) ON CONFLICT(requisition_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,actor_user_id=excluded.actor_user_id,version=version+1",
+        "INSERT INTO hiring_requisition_reviews(requisition_id,state,payload,actor_user_id) SELECT :requisition_id,:state,json_object('description',:description,'location',:location,'arrangement',:arrangement,'compensation',:compensation,'notice_version',:notice_version,'notice_text',:notice_text,'contact',:contact,'compensation_type',coalesce(:compensation_type,'unspecified')),:__user_id FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :state IN ('draft','pending_review') AND (:compensation_type IN ('paid','unpaid','internship','volunteer') OR (:compensation_type='unspecified' AND EXISTS(SELECT 1 FROM hiring_current_vacancy_terms vt WHERE vt.requisition_id=r.id AND vt.compensation_type='other'))) AND length(trim(:description)) BETWEEN 1 AND 20000 AND length(trim(:location)) BETWEEN 1 AND 2000 AND length(trim(:arrangement)) BETWEEN 1 AND 2000 AND length(trim(:compensation)) BETWEEN 1 AND 2000 AND length(trim(:notice_version)) BETWEEN 1 AND 2000 AND length(trim(:notice_text)) BETWEEN 1 AND 20000 AND length(trim(:contact)) BETWEEN 1 AND 2000 AND NOT EXISTS (SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) AND :expected_version=coalesce((SELECT version FROM hiring_requisition_reviews WHERE requisition_id=r.id),0) ON CONFLICT(requisition_id) DO UPDATE SET state=excluded.state,payload=excluded.payload,actor_user_id=excluded.actor_user_id,version=version+1",
         "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id) SELECT :operation_id,:organization_id,:brand_id,'requisition.review_saved',:__user_id,:operation_id,:__now,'requisition',:requisition_id WHERE changes()=1"
       ]
     },
@@ -1949,7 +1953,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at,j.arrangement,j.description,j.compensation,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:organization_id IS NULL OR :organization_id='' OR j.organization_id=:organization_id) AND (:brand_id IS NULL OR :brand_id='' OR j.brand_id=:brand_id) AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_published_vacancy_terms vt WHERE vt.requisition_id=j.requisition_id) AS terms_json,j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.location,j.created_at,j.arrangement,j.description,j.compensation,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND (:organization_id IS NULL OR :organization_id='' OR j.organization_id=:organization_id) AND (:brand_id IS NULL OR :brand_id='' OR j.brand_id=:brand_id) AND (:after_id='' OR j.requisition_id>:after_id) ORDER BY j.requisition_id LIMIT 25"
     },
     {
       "name": "get_vacancy_detail",
@@ -1969,7 +1973,7 @@
         }
       },
       "requires_auth": false,
-      "sql": "SELECT j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_published_vacancy_terms vt WHERE vt.requisition_id=j.requisition_id) AS terms_json,j.requisition_id,j.organization_id,j.brand_id,r.title,i.brand_name,i.organization_name,j.description,j.location,j.arrangement,j.compensation,j.compensation_type,j.notice_version,j.notice_text,j.contact,j.version,pd.payload AS pd_json,pd.pd_version,'published' AS status FROM hiring_job_publications j LEFT JOIN hiring_pd_publications pd ON pd.requisition_id=j.requisition_id JOIN hiring_publication_identities i ON i.requisition_id=j.requisition_id JOIN hiring_requisitions r ON r.id=j.requisition_id AND r.organization_id=j.organization_id AND r.brand_id=j.brand_id JOIN hiring_brands b ON b.id=j.brand_id AND b.organization_id=j.organization_id JOIN hiring_organizations o ON o.id=j.organization_id WHERE NOT EXISTS (SELECT 1 FROM hiring_restricted_internships ri WHERE ri.requisition_id=j.requisition_id) AND j.status='published' AND NOT EXISTS (SELECT 1 FROM hiring_publication_controls pc WHERE pc.requisition_id=j.requisition_id AND pc.paused=1) AND o.status='active' AND j.requisition_id=:requisition_id AND ((:brand_id IS NULL AND :organization_id IS NULL) OR (j.brand_id=:brand_id AND j.organization_id=:organization_id)) LIMIT 1"
     },
     {
       "name": "list_vacancy_management",
@@ -1984,7 +1988,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT r.id,r.title,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY updated_at DESC,r.id LIMIT 100"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_current_vacancy_terms vt WHERE vt.requisition_id=r.id) AS terms_json,coalesce((SELECT version FROM hiring_current_vacancy_terms vt WHERE vt.requisition_id=r.id),0) AS terms_version,r.id,r.title,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) ORDER BY updated_at DESC,r.id LIMIT 100"
     },
     {
       "name": "get_vacancy_management",
@@ -2002,7 +2006,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT r.id,r.title,r.status,EXISTS (SELECT 1 FROM hiring_effective_access publisher WHERE publisher.organization_id=r.organization_id AND publisher.brand_id=r.brand_id AND publisher.user_id=:__user_id AND publisher.role IN ('owner','recruiter') AND publisher.requisition_id IS NULL) AS can_publish,v.state AS review_state,j.version AS publication_version,j.description AS published_description,j.location AS published_location,j.arrangement AS published_arrangement,j.compensation AS published_compensation,j.contact AS published_contact,j.notice_version AS published_notice_version,j.notice_text AS published_notice_text,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1"
+      "sql": "SELECT (SELECT json_object('engagement_basis',vt.engagement_basis,'programme_kind',vt.programme_kind,'compensation_type',vt.compensation_type,'compensation_amount',vt.compensation_amount,'compensation_currency',vt.compensation_currency,'weekly_hours_min',vt.weekly_hours_min,'weekly_hours_max',vt.weekly_hours_max,'programme_weeks',vt.programme_weeks,'weeks_basis',vt.weeks_basis) FROM hiring_current_vacancy_terms vt WHERE vt.requisition_id=r.id) AS terms_json,coalesce((SELECT version FROM hiring_current_vacancy_terms vt WHERE vt.requisition_id=r.id),0) AS terms_version,r.id,r.title,r.status,EXISTS (SELECT 1 FROM hiring_effective_access publisher WHERE publisher.organization_id=r.organization_id AND publisher.brand_id=r.brand_id AND publisher.user_id=:__user_id AND publisher.role IN ('owner','recruiter') AND publisher.requisition_id IS NULL) AS can_publish,v.state AS review_state,j.version AS publication_version,j.description AS published_description,j.location AS published_location,j.arrangement AS published_arrangement,j.compensation AS published_compensation,j.contact AS published_contact,j.notice_version AS published_notice_version,j.notice_text AS published_notice_text,CASE WHEN j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' WHEN v.state='pending_review' THEN 'in review' ELSE 'draft' END AS state, max(r.created_at,coalesce(j.created_at,0),coalesce(d.updated_at,0),coalesce((SELECT max(a.created_at) FROM hiring_audit_events a WHERE a.organization_id=r.organization_id AND a.brand_id=r.brand_id AND a.object_id=r.id),0)) AS updated_at FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id LEFT JOIN hiring_requisition_reviews v ON v.requisition_id=r.id LEFT JOIN hiring_pd_versions d ON d.requisition_id=r.id AND d.version=(SELECT max(version) FROM hiring_pd_versions WHERE requisition_id=r.id) WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.id=:requisition_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) LIMIT 1"
     },
     {
       "name": "get_my_application",
@@ -5970,6 +5974,120 @@
         }
       },
       "sql": "SELECT w.id,w.version,w.invitation,w.owner_user_id,w.playbook_version,w.outcome,w.exceptions,w.invited_at,w.completed_at,w.created_at,w.actor_user_id FROM working_interview_records w JOIN hiring_applications a ON a.id=w.application_id AND a.organization_id=w.organization_id AND a.brand_id=w.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id)) AND w.version=(SELECT MAX(v.version) FROM working_interview_records v WHERE v.id=w.id) ORDER BY w.invited_at DESC,w.id LIMIT 100"
+    },
+    {
+      "name": "save_vacancy_terms",
+      "description": "Explicitly review structured vacancy terms; appends an audited version, invalidates publication review. Published legacy vacancies may be backfilled once. Never infers terms from title.",
+      "operation": "execute",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "engagement_basis": {
+          "type": "string"
+        },
+        "programme_kind": {
+          "type": "string"
+        },
+        "compensation_type": {
+          "type": "string"
+        },
+        "compensation_amount": {
+          "type": "number",
+          "optional": true
+        },
+        "compensation_currency": {
+          "type": "string",
+          "optional": true
+        },
+        "weekly_hours_min": {
+          "type": "number"
+        },
+        "weekly_hours_max": {
+          "type": "number"
+        },
+        "programme_weeks": {
+          "type": "number",
+          "optional": true
+        },
+        "weeks_basis": {
+          "type": "string",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "number"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_vacancy_terms(requisition_id,version,organization_id,brand_id,engagement_basis,programme_kind,compensation_type,compensation_amount,compensation_currency,weekly_hours_min,weekly_hours_max,programme_weeks,weeks_basis,actor_user_id,operation_id,created_at) SELECT r.id,:expected_version+1,r.organization_id,r.brand_id,:engagement_basis,:programme_kind,:compensation_type,:compensation_amount,:compensation_currency,:weekly_hours_min,:weekly_hours_max,:programme_weeks,:weeks_basis,:__user_id,:operation_id,:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND :expected_version=coalesce((SELECT max(version) FROM hiring_vacancy_terms WHERE requisition_id=r.id),0) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND (NOT EXISTS(SELECT 1 FROM hiring_job_publications WHERE requisition_id=r.id) OR EXISTS(SELECT 1 FROM hiring_effective_access pub WHERE pub.organization_id=r.organization_id AND pub.brand_id=r.brand_id AND pub.user_id=:__user_id AND pub.role IN ('owner','recruiter') AND pub.requisition_id IS NULL))"
+    },
+    {
+      "name": "create_vacancy_with_terms",
+      "description": "Atomically create a vacancy with explicitly reviewed engagement, compensation and programme terms. Invalid terms roll back creation.",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO hiring_requisitions(id,organization_id,brand_id,title,created_at,operation_id) SELECT :requisition_id,:organization_id,:brand_id,:title,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND length(trim(:title))>0 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:operation_id))>0",
+        "INSERT OR IGNORE INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at) SELECT :operation_id,:organization_id,:brand_id,NULL,'requisition.created',:__user_id,:operation_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=NULL) AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_requisitions WHERE id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND length(trim(:operation_id))>0 AND changes()=1",
+        "INSERT INTO hiring_vacancy_terms(requisition_id,version,organization_id,brand_id,engagement_basis,programme_kind,compensation_type,compensation_amount,compensation_currency,weekly_hours_min,weekly_hours_max,programme_weeks,weeks_basis,actor_user_id,operation_id,created_at) SELECT r.id,1,r.organization_id,r.brand_id,:engagement_basis,:programme_kind,:compensation_type,:compensation_amount,:compensation_currency,:weekly_hours_min,:weekly_hours_max,:programme_weeks,:weeks_basis,:__user_id,:operation_id||'-terms',:__now FROM hiring_requisitions r WHERE r.id=:requisition_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=r.organization_id AND p.brand_id=r.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=r.id)) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND r.operation_id=:operation_id AND changes()=1"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "engagement_basis": {
+          "type": "string"
+        },
+        "programme_kind": {
+          "type": "string"
+        },
+        "compensation_type": {
+          "type": "string"
+        },
+        "compensation_amount": {
+          "type": "number",
+          "optional": true
+        },
+        "compensation_currency": {
+          "type": "string",
+          "optional": true
+        },
+        "weekly_hours_min": {
+          "type": "number"
+        },
+        "weekly_hours_max": {
+          "type": "number"
+        },
+        "programme_weeks": {
+          "type": "number",
+          "optional": true
+        },
+        "weeks_basis": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "requires_auth": true
     }
   ]
 }

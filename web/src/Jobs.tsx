@@ -1,3 +1,4 @@
+import { VacancyTerms, parseTerms, termsText } from './vacancy-terms'
 import { mutationError } from './mutation-state'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { LoadingState, EmptyState, ErrorState, NotFound } from './route-ui'
@@ -18,15 +19,18 @@ export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; r
     if (!requisition) return
     setBusy(true); setMessage(''); setFailed(false)
     try {
+      const vacancy = (await read<{ terms_json: string | null; terms_version: number }>('get_vacancy_management', { ...scope, requisition_id: requisition.id }))[0]
+      const terms = parseTerms(vacancy?.terms_json)
+      if (!terms) throw new Error('Review structured vacancy terms before publishing.')
       const review = (await read<{ version: number; payload: string }>('get_requisition_review', { ...scope, requisition_id: requisition.id }))[0]
       if (!review) throw new Error('Add the job details before publishing.')
       const content = JSON.parse(review.payload) as Record<string, string>
-      const details = { ...scope, requisition_id: requisition.id, description: content.description, location: content.location, arrangement: content.arrangement, compensation: content.compensation, notice_version: content.notice_version, notice_text: content.notice_text, contact: content.contact, compensation_type: content.compensation_type }
+      const details = { ...scope, requisition_id: requisition.id, description: content.description, location: content.location, arrangement: content.arrangement, compensation: termsText(terms), notice_version: content.notice_version, notice_text: content.notice_text, contact: content.contact, compensation_type: terms.programme_kind === 'internship' ? 'internship' : terms.compensation_type === 'unpaid' ? 'unpaid' : terms.compensation_type === 'other' ? 'unspecified' : 'paid' }
       await write('save_requisition_review', { ...details, state: 'pending_review', expected_version: review.version, operation_id: id() })
-      await write('publish_job_requisition', { ...details, operation_id: id() })
-      if (content.compensation_type !== 'internship') await write('set_hiring_runtime_gate', { ...scope, intake_status: 'open', operation_id: id() })
+      await write('publish_job_requisition', { ...details, expected_terms_version: vacancy.terms_version, operation_id: id() })
+      if (details.compensation_type !== 'internship') await write('set_hiring_runtime_gate', { ...scope, intake_status: 'open', operation_id: id() })
       await onChanged?.()
-      setMessage(content.compensation_type === 'internship' ? 'Published as an unlisted internship. Use controlled sourcing and direct Interns onboarding.' : 'Published and accepting applications.')
+      setMessage(details.compensation_type === 'internship' ? 'Published as an unlisted internship. Use controlled sourcing and direct Interns onboarding.' : 'Published and accepting applications.')
     } catch (e) { setFailed(true); setMessage(mutationError(e)) }
     finally { setBusy(false) }
   }
@@ -76,7 +80,7 @@ export function Jobs({ userId, mode = 'list' }: { userId?: string; mode?: 'list'
   return <div className="mx-auto max-w-4xl space-y-5 px-4 py-8">
     {mode === 'list' && <><h1 className="text-2xl font-semibold">Jobs</h1><button className={button} disabled={loading} onClick={() => void load()}>Refresh jobs</button><DiscoveryFilters search={search} brand={brand} brands={brands} onSearch={setSearch} onBrand={setBrand} /><p>Search and filters apply to loaded results.</p><ul className="space-y-2">{filtered.map(j => <li key={j.requisition_id}><Link className={panel + ' block min-h-[44px] text-left'} to={link(j)}>{j.title} · {j.brand_name} · {j.location}</Link></li>)}</ul>{!filtered.length && <EmptyState>{jobs.length ? 'No jobs match these filters.' : 'No published jobs are available.'}</EmptyState>}{loading && <LoadingState />}{more && <button className={button} disabled={loading} onClick={() => void load(jobs.at(-1)!.requisition_id)}>More jobs</button>}</>}
     {job && mode !== 'list' && <Link className="underline" to={withBack(vacancyUrl(job.requisition_id), safeBack(query.get('back'), 'vacancies'))}>Vacancy details</Link>}
-    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><p>{job.compensation}</p><p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={withBack(link(job, true), safeBack(query.get('back'), 'vacancies'))}>Apply for this job</Link> : !userId ? <div className="mt-4 space-y-3"><p>Sign in to apply with your own candidate account.</p><Link className="inline-flex min-h-[44px] items-center underline" to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)}>Sign in to continue</Link><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={async () => setRefreshMine(n => n + 1)} />}</section>}
+    {job && <section className={panel}><h1 className="text-xl font-semibold">{job.title}</h1><p>{job.organization_name} / {job.brand_name} · {job.location}</p><p className="mt-4 whitespace-pre-wrap">{job.description}</p><h2 className="mt-4 font-semibold">Arrangement</h2><p className="whitespace-pre-wrap">{job.arrangement}</p><VacancyTerms value={job.terms_json} />{!job.terms_json && <p>{job.compensation}</p>}<p>Contact: {job.contact}</p><h2 className="mt-4 font-semibold">Privacy notice — {job.notice_version}</h2><p className="whitespace-pre-wrap">{job.notice_text}</p>{!available ? <p role="status" className="mt-4">Applications are not open yet. Please check back later.</p> : mode !== 'apply' ? <Link className="inline-flex min-h-[44px] items-center underline" to={withBack(link(job, true), safeBack(query.get('back'), 'vacancies'))}>Apply for this job</Link> : !userId ? <div className="mt-4 space-y-3"><p>Sign in to apply with your own candidate account.</p><Link className="inline-flex min-h-[44px] items-center underline" to={'/sign-in?returnTo=' + encodeURIComponent(location.pathname + location.search)}>Sign in to continue</Link><div className="flex flex-col items-start gap-3"><SignInButton app={app} provider="google" label="Continue with Google" /><SignInButton app={app} provider="github" label="Continue with GitHub" /></div></div> : <CandidateForm key={job.requisition_id} job={job} onSaved={async () => setRefreshMine(n => n + 1)} />}</section>}
     {userId && <section className={panel}><h2 className="font-semibold"><Link to="/my-applications" className="underline">My applications</Link></h2><CandidateApplications key={refreshMine} userId={userId} /></section>}
   </div>
 }
