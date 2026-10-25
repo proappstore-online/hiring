@@ -32,6 +32,6 @@ test('acceptance UI requires explicit evidence and confirmation, preserves opera
  await expect.poll(()=>page.evaluate(()=>window.calls.length)).toBe(2)
  const result=await page.evaluate(()=>({calls:window.calls}));assert.equal(result.calls[0].name,'record_acceptance');assert.equal(result.calls[0].params.expected_version,7);assert.equal(result.calls[0].params.acceptance_evidence,'Candidate signed the exact offer');assert.equal(result.calls[0].params.operation_id,result.calls[1].params.operation_id)
  await page.evaluate(()=>window.offerStatus='draft');await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(button).toHaveCount(0)
- await page.evaluate(()=>{window.offerStatus='approved';window.compensation='unpaid'});await page.getByRole('button',{name:'Refresh',exact:true}).click();await expect(button).toHaveCount(0)
+ await page.evaluate(()=>{window.offerStatus='approved';window.compensation='unpaid'});await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByText('Offer management · approved',{exact:true}).click();await expect(button).toBeVisible()
  }finally{await browser?.close();await live.close();rmSync(cacheDir,{recursive:true,force:true})}
 })

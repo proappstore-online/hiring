@@ -199,7 +199,7 @@ test('acceptance denies unauthorized, cross-brand, stale, blank, unapproved and 
  f.call('create_workspace','staff-a',{...bootstrap,brand_id:'brand-b',requisition_id:'req-b',operation_id:'sibling-bootstrap'});f.call('add_workspace_member','staff-a',{...scope,brand_id:'brand-b',member_user_id:'sibling',role:'recruiter',operation_id:'sibling-member'});
  for(const user of ['reviewer','outsider','system:worker','sibling'])assert.equal(f.call('record_acceptance',user,acceptanceArgs)[0],0)
  for(const stage of ['submitted','interviewing','decision_pending']){f.db.prepare('UPDATE hiring_applications SET stage=?').run(stage);assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],0)}
- f.db.exec("UPDATE hiring_applications SET stage='offered'");step(f,'revoke_offer');assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],0)
+ f.db.exec("UPDATE hiring_applications SET stage='offered'");step(f,'revoke_offer');assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/approved offer/)
  }finally{f.db.close()}
 })
 test('acceptance audit failure rolls back evidence, history and version',()=>{
@@ -243,4 +243,31 @@ test('failed offer reconciliation preserves the immutable one-draft authorizatio
  assert.ok(f.call('claim_communication','staff-a',{...message,operation_id:'old-retry'}).every(n=>n===0))
  assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_outbox WHERE delivery_state='sending'").get().n,0)
  }finally{f.db.close()}
+})
+
+test('approved unpaid, internship and volunteer offers can record candidate acceptance',()=>{
+ for(const compensation_type of ['unpaid','internship','volunteer']){
+  const f=seeded();try{
+   f.call('save_offer_draft','staff-a',{...draft,terms_json:JSON.stringify({compensation_type,subject:'Offer',body:'Explicit non-paid role terms'})})
+   step(f,'submit_offer_for_approval');step(f,'approve_offer')
+   f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'")
+   assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],1)
+   const row=f.call('get_acceptance_result','staff-a',acceptanceArgs)[0]
+   assert.equal(row.stage,'accepted');assert.equal(row.acceptance_evidence,acceptanceArgs.acceptance_evidence)
+   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,1)
+  }finally{f.db.close()}
+ }
+})
+test('unapproved offers fail with an explicit approval error and preserve application state',()=>{
+ for(const status of ['draft','pending_approval','revoked']){
+  const f=ready();try{
+   if(status==='pending_approval')step(f,'submit_offer_for_approval')
+   if(status==='revoked')step(f,'revoke_offer')
+   f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'")
+   assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/approved offer/)
+   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,0)
+   const row=f.call('get_application','staff-a',{...scope,application_id:'app-a'})[0]
+   assert.equal(row.stage,'offered');assert.equal(row.version,1);assert.equal(row.acceptance_evidence,null)
+  }finally{f.db.close()}
+ }
 })

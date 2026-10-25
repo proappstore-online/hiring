@@ -3023,7 +3023,7 @@
     },
     {
       "name": "record_acceptance",
-      "description": "Record explicit candidate acceptance of approved paid offer terms. Read back with get_acceptance_result.",
+      "description": "Record explicit candidate acceptance of approved offer terms. Read back with get_acceptance_result.",
       "requires_auth": true,
       "operation": "batch",
       "params": {
@@ -3047,7 +3047,7 @@
         }
       },
       "statements": [
-        "INSERT INTO hiring_acceptances SELECT :operation_id,a.organization_id,a.brand_id,a.id,o.id,o.current_version,:__user_id,a.version,:acceptance_evidence,:__now FROM hiring_applications a JOIN hiring_offers o ON o.application_id=a.id AND o.tenant_id=a.organization_id AND o.brand_id=a.brand_id JOIN hiring_offer_versions v ON v.offer_id=o.id AND v.version=o.current_version WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=a.organization_id AND g.brand_id=a.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND a.version=:expected_version AND COALESCE(a.accepted_stage,a.stage_extension,a.stage)='offered' AND o.status='approved' AND json_extract(v.terms_json,'$.compensation_type')='paid' AND length(trim(:acceptance_evidence)) BETWEEN 1 AND 10000 AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_acceptances WHERE operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_stage_events WHERE id=:operation_id)"
+        "INSERT INTO hiring_acceptances SELECT :operation_id,a.organization_id,a.brand_id,a.id,o.id,o.current_version,:__user_id,a.version,:acceptance_evidence,:__now FROM hiring_applications a JOIN hiring_offers o ON o.application_id=a.id AND o.tenant_id=a.organization_id AND o.brand_id=a.brand_id JOIN hiring_offer_versions v ON v.offer_id=o.id AND v.version=o.current_version WHERE a.id=:application_id AND a.organization_id=:tenant_id AND a.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=a.organization_id AND g.brand_id=a.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND a.version=:expected_version AND COALESCE(a.accepted_stage,a.stage_extension,a.stage)='offered' AND length(trim(:acceptance_evidence)) BETWEEN 1 AND 10000 AND length(trim(:operation_id))>0 AND NOT EXISTS(SELECT 1 FROM hiring_acceptances WHERE operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE id=:operation_id OR operation_id=:operation_id) AND NOT EXISTS(SELECT 1 FROM hiring_stage_events WHERE id=:operation_id)"
       ]
     },
     {

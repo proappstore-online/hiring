@@ -187,7 +187,7 @@ independent mail archive actions record evidence, rather than dispatch messages.
 expected_version, acceptance_evidence)` requires authentication by an authorised
 owner or recruiter. Tenant means organization. Evidence must be 1–10000 characters
 after trimming and must describe actual candidate acceptance. Owner/recruiter
-requisition grants, offered prior state and approved paid terms are rechecked.
+requisition grants, offered prior state and approved offer terms (including unpaid, internship and volunteer terms) are rechecked.
 The mutation commits acceptance, application state, stage history and audit in
 one transaction. `get_acceptance_result` takes the exact same arguments and
 returns the updated application ID, stage, version, evidence and operation ID for
