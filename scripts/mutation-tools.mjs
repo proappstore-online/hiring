@@ -41,7 +41,7 @@ export function buildMutationTools(tools) {
     }
     if (source === 'queue_communication') {
       guard += ' AND EXISTS (SELECT 1 FROM hiring_outbox v WHERE v.id=:draft_id AND v.organization_id=:organization_id AND v.brand_id=:brand_id AND v.application_id=:application_id AND v.template_id IS NOT NULL AND v.template_version=:expected_version)'
-      tool.description += ' Requires preview of the immutable draft and pinned approved template version; passkey confirmation authorizes durable outbox enqueue, not a provider delivery receipt.'
+      tool.description += ' Requires preview of the immutable draft and pinned approved template version; the authorised user confirms the queued message in the app, not a provider delivery receipt.'
     }
     tool.statements = tool.statements.map(sql => sql
       .replaceAll(':tenant_id', ':organization_id')

@@ -169,7 +169,7 @@ application version and atomically updates stage/version, stage evidence and aud
 Deferred preserves the current stage. Hired requires offered stage and an approved
 paid offer. Rejected requires a review/offer/interview/decision stage. Withdrawn and
 deferred require a nonterminal application. Only one hired/rejected final decision
-is allowed. Existing stage actions now require platform passkey step-up; entry to
+is allowed. Existing stage actions require scoped role authority; entry to
 offered/hired also requires approved paid terms. Final hires/rejections through the existing
 stage action also append a decision record in its atomic stage/audit batch.
 Score capture supplies no authority.
@@ -202,7 +202,7 @@ interviewing; interviewing advances to decision_pending, which may advance to
 offered or rejected. Accepted is terminal and is recorded only by
 `record_acceptance`, never by the general stage operation.
 
-Acceptance requires scoped owner/recruiter authority, platform passkey step-up,
+Acceptance requires scoped owner/recruiter authority, explicit UI confirmation,
 expected application version, offered prior state, approved paid offer terms and
 explicit nonblank evidence that the candidate actually accepted. An immutable
 acceptance record binds actor/time/evidence to the exact offer revision. Its

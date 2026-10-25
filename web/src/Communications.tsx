@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { id, write, read, type Communication, type Draft, type EmailStatusEvent, type Scope } from './api'
 import { emailCards, statusLabel } from './email-model'
 import { date } from './ui'
-import { verifyPublicationPasskey } from './passkey'
 
 export function Communications({ scope, applicationId, drafts, communications, loading = false, error = '', onRetry, brandName }: { scope: Scope; applicationId: string; drafts: Draft[]; communications: Communication[]; loading?: boolean; error?: string; onRetry?: () => void; brandName?: string }) {
   const cards = emailCards(drafts, communications)
@@ -64,7 +63,6 @@ function Recovery({ scope, applicationId, draft, onChanged }: { scope: Scope; ap
   async function reconcile(outcome: string) {
     setBusy(true); setMessage('')
     try {
-      await verifyPublicationPasskey()
       await write('reconcile_communication', { ...scope, application_id: applicationId, draft_id: draft.id, outcome, evidence, operation_id: id() })
       const rows = await read<{ replacement_draft_id: string | null }>('get_communication_reconciliation', { ...scope, application_id: applicationId, draft_id: draft.id })
       setRecovered(true)
@@ -73,7 +71,7 @@ function Recovery({ scope, applicationId, draft, onChanged }: { scope: Scope; ap
     } catch { setMessage('Recovery could not be confirmed. Refresh and check the recorded reconciliation before retrying.') }
     finally { setBusy(false) }
   }
-  return <details className="my-3 border p-3"><summary>Reconcile: {draft.subject}</summary>{draft.delivery_reason && <p>{deliveryGuidance(draft.delivery_reason)}</p>}<p>Check the provider outcome first. Never retry an uncertain send. Non-acceptance creates an unsent replacement only for messages other than application receipts and offers. Receipt and offer resends remain blocked. Recovery preserves the original attempt and requires a passkey.</p><label>Provider evidence (no secrets)<textarea maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><fieldset disabled={busy || recovered || !evidence.trim()}><button type="button" className="min-h-[44px] underline mr-4" onClick={() => void reconcile('accepted')}>Confirm provider accepted</button><button type="button" className="min-h-[44px] underline" onClick={() => void reconcile('not_accepted')}>Confirm provider did not accept</button></fieldset>{message && <p role="status">{message}</p>}</details>
+  return <details className="my-3 border p-3"><summary>Reconcile: {draft.subject}</summary>{draft.delivery_reason && <p>{deliveryGuidance(draft.delivery_reason)}</p>}<p>Check the provider outcome first. Never retry an uncertain send. Non-acceptance creates an unsent replacement only for messages other than application receipts and offers. Receipt and offer resends remain blocked. Recovery preserves the original attempt and records the evidence.</p><label>Provider evidence (no secrets)<textarea maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} /></label><fieldset disabled={busy || recovered || !evidence.trim()}><button type="button" className="min-h-[44px] underline mr-4" onClick={() => void reconcile('accepted')}>Confirm provider accepted</button><button type="button" className="min-h-[44px] underline" onClick={() => void reconcile('not_accepted')}>Confirm provider did not accept</button></fieldset>{message && <p role="status">{message}</p>}</details>
 }
 
 function deliveryGuidance(reason: string) {
@@ -102,7 +100,6 @@ export function ApprovedMessage({ scope, applicationId, recipient, onChanged }: 
     if (!t) return
     setBusy(true); setMessage('')
     try {
-      await verifyPublicationPasskey()
       const draft = id()
       await write('create_communication_draft', { ...scope, application_id: applicationId, draft_id: draft, recipient_email: recipient, subject: t.subject, body: t.body, template_id: t.id, template_version: t.version, operation_id: id() })
       await write('queue_communication', { ...scope, application_id: applicationId, draft_id: draft, operation_id: id() })

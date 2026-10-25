@@ -187,7 +187,7 @@ test('reconciliation cannot retry recorded acceptance, pending jobs or active cl
   assert.equal(db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,1)
   db.close()
  }
- assert.equal(action('reconcile_communication').step_up,true)
+ assert.equal(action('reconcile_communication').step_up,undefined)
 })
 
 

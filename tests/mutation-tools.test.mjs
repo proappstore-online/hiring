@@ -78,7 +78,9 @@ test('v1 registry is generated from current controls, has no caller identity cla
       for(const key of used) assert.ok(Object.hasOwn(tool.params,key),`${name}: ${key}`)
     }
   }
-  for(const name of ['hiring_v1_record_decision','hiring_v1_send_approved_message','hiring_v1_advance_application']) assert.equal(action(name).step_up,true)
+  assert.equal(action('hiring_v1_record_decision').step_up, undefined, 'an authorised hiring manager confirms the action in the app; server role checks and audit remain authoritative')
+  assert.equal(action('hiring_v1_send_approved_message').step_up, undefined, 'an authorised recruiter confirms the reviewed message in the app; recipient, template and audit controls remain enforced')
+  assert.equal(action('hiring_v1_advance_application').step_up, true)
 })
 
 for(const name of Object.keys(MUTATIONS_V1)) {

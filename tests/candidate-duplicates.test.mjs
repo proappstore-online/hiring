@@ -57,7 +57,7 @@ test('suggestions are read-only, normalized and confidential across brands and r
 })
 test('explicit owner merge records canonical field provenance, preserves applications and audits atomically',()=>{
  const {db,call}=setup()
- assert.equal(action('merge_candidates').step_up,true)
+ assert.equal(action('merge_candidates').step_up,undefined)
  const before=db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
  assert.deepEqual(call('merge_candidates','staff-a',merge),[1])
  assert.equal(db.prepare("SELECT merged_into FROM hiring_candidates WHERE id='cand-b'").get().merged_into,'cand-a')

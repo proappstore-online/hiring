@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { id, read, write, type Application, type Scope } from './api'
-import { registerPublicationPasskey, verifyPublicationPasskey } from './passkey'
 import { ConfirmDialog } from './ConfirmDialog'
 import { button, field, panel } from './ui'
 
@@ -34,7 +33,6 @@ export function CandidateDuplicates({ scope, application, owner }: { scope: Scop
     setConfirm(false)
     await run(async()=>{
       if (!selected || !candidateId) return
-      await verifyPublicationPasskey()
       const operation=id()
       try { await write('merge_candidates',{...scope,source_id:selected.id,target_id:candidateId,reason,operation_id:operation,...Object.fromEntries(fields.map(f=>[f+'_source',sources[f]]))}) } catch { /* Resolve uncertain responses against durable provenance. */ }
       const rows=await read<Merge>('list_candidate_merges',params)
@@ -45,14 +43,13 @@ export function CandidateDuplicates({ scope, application, owner }: { scope: Scop
   return <section className={panel} aria-label="Candidate duplicates"><h3 className="font-semibold">Possible duplicate candidates</h3>
     <p>Email matches are suggestions for human review. Only authorized records in this brand are considered.</p>
     <button className={button} disabled={busy} onClick={()=>void run(refresh)}>Check duplicates and merge history</button>
-    {owner && <button className={button} disabled={busy} onClick={()=>void run(registerPublicationPasskey)}>Register merge passkey</button>}
     <ul>{suggestions.map(c=><li key={c.id}>{c.name} · {c.email} · {c.id} {owner && <button className={button} disabled={busy} onClick={()=>{setSelected(c);setReason('');setSources(Object.fromEntries(fields.map(f=>[f,candidateId!])));setMessage('')}}>Review merge</button>}</li>)}</ul>
     {selected && <fieldset disabled={busy} className="space-y-3"><legend>Merge {selected.name} into {application.candidate_name}</legend><p>Choose the source for each canonical field. Original profiles, applications, consent, notes and access stay attached to their original records. This merge cannot be repeated or chained.</p>
       {fields.map(f=><label className="block" key={f}>{f.replaceAll('_',' ')}<select className={field} value={sources[f]} onChange={e=>setSources({...sources,[f]:e.target.value})}><option value={candidateId}>Current: {f==='name'?application.candidate_name:application[f] || '(empty)'}</option><option value={selected.id}>Duplicate: {selected[f] || '(empty)'}</option></select></label>)}
       <label className="block">Merge reason<textarea className={field} maxLength={2000} value={reason} onChange={e=>setReason(e.target.value)} /></label>
       <button className={button} disabled={!reason.trim()} onClick={()=>setConfirm(true)}>Confirm merge choices</button><button className={button} onClick={()=>setSelected(undefined)}>Cancel review</button>
     </fieldset>}
-    {confirm && <ConfirmDialog title="Merge these candidates?" body="The current candidate becomes canonical using your chosen field sources. Original records remain available. A passkey is required and this action is audited." confirmLabel="Merge candidates" onCancel={()=>setConfirm(false)} onConfirm={()=>void merge()} />}
+    {confirm && <ConfirmDialog title="Merge these candidates?" body="The current candidate becomes canonical using your chosen field sources. Original records remain available and the action is audited." confirmLabel="Merge candidates" onCancel={()=>setConfirm(false)} onConfirm={()=>void merge()} />}
     {history.map(m=><div key={m.operation_id} className="mt-3"><p>Canonical profile: {m.name} · {m.email} · {m.phone} · {m.linkedin_url}</p><p>{m.source_id} → {m.target_id} · {m.reason}</p><p>Field sources: {m.field_sources_json}</p></div>)}
     <p role="status">{message}</p>
   </section>

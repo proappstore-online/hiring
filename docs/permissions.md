@@ -6,7 +6,7 @@ Migration `0012_scoped_permissions` adds a membership revocation ledger and the 
 
 | Role | Server permission |
 | --- | --- |
-| Owner | Brand-wide staff operations, grant administration, passkey-protected publication. Creating sibling brands and organization-wide delegation also require organization creator identity. Owner delegation/revocation is unavailable through these tools. |
+| Owner | Brand-wide staff operations, grant administration and publication. Creating sibling brands and organization-wide delegation also require organization creator identity. Owner delegation/revocation is unavailable through these tools. |
 | Recruiter | Full application reads and operational writes within granted requisitions. Creating requisitions and listing staff/publications require brand-wide authority. |
 | Reviewer | Restricted `gateway_get_application` / `gateway_list_applications` reads for currently assigned applications. Interview packets require the current interview assignment. Reads and edits only own current assigned scorecard. No full candidate/contact reads, other reviewer content, application mutations or hiring decisions. |
 | Auditor | `list_application_audit` within granted requisitions. No candidate detail reads or business mutations. |

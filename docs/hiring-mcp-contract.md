@@ -138,8 +138,10 @@ Root `mcp.json` is the action registry; there is no `contracts/mcp.json`.
 All new actions require authentication and exact tenant/brand/requisition access.
 Every mutation requires a fresh `operation_id`. Actor/time/role are server-derived;
 optional actor claims are equality checks, never authorization. System identities
-are denied. Human actions use the existing platform `step_up: true` passkey gate;
-no `human_confirmed` boolean is trusted. This gate is enforced by PAS, outside SQL.
+are denied. The recruiter UI asks the already-authorised user for an explicit
+confirmation before consequential decisions, offers, dispatch authorisation and
+acceptance. No caller-supplied confirmation flag is authorization: current scoped
+role checks, optimistic versions and immutable audit records remain server-side.
 
 | Action | Parameters beyond tenant_id/brand_id |
 | --- | --- |
@@ -153,10 +155,9 @@ no `human_confirmed` boolean is trusted. This gate is enforced by PAS, outside S
 | `list_offer_versions` | offer_id, before_version?; up to 50 descending revisions |
 | `authorize_offer_dispatch` | offer_id, draft_id, expected_version, authorized_by?, operation_id |
 
-Decision, submission, approval, revocation and dispatch authorization require
-platform step-up. The existing stage-change and general queue actions now also
-require it. Draft capture and scoped history reads do not. The UI uses the existing
-passkey enrollment/verification flow and displays exact terms before confirmation.
+Decision, submission, approval, revocation and dispatch authorization require an
+authorised owner or recruiter and an explicit UI confirmation. Draft capture and
+scoped history reads do not. The UI displays exact terms before confirmation.
 
 Mutation batches contain writes only, as required by PAS registration. Each has
 a separate scoped `get_*_result` readback action with the same original arguments:
@@ -177,8 +178,8 @@ independent mail archive actions record evidence, rather than dispatch messages.
 ## Candidate acceptance (#98)
 
 `record_acceptance(tenant_id, brand_id, application_id, operation_id,
-expected_version, acceptance_evidence)` requires authentication and platform
-passkey step-up. Tenant means organization. Evidence must be 1–10000 characters
+expected_version, acceptance_evidence)` requires authentication by an authorised
+owner or recruiter. Tenant means organization. Evidence must be 1–10000 characters
 after trimming and must describe actual candidate acceptance. Owner/recruiter
 requisition grants, offered prior state and approved paid terms are rechecked.
 The mutation commits acceptance, application state, stage history and audit in
@@ -212,7 +213,7 @@ remain unchanged; issue #5 still has acceptance gaps.
 Ordinary `change_application_stage` pipeline updates require current scoped staff
 authority, version/reason checks and audit, without platform passkey step-up.
 Dedicated final-decision, offer approval/dispatch and candidate-acceptance actions
-retain their separate human/passkey gates.
+retain their separate explicit-confirmation UI and server-side role/audit controls.
 
 `withdraw_my_application` is authenticated candidate self-service. It requires
 exact organization/brand/application, expected version and an operation ID, and

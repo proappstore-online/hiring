@@ -10,9 +10,9 @@ accounts and tokens are never linked by email.
 
 Only a brand-wide owner may merge. Review the two profiles, select the source for each
 canonical field (name, email, phone and LinkedIn URL), enter a reason and explicitly
-confirm. The registered `merge_candidates` action requires PAS WebAuthn step-up as well
-as a current SQL owner grant. A caller-supplied confirmation flag grants no authority.
-Register a passkey using the control beside duplicate review if needed.
+confirm. The registered `merge_candidates` action requires a current SQL owner grant;
+the in-app confirmation is a deliberate user action, while role checks and the immutable
+audit record remain authoritative. A caller-supplied confirmation flag grants no authority.
 
 Migration `0033_candidate_duplicates` records a logical merge: the source candidate's
 `merged_into` identifies the canonical target. Each pair can merge once; chains, cycles,

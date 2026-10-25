@@ -72,8 +72,8 @@ test('automated and forged actor claims cannot decide or approve',()=>{
  assert.ok(f.call('record_decision','system:worker',{...base,disposition:'deferred',expected_version:1,operation_id:'system'}).every(n=>n===0))
  step(f,'submit_offer_for_approval')
  assert.ok(step(f,'approve_offer',{actor_role:'automation'}).every(n=>n===0));assert.equal(offer(f).status,'pending_approval')
- for(const name of ['record_decision','approve_offer','submit_offer_for_approval','revoke_offer','authorize_offer_dispatch'])assert.equal(action(name).step_up,true)
- assert.equal(action('change_application_stage').step_up,undefined,'ordinary pipeline updates use scoped grants and audit without passkey step-up')
+ for(const name of ['record_decision','approve_offer','submit_offer_for_approval','revoke_offer','authorize_offer_dispatch','record_acceptance'])assert.equal(action(name).step_up,undefined,`${name} uses role checks, explicit UI confirmation and audit rather than a device passkey`)
+ assert.equal(action('change_application_stage').step_up,undefined,'ordinary pipeline updates use scoped grants and audit')
  }finally{f.db.close()}
 })
 test('offer revisions, optimistic locking, approval and revocation preserve evidence',()=>{
@@ -178,7 +178,7 @@ const acceptanceArgs={...base,expected_version:1,operation_id:'acceptance',accep
 function acceptanceReady(){const f=ready();step(f,'submit_offer_for_approval');step(f,'approve_offer');f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'");return f}
 test('acceptance commits explicit evidence, canonical reads, filtering and exact replay once',()=>{
  const f=acceptanceReady();try{
- assert.equal(action('record_acceptance').step_up,true)
+ assert.equal(action('record_acceptance').step_up,undefined)
  assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],1)
  const row=f.call('get_acceptance_result','staff-a',acceptanceArgs)[0];assert.equal(row.stage,'accepted');assert.equal(row.version,2)
  assert.ok(f.call('record_acceptance','staff-a',acceptanceArgs).every(n=>n===0))
