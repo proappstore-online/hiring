@@ -50,7 +50,9 @@ export function CreateCandidateScreen() {
   const { space, userId } = useWorkspace(); const scope = scopeOf(space); const navigate = useNavigate()
   const requisitions = useRows<Requisition>('list_requisitions', scope); const members = useRows<Member>('list_workspace_members', scope)
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  const run: Run = async (name, params) => { setBusy(true); setError(''); try { await write(name, params); navigate(recruiterApplicationUrl(String(params.application_id), scope)) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
+  const run: Run = async (name, params) => { setBusy(true); setError(''); try { await write(name, params); navigate('/recruiter/applications?' + new URLSearchParams(scope), { replace: true, state: { createdApplicationId: String(params.application_id) } }) } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
+  const back = '/recruiter/applications?' + new URLSearchParams(scope)
+  useEffect(() => { const cancel = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) navigate(back) }; document.addEventListener('keydown', cancel); return () => document.removeEventListener('keydown', cancel) }, [back, busy, navigate])
   return <Screen title="Add candidate"><Link className="underline" to={'/recruiter/applications?' + new URLSearchParams(scope)}>All applications</Link>{error && <p role="alert">{error}</p>}<RowsState key={JSON.stringify(scope)} loading={requisitions.loading || members.loading} error={requisitions.error || members.error} retry={() => { requisitions.retry(); members.retry() }}><CreateApplication key={members.rows.map(row => row.user_id).join()} scope={scope} requisitions={requisitions.rows} members={members.rows} userId={userId} busy={busy} run={run} /></RowsState></Screen>
 }
 export function SearchScreen() { const { space, userId } = useWorkspace(); return <Screen title="Search records"><WorkspaceSearch key={JSON.stringify([userId, space])} scope={scopeOf(space)} reviewer={space.role === 'reviewer'} /></Screen> }

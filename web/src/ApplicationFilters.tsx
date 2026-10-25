@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { read, stageLabel, type Application, type Member, type Requisition, type Workspace } from './api'
 import { FILTER_STAGES, ONBOARDING_STATUSES, filterQuery, matchesSearch, type FilterKey } from './filter-params'
 import { useFilterParams } from './useFilterParams'
@@ -9,6 +9,8 @@ import { recruiterApplicationUrl, staffBack, withBack } from './routes'
 
 type Row = Pick<Application, 'id' | 'candidate_name' | 'stage' | 'requisition_title' | 'assignee_user_id' | 'source' | 'requisition_id'> & { source_detail?: string; created_at?: number | string }
 export function ApplicationFilters({ space, requisitions, members }: { space: Workspace; requisitions: Requisition[]; members: Member[] }) {
+  const location = useLocation()
+  const createdApplicationId = location.state?.createdApplicationId as string | undefined
   const { filters, change, clear, query } = useFilterParams()
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(false)
@@ -18,12 +20,14 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
   const [retry, setRetry] = useState(0)
   const sequence = useRef(0)
   const staff = space.role === 'owner' || space.role === 'recruiter'
-  const key = JSON.stringify([space.organization_id, space.brand_id, space.role, filters])
+  const key = JSON.stringify([space.organization_id, space.brand_id, space.role, filters, createdApplicationId])
   useEffect(() => {
     const current = ++sequence.current
     setLoading(true); setError('')
     if (space.role === 'auditor') { setLoading(false); return }
-    read<Row>(staff ? 'list_applications' : 'gateway_list_applications', { organization_id: space.organization_id, brand_id: space.brand_id, ...filterQuery(filters) })
+    const scope = { organization_id: space.organization_id, brand_id: space.brand_id }
+    Promise.all([read<Row>(staff ? 'list_applications' : 'gateway_list_applications', { ...scope, ...filterQuery(filters) }), staff && createdApplicationId && !Object.values(filters).some(Boolean) ? read<Row>('get_application', { ...scope, application_id: createdApplicationId }) : Promise.resolve([])])
+      .then(([rows, saved]) => [...saved, ...rows.filter(row => !saved.some(record => record.id === row.id))])
       .then(rows => { if (sequence.current === current) setResult({ key, rows: rows.map(row => ({ ...row, created_at: row.created_at == null ? undefined : Number.isNaN(new Date(row.created_at).getTime()) ? undefined : new Date(row.created_at).toISOString() })) }) })
       .catch(() => { if (sequence.current === current) setError('Could not load applications.') })
       .finally(() => { if (sequence.current === current) setLoading(false) })
@@ -37,6 +41,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
   const select = (name: FilterKey, label: string, options: [string, string][]) => <label className="block min-w-0">{label}<select aria-label={label} className={field} value={filters[name]} onChange={event => change(name, event.target.value)}><option value="">All</option>{filters[name] && !options.some(([value]) => value === filters[name]) && <option value={filters[name]}>{filters[name]}</option>}{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>{filters[name] && <button type="button" className="min-h-[44px] underline" onClick={() => change(name, '')}>Clear {label}</button>}</label>
   const scopeQuery = new URLSearchParams({ organization_id: space.organization_id, brand_id: space.brand_id })
   return <section aria-labelledby="applications-title">
+    {createdApplicationId && staff && <p role="status">Candidate saved successfully. No outreach was sent.</p>}
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 id="applications-title" className="text-2xl font-semibold">Applications</h1><p role="status" aria-live="polite" className="text-sm">{pending ? 'Loading count…' : error ? 'Count unavailable' : `${visible.length} visible / ${rows.length} loaded${rows.length === (staff ? 100 : 25) ? ' · limit reached; narrow filters' : ''}`}</p></div>
       <Link className={button + ' inline-flex min-h-11 items-center'} to={(staff ? '/recruiter/applications/new?' : '/recruiter/search?') + scopeQuery}>{staff ? 'Add candidate' : 'Search records'}</Link>
