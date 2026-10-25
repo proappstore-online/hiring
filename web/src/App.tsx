@@ -11,7 +11,7 @@ import { CandidateAccountPage } from './CandidateAccount'
 import { Jobs } from './Jobs'
 import { VacanciesIndexPage, VacancyDetailPage } from './Vacancies'
 import { CreateCandidateScreen, CreateVacancyScreen, SearchScreen, TalentPoolScreen, OverviewScreen, VacanciesScreen, ApplicationsScreen, ApplicationScreen, CommunicationsScreen, PlaybookScreen, OperationsScreen, ComplianceScreen, SettingsScreen, RecruiterContext } from './RecruiterScreens'
-import { brandSettingsUrl, safeBack, vacancyUrl, applyUrl, withBack, recruiterVacancyUrl, staffBack } from './routes'
+import { diagnosticsSettingsUrl, settingsUrl, brandSettingsUrl, safeBack, vacancyUrl, applyUrl, withBack, recruiterVacancyUrl, staffBack } from './routes'
 
 const decodePathId = (value: string | undefined) => { try { return value ? decodeURIComponent(value) : null } catch { return null } }
 
@@ -105,7 +105,7 @@ function ProtectedShell() {
     const path = location.pathname.replace(/\/applications\/[^/]+$/, '/applications')
     navigate(path + '?' + new URLSearchParams(nextScope))
   }
-  return <ProShell app={app} appName="hiring" branding="app" nav={space && scope ? primarySections(space.role).map(section => ({ label: section.label, href: section.path === '/recruiter/settings' ? brandSettingsUrl(scope) : section.path + '?' + new URLSearchParams(scope) })) : [{ label: 'Switch to Public Vacancies', href: '/vacancies' }]} onNavigate={navigate} renderNav={() => space && scope ? <PrimaryNav role={space.role} scope={scope} /> : <nav aria-label="Primary navigation"><Link className="inline-flex min-h-11 items-center px-3 text-sm underline" to="/vacancies">Switch to Public Vacancies</Link></nav>}><main id="route-content" tabIndex={-1}><div className="mx-auto max-w-7xl px-4 py-8 md:px-8">{space && spaces && <div className="mb-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={space.brand_id} onChange={e => void switchSpace(e.target.value)}>{selectorSpaces?.map(row => <option key={row.organization_id + row.brand_id} value={row.brand_id}>{row.organization_name} / {row.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>}{spaceError ? <ErrorState retry={() => void reloadSpaces()}>Could not load workspaces.</ErrorState> : !spaces || exactLoading ? <LoadingState>Loading workspace…</LoadingState> : exact?.key === exactKey && exact.error ? <ErrorState retry={() => setExactRevision(value => value + 1)}>Could not load workspace.</ErrorState> : !space && hasExact ? <NotFound /> : !space ? <SetupScreen reloadSpaces={reloadSpaces} /> : <RecruiterContext.Provider value={{ space, userId: user.id, reloadSpaces }}><Outlet /></RecruiterContext.Provider>}</div></main></ProShell>
+  return <ProShell app={app} appName="hiring" branding="app" nav={space && scope ? primarySections(space.role).map(section => ({ label: section.label, href: section.path === '/recruiter/settings' ? settingsUrl(scope) : section.path + '?' + new URLSearchParams(scope) })) : [{ label: 'Switch to Public Vacancies', href: '/vacancies' }]} onNavigate={navigate} renderNav={() => space && scope ? <PrimaryNav role={space.role} scope={scope} /> : <nav aria-label="Primary navigation"><Link className="inline-flex min-h-11 items-center px-3 text-sm underline" to="/vacancies">Switch to Public Vacancies</Link></nav>}><main id="route-content" tabIndex={-1}><div className="mx-auto max-w-7xl px-4 py-8 md:px-8">{space && spaces && <div className="mb-6 flex flex-wrap items-center gap-3"><label htmlFor="workspace" className="text-sm font-medium">Workspace</label><select id="workspace" aria-label="Workspace" className={field + ' max-w-xs'} value={space.brand_id} onChange={e => void switchSpace(e.target.value)}>{selectorSpaces?.map(row => <option key={row.organization_id + row.brand_id} value={row.brand_id}>{row.organization_name} / {row.brand_name}</option>)}</select><span className="text-xs text-[var(--muted)]">{space.role}</span></div>}{spaceError ? <ErrorState retry={() => void reloadSpaces()}>Could not load workspaces.</ErrorState> : !spaces || exactLoading ? <LoadingState>Loading workspace…</LoadingState> : exact?.key === exactKey && exact.error ? <ErrorState retry={() => setExactRevision(value => value + 1)}>Could not load workspace.</ErrorState> : !space && hasExact ? <NotFound /> : !space ? location.pathname === '/recruiter/settings' ? <SetupScreen reloadSpaces={reloadSpaces} /> : <Navigate replace to="/recruiter/settings" /> : <RecruiterContext.Provider value={{ space, userId: user.id, reloadSpaces }}><Outlet /></RecruiterContext.Provider>}</div></main></ProShell>
 }
 function SetupScreen({ reloadSpaces }: { reloadSpaces: () => Promise<void> }) {
   const [busy, setBusy] = useState(false)
@@ -172,7 +172,7 @@ function LegacyPublicRedirect({ apply = false }: { apply?: boolean }) {
 }
 function LegacySettingsRedirect() {
   const context = useContext(RecruiterContext)
-  return context?.space.role === 'owner' ? <Navigate replace to={brandSettingsUrl(context.space)} /> : <NotFound />
+  return context?.space.role === 'owner' ? <Navigate replace to={brandSettingsUrl(context.space)} /> : context?.space.role === 'recruiter' ? <Navigate replace to={diagnosticsSettingsUrl(context.space)} /> : <NotFound />
 }
 function CommunicationsRoute() {
   const location = useLocation()
@@ -199,8 +199,9 @@ export function AppRoutes() {
       <Route path="recruiter/communications" element={<Allowed roles={['owner','recruiter']}><CommunicationsRoute /></Allowed>} />
       <Route path="recruiter/communications/:applicationId" element={<Allowed roles={['owner','recruiter']}><CommunicationsScreen /></Allowed>} />
       <Route path="recruiter/playbook" element={<Allowed roles={['owner','recruiter']}><PlaybookScreen /></Allowed>} />
-      <Route path="recruiter/operations" element={<Allowed roles={['owner','recruiter']}><OperationsScreen /></Allowed>} />
+      <Route path="recruiter/operations" element={<Allowed roles={['owner','recruiter']}><LegacyRedirect to="/recruiter/settings/operations" /></Allowed>} />
       <Route path="recruiter/compliance" element={<Allowed roles={['owner','recruiter','auditor']}><ComplianceScreen /></Allowed>} />
+      <Route path="recruiter/settings/operations" element={<Allowed roles={['owner','recruiter']}><OperationsScreen /></Allowed>} />
       <Route path="recruiter/settings" element={<LegacySettingsRedirect />} />
       <Route path="recruiter/organizations/:organizationId/settings" element={<Allowed roles={['owner']}><SettingsScreen /></Allowed>} />
       <Route path="recruiter/organizations/:organizationId/brands/:brandId/settings" element={<Allowed roles={['owner']}><SettingsScreen /></Allowed>} />

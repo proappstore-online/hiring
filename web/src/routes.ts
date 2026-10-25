@@ -46,3 +46,6 @@ export function staffBack(raw: string | null, scope: Scope, list: 'applications'
     return `/recruiter/${list}?${next}`
   } catch { return fallback }
 }
+
+export const diagnosticsSettingsUrl = (scope: Scope) => '/recruiter/settings/operations?' + new URLSearchParams(scope)
+export const settingsUrl = (scope: Scope) => '/recruiter/settings?' + new URLSearchParams(scope)

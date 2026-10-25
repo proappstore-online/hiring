@@ -18,7 +18,7 @@ import { Admin, CreateApplication } from './forms'
 import { mutationError } from './mutation-state'
 import { LoadingState, ErrorState, NotFound } from './route-ui'
 import { Form, TextField, val, button, panel } from './ui'
-import { brandSettingsUrl, organizationSettingsUrl, recruiterApplicationUrl, staffBack } from './routes'
+import { diagnosticsSettingsUrl, brandSettingsUrl, organizationSettingsUrl, recruiterApplicationUrl, staffBack } from './routes'
 
 type Context = { space: Workspace; userId: string; reloadSpaces: () => Promise<void> }
 export const RecruiterContext = createContext<Context | null>(null)
@@ -100,13 +100,23 @@ export function CommunicationsScreen() {
   return <RowsState loading={data.loading || exact.loading} error={data.error || exact.error} retry={() => { data.retry(); exact.retry() }}><AdminCommunications scope={scope} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /></RowsState>
 }
 export function PlaybookScreen() { const { space } = useWorkspace(); return <Screen title="Playbook"><PlaybookEditor organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /></Screen> }
-export function OperationsScreen() { const { space } = useWorkspace(); return <OperationalDiagnostics scope={scopeOf(space)} /> }
+export function OperationsScreen() { const { space } = useWorkspace(); return <><PageHeader title="Settings" /><SettingsNavigation /><OperationalDiagnostics scope={scopeOf(space)} /></> }
 export function ComplianceScreen() { const { space } = useWorkspace(); return <ErasureRequest key={space.organization_id + ':' + space.brand_id} scope={scopeOf(space)} role={space.role} /> }
 export function SettingsScreen() {
   const { space, reloadSpaces } = useWorkspace(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')
   const location = useLocation()
   const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); await reloadSpaces(); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
-  const brandPath = brandSettingsUrl(space), organizationPath = organizationSettingsUrl(space.organization_id)
+  const organizationPath = organizationSettingsUrl(space.organization_id)
   if (location.pathname === organizationPath && !space.can_create_brand) return <NotFound />
-  return <Screen title="Settings"><nav aria-label="Management scope" className="mb-4 flex gap-4"><Link className="underline" aria-current={location.pathname === brandPath ? 'page' : undefined} to={brandPath}>Brand management</Link>{Boolean(space.can_create_brand) && <Link className="underline" aria-current={location.pathname === organizationPath ? 'page' : undefined} to={organizationPath}>Organisation management</Link>}</nav>{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
+  return <Screen title="Settings"><SettingsNavigation />{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
+}
+
+function SettingsNavigation() {
+  const { space } = useWorkspace(); const location = useLocation()
+  const links = [
+    ...(space.role === 'owner' ? [{ to: brandSettingsUrl(space), label: 'Brand management' }] : []),
+    ...(space.role === 'owner' && space.can_create_brand ? [{ to: organizationSettingsUrl(space.organization_id), label: 'Organisation management' }] : []),
+    { to: diagnosticsSettingsUrl(scopeOf(space)), label: 'Operations' },
+  ]
+  return <nav aria-label="Management scope" className="my-4 flex flex-wrap gap-4">{links.map(link => <Link key={link.to} className="underline" aria-current={location.pathname === link.to.split('?')[0] ? 'page' : undefined} to={link.to}>{link.label}</Link>)}</nav>
 }
