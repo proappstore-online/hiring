@@ -33,7 +33,7 @@ function correction(f,patch={}){return {...scope,offer_id:f.offer.id,expected_ap
 
 test('upgrade retains the original paid-only migration and commits unpaid acceptance without changing that guard',()=>{
  assert.deepEqual(migrations.find(m=>m.name==='0028_candidate_acceptance'),read('tests/fixtures/migration-0028-original.json'))
- assert.deepEqual(migrations.at(-1),onboardingMigration)
+ assert.deepEqual(migrations.find(m=>m.name===onboardingMigration.name),onboardingMigration)
  for(const compensation of ['paid','unpaid','internship','volunteer']){
   const f=fixture({legacy:true,compensation});try{
    const before=f.db.prepare('SELECT * FROM hiring_applications').all()

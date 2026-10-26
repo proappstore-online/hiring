@@ -45,6 +45,9 @@ function setup(approvedUrl=url){
  return f
 }
 function configured(){const f=setup(); assert.deepEqual(f.call('configure_internship_requisition','staff-a',config),[1]);return f}
+function approveNext(f,version,body='Start your Interns onboarding: '+url){
+ f.db.prepare('INSERT INTO hiring_template_approvals VALUES(?,?,?,?,?,?,?,1,?)').run('intern-template',version,'org-a','brand-a','Your Interns invitation',body,'staff-a',`approval-${version}`)
+}
 const intake={...candidate,source:'recruiter_sourced',profile_url:''}
 const progress={...scope,requisition_id:'req-a',application_id:'app-a',expected_version:0,status:'sourced',reason_code:'source_verified',evidence:'Source and lawful basis verified',discord_status:'invite_pending',discord_username:'',operation_id:'progress-1'}
 test('approved direct Interns URLs link with and without a trailing slash',()=>{
@@ -62,6 +65,36 @@ test('internship configuration requires owner, exact direct Interns origin and a
   assert.deepEqual(f.call('configure_internship_requisition','staff-a',config),[1])
   assert.deepEqual(f.call('get_internship_policy','outsider',config),[])
   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,0)
+ }finally{f.db.close()}
+})
+test('owner can relink a role to newer approved versions with immutable, attributed history',()=>{
+ const f=configured();try{
+  approveNext(f,2);approveNext(f,3)
+  const relink={...scope,requisition_id:'req-a',template_id:'intern-template',expected_version:1,new_version:2,operation_id:'relink-2'}
+  assert.deepEqual(f.call('relink_internship_requisition_template','staff-a',relink),[1])
+  assert.equal(f.call('get_internship_policy','staff-a',config)[0].template_version,2)
+  assert.equal(f.db.prepare('SELECT template_version FROM hiring_internship_requisitions').get().template_version,1)
+  assert.deepEqual(f.call('relink_internship_requisition_template','staff-a',{...relink,expected_version:2,new_version:3,operation_id:'relink-3'}),[1])
+  assert.equal(f.call('get_internship_policy','staff-a',config)[0].template_version,3)
+  const rows=f.db.prepare('SELECT old_version,new_version,actor_user_id,created_at FROM hiring_internship_template_relinks ORDER BY rowid').all()
+  assert.deepEqual(rows.map(r=>[r.old_version,r.new_version,r.actor_user_id]),[[1,2,'staff-a'],[2,3,'staff-a']])
+  assert.ok(rows.every(r=>r.created_at>0))
+  assert.throws(()=>f.db.exec('DELETE FROM hiring_internship_template_relinks'),/immutable/)
+  assert.throws(()=>f.db.exec('UPDATE hiring_internship_template_relinks SET new_version=9'),/immutable/)
+ }finally{f.db.close()}
+})
+test('relink rejects unauthorized, stale, unapproved, unrelated and downgraded versions with readable errors',()=>{
+ const f=configured();try{
+  approveNext(f,2)
+  const relink={...scope,requisition_id:'req-a',template_id:'intern-template',expected_version:1,new_version:2,operation_id:'relink-2'}
+  assert.throws(()=>f.call('configure_internship_requisition','staff-a',config),/use relink_internship_requisition_template/)
+  assert.throws(()=>f.call('relink_internship_requisition_template','outsider',relink),/Only an owner/)
+  assert.throws(()=>f.call('relink_internship_requisition_template','staff-a',{...relink,new_version:3}),/newer approved/)
+  assert.throws(()=>f.call('relink_internship_requisition_template','staff-a',{...relink,template_id:'another'}),/newer approved/)
+  assert.throws(()=>f.call('relink_internship_requisition_template','staff-a',{...relink,brand_id:'brand-b'}),/Only an owner/)
+  assert.deepEqual(f.call('relink_internship_requisition_template','staff-a',relink),[1])
+  assert.throws(()=>f.call('relink_internship_requisition_template','staff-a',{...relink,operation_id:'stale',new_version:2}),/newer approved|changed/)
+  assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_internship_template_relinks').get().n,1)
  }finally{f.db.close()}
 })
 test('generic sources and forged campaigns cannot create internship candidates; recruiter intake retains provenance',()=>{

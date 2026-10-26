@@ -5441,7 +5441,7 @@
     },
     {
       "name": "configure_internship_requisition",
-      "description": "Owner configures immutable restricted internship intake and an approved direct Interns invitation template. Does not send email.",
+      "description": "Owner configures restricted internship intake and an approved direct Interns invitation template. Use relink_internship_requisition_template to move to a newer approved version. Does not send email.",
       "operation": "execute",
       "sql": "INSERT INTO hiring_internship_requisitions(requisition_id,organization_id,brand_id,onboarding_url,template_id,template_version,configured_by,configured_at) SELECT :requisition_id,:organization_id,:brand_id,:onboarding_url,:template_id,:template_version,:__user_id,:__now WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id)) AND EXISTS(SELECT 1 FROM hiring_requisitions WHERE id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id) AND (:onboarding_url='https://interns.proappstore.online' OR :onboarding_url LIKE 'https://interns.proappstore.online/%') AND :onboarding_url NOT GLOB '*['||char(10)||char(13)||' <>\" ]*' AND length(:onboarding_url)<=2000 AND EXISTS(SELECT 1 FROM hiring_template_approvals WHERE template_id=:template_id AND version=:template_version AND organization_id=:organization_id AND brand_id=:brand_id AND instr(body,:onboarding_url)>0)",
       "params": {
@@ -5500,7 +5500,7 @@
       "name": "get_internship_policy",
       "description": "Read configured restricted intake for this requisition; recruiter scoped.",
       "operation": "query",
-      "sql": "SELECT ir.* FROM hiring_internship_requisitions ir WHERE ir.requisition_id=:requisition_id AND ir.organization_id=:organization_id AND ir.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id))",
+      "sql": "SELECT ir.requisition_id,ir.organization_id,ir.brand_id,ir.onboarding_url,ir.template_id,COALESCE((SELECT r.new_version FROM hiring_internship_template_relinks r WHERE r.requisition_id=ir.requisition_id ORDER BY r.rowid DESC LIMIT 1),ir.template_version) AS template_version,ir.configured_by,ir.configured_at FROM hiring_internship_requisitions ir WHERE ir.requisition_id=:requisition_id AND ir.organization_id=:organization_id AND ir.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id))",
       "params": {
         "organization_id": {
           "type": "string"
@@ -6299,6 +6299,36 @@
         }
       },
       "sql": "SELECT x.* FROM hiring_offer_corrections x WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.application_id=:application_id AND x.offer_id=:offer_id AND EXISTS(SELECT 1 FROM hiring_effective_access g JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=g.organization_id AND a.brand_id=g.brand_id WHERE g.user_id=:__user_id AND g.organization_id=x.organization_id AND g.brand_id=x.brand_id AND g.role='owner' AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) ORDER BY x.correction_version DESC LIMIT 100"
+    },
+    {
+      "name": "relink_internship_requisition_template",
+      "description": "Owner moves a configured internship role to a newer approved version of its current invitation template. Each move is immutable and attributed.",
+      "operation": "execute",
+      "sql": "INSERT INTO hiring_internship_template_relinks(operation_id,requisition_id,organization_id,brand_id,template_id,old_version,new_version,actor_user_id,created_at) VALUES(:operation_id,:requisition_id,:organization_id,:brand_id,:template_id,:expected_version,:new_version,:__user_id,:__now)",
+      "params": {
+        "operation_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "new_version": {
+          "type": "integer"
+        }
+      },
+      "requires_auth": true
     }
   ]
 }
