@@ -38,15 +38,23 @@ const candidate = { ...scope, requisition_id: 'req-a', candidate_id: 'cand-a', a
 
 const url='https://interns.proappstore.online/onboarding'
 const config={...scope,requisition_id:'req-a',onboarding_url:url,template_id:'intern-template',template_version:1}
-function setup(){
+function setup(approvedUrl=url){
  const f=fixture();f.call('create_workspace','staff-a',bootstrap)
- f.db.prepare('INSERT INTO hiring_communication_templates(id,organization_id,brand_id,name,subject,body,version,updated_at,operation_id) VALUES(?,?,?,?,?,?,1,1,?)').run('intern-template','org-a','brand-a','Interns','Your Interns invitation','Start your Interns onboarding: '+url,'template-op')
- f.db.prepare('INSERT INTO hiring_template_approvals VALUES(?,1,?,?,?,?,?,1,?)').run('intern-template','org-a','brand-a','Your Interns invitation','Start your Interns onboarding: '+url,'staff-a','approval-op')
+ f.db.prepare('INSERT INTO hiring_communication_templates(id,organization_id,brand_id,name,subject,body,version,updated_at,operation_id) VALUES(?,?,?,?,?,?,1,1,?)').run('intern-template','org-a','brand-a','Interns','Your Interns invitation','Start your Interns onboarding: '+approvedUrl,'template-op')
+ f.db.prepare('INSERT INTO hiring_template_approvals VALUES(?,1,?,?,?,?,?,1,?)').run('intern-template','org-a','brand-a','Your Interns invitation','Start your Interns onboarding: '+approvedUrl,'staff-a','approval-op')
  return f
 }
 function configured(){const f=setup(); assert.deepEqual(f.call('configure_internship_requisition','staff-a',config),[1]);return f}
 const intake={...candidate,source:'recruiter_sourced',profile_url:''}
 const progress={...scope,requisition_id:'req-a',application_id:'app-a',expected_version:0,status:'sourced',reason_code:'source_verified',evidence:'Source and lawful basis verified',discord_status:'invite_pending',discord_username:'',operation_id:'progress-1'}
+test('approved direct Interns URLs link with and without a trailing slash',()=>{
+ for(const approvedUrl of ['https://interns.proappstore.online','https://interns.proappstore.online/']){
+  const f=setup(approvedUrl);try{
+   assert.deepEqual(f.call('configure_internship_requisition','staff-a',{...config,onboarding_url:approvedUrl}),[1])
+   assert.equal(f.call('get_internship_policy','staff-a',config)[0].onboarding_url,approvedUrl)
+  }finally{f.db.close()}
+ }
+})
 test('internship configuration requires owner, exact direct Interns origin and approved matching template',()=>{
  const f=setup();try{
   for(const patch of [{onboarding_url:'https://evil.test/'},{onboarding_url:'https://interns.proappstore.online.evil.test/'},{onboarding_url:url+'?other'},{template_version:2},{brand_id:'brand-b'}])assert.deepEqual(f.call('configure_internship_requisition','staff-a',{...config,...patch}),[0])
