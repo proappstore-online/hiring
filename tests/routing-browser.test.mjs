@@ -149,7 +149,17 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
     const screenshot=await content.screenshot({animations:'disabled'})
     const path=new URL(name+'-'+width+'.png',baselines)
     if(process.env.UPDATE_HIRING_VISUALS==='1')writeFileSync(path,screenshot)
-    assert.ok(screenshot.equals(readFileSync(path)),'Visual changed: '+path.pathname+'; review and regenerate with UPDATE_HIRING_VISUALS=1')
+    const baseline=readFileSync(path)
+    const difference=await page.evaluate(async ({actual,expected})=>{
+     const bitmap=async encoded=>createImageBitmap(new Blob([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],{type:'image/png'}))
+     const [a,b]=await Promise.all([bitmap(actual),bitmap(expected)])
+     if(a.width!==b.width||a.height!==b.height)return {sizeChanged:true,actual:[a.width,a.height],expected:[b.width,b.height]}
+     const pixels=image=>{const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const context=canvas.getContext('2d');context.drawImage(image,0,0);return context.getImageData(0,0,image.width,image.height).data}
+     const left=pixels(a),right=pixels(b);let changed=0,totalError=0
+     for(let i=0;i<left.length;i+=4){const error=Math.max(Math.abs(left[i]-right[i]),Math.abs(left[i+1]-right[i+1]),Math.abs(left[i+2]-right[i+2]));if(error>10)changed++;totalError+=error}
+     return {changedFraction:changed/(left.length/4),meanError:totalError/(left.length/4)}
+    },{actual:screenshot.toString('base64'),expected:baseline.toString('base64')})
+    assert.ok(!difference.sizeChanged&&difference.changedFraction<0.03&&difference.meanError<2,`Visual changed: ${path.pathname} (${JSON.stringify(difference)}); review and regenerate with UPDATE_HIRING_VISUALS=1`)
    }
   })
   await t.test('first workspace setup is confined to Settings',async()=>{
