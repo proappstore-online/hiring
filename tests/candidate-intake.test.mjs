@@ -60,7 +60,7 @@ test('candidate withdrawal is exact-owner scoped, versioned, atomic and replay s
   const event=db.prepare("SELECT from_stage,to_stage,actor_user_id,version FROM hiring_stage_events WHERE id='withdraw-a'").get()
   assert.deepEqual({...event},{from_stage:'submitted',to_stage:'withdrawn',actor_user_id:'worker',version:2})
   assert.equal(db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE action='application.withdrawn'").get().actor_user_id,'worker')
-  assert.deepEqual(call('change_application_stage','staff-a',{...A,application_id:'application-a',expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'reopen'}),[0,0,0,0])
+  assert.throws(()=>call('change_application_stage','staff-a',{...A,application_id:'application-a',expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'reopen'}),/invalid application stage transition/)
   db.close()
 })
 
@@ -480,7 +480,7 @@ test('withdrawal token is consumed atomically with audit and cannot reopen or cr
   assert.ok(db.prepare('SELECT consumed_at FROM hiring_candidate_access_tokens WHERE token=?').get(token).consumed_at)
   assert.deepEqual(call('withdraw_candidate_application','worker',p),[0,0,0,0])
   assert.equal(call('get_my_application','worker',{application_id:'application-b'})[0].stage,'submitted')
-  assert.deepEqual(call('change_application_stage','staff-a',{...A,application_id:p.application_id,expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'token-reopen'}),[0,0,0,0])
+  assert.throws(()=>call('change_application_stage','staff-a',{...A,application_id:p.application_id,expected_version:2,from_stage:'withdrawn',to_stage:'in_review',reason:'Cannot reopen',operation_id:'token-reopen'}),/invalid application stage transition/)
   const event=db.prepare("SELECT actor_user_id FROM hiring_audit_events WHERE id='token-withdraw'").get()
   assert.equal(event.actor_user_id,'worker')
   db.close()

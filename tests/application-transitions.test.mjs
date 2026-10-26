@@ -80,14 +80,14 @@ test('approved unpaid offers allow the transition into offered', () => {
     assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_stage_events WHERE id='unpaid-offer'").get().n, 1)
   } finally { db.close() }
 })
-test('every invalid edge including terminal, backwards, skipped and unknown stages writes nothing', () => {
+test('every invalid edge including terminal, backwards, skipped and unknown stages reports an error', () => {
   const {db,call}=seeded()
   try {
     for(const from of Object.keys(transitions).filter(s=>!['accepted','onboarding','onboarded','active'].includes(s))) for(const to of [...Object.keys(transitions),'forged']) {
       if(transitions[from].includes(to))continue
       setStage(db,from)
       const before=db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n
-      assert.ok(call('change_application_stage','staff-a',change(from,to)).every(n=>n===0),from+' -> '+to)
+      assert.throws(()=>call('change_application_stage','staff-a',change(from,to)),/invalid application stage transition/,from+' -> '+to)
       assert.equal(call('get_application','staff-a',{...scope,application_id:'app-a'})[0].version,1)
       assert.equal(db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n,before)
     }
@@ -97,8 +97,8 @@ test('stale version, forged prior state, blank reason/operation and unauthorized
  const {db,call}=seeded()
  try {
   for(const patch of [{expected_version:0},{expected_version:2},{from_stage:'offered'},{reason:' '},{operation_id:' '},{application_id:'forged'},{brand_id:'brand-b'},{organization_id:'org-b'}])
-   assert.ok(call('change_application_stage','staff-a',change('submitted','in_review',patch)).every(n=>n===0))
-  assert.ok(call('change_application_stage','outsider',change('submitted','in_review')).every(n=>n===0))
+   assert.throws(()=>call('change_application_stage','staff-a',change('submitted','in_review',patch)),/stale application|reason and operation_id|required|application not found/)
+  assert.throws(()=>call('change_application_stage','outsider',change('submitted','in_review')),/actor lacks recruiter access/)
   assert.equal(call('get_application','staff-a',{...scope,application_id:'app-a'})[0].version,1)
  } finally {db.close()}
 })
@@ -128,16 +128,16 @@ test('direct full detail works outside the queue and denies sibling brands, tena
   call('create_linkedin_application','staff-b',{...candidate,...B,requisition_id:'req-b',candidate_id:'cand-b',application_id:'app-b',assignee_user_id:'staff-b',operation_id:'create-b'})
   for(const params of [{...scope,application_id:'app-b'},{...scope,application_id:'missing'},{organization_id:'forged',brand_id:'brand-a',application_id:'app-a'}])assert.equal(call('get_application','staff-a',params).length,0)
   assert.equal(call('get_application','staff-b',{...scope,application_id:'app-a'}).length,0)
-  assert.ok(call('change_application_stage','staff-b',change('submitted','in_review')).every(n=>n===0))
+  assert.throws(()=>call('change_application_stage','staff-b',change('submitted','in_review')),/actor lacks recruiter access/)
   call('grant_workspace_access','staff-a',{...scope,requisition_id:'req-a',member_user_id:'reviewer',role:'reviewer',grant_id:'reviewer',operation_id:'grant-reviewer'})
   call('reassign_application','staff-a',{...scope,application_id:'app-a',expected_version:1,from_user_id:'staff-a',to_user_id:'reviewer',reason:'Review',operation_id:'assign-reviewer'})
   assert.equal(call('gateway_get_application','reviewer',{...scope,application_id:'app-a'}).length,1)
   assert.equal(call('get_application','reviewer',{...scope,application_id:'app-a'}).length,0)
-  assert.ok(call('change_application_stage','reviewer',change('submitted','in_review',{expected_version:2})).every(n=>n===0))
+  assert.throws(()=>call('change_application_stage','reviewer',change('submitted','in_review',{expected_version:2})),/actor lacks recruiter access/)
  } finally {db.close()}
 })
 
 test('registered server predicate is compiled from the same static map as the UI', async()=>{
  const {transitionPredicate}=await import('../scripts/application-stages.mjs')
- assert.ok(action('change_application_stage').statements.slice(0,2).every(statement => statement.includes(`AND ${transitionPredicate} AND`)))
+ assert.ok(action('change_application_stage').statements.slice(1,3).every(statement => statement.includes(`AND ${transitionPredicate} AND`)))
 })

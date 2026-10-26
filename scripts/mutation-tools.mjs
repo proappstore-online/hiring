@@ -20,7 +20,7 @@ export function buildMutationTools(tools) {
     if (!original) throw new Error(`Missing source action ${source}`)
     const tool = structuredClone(original)
     tool.name = name
-    tool.description = `Hiring mutation contract v1. ${original.description} Zero changes is denial/conflict, never success.`
+    tool.description = `Hiring mutation contract v1. ${original.description} Refused stage and decision writes return an error; zero changes may indicate a retry.`
     if (tool.params.tenant_id) {
       tool.params.organization_id = tool.params.tenant_id
       delete tool.params.tenant_id
@@ -43,9 +43,11 @@ export function buildMutationTools(tools) {
       guard += ' AND EXISTS (SELECT 1 FROM hiring_outbox v WHERE v.id=:draft_id AND v.organization_id=:organization_id AND v.brand_id=:brand_id AND v.application_id=:application_id AND v.template_id IS NOT NULL AND v.template_version=:expected_version)'
       tool.description += ' Requires preview of the immutable draft and pinned approved template version; the authorised user confirms the queued message in the app, not a provider delivery receipt.'
     }
-    tool.statements = tool.statements.map(sql => sql
-      .replaceAll(':tenant_id', ':organization_id')
-      .replaceAll(':actor_id', 'NULL').replaceAll(':actor_role', 'NULL') + guard)
+    tool.statements = tool.statements.map(sql => {
+      const adapted = sql.replaceAll(':tenant_id', ':organization_id')
+        .replaceAll(':actor_id', 'NULL').replaceAll(':actor_role', 'NULL')
+      return adapted.startsWith('INSERT INTO hiring_mutation_checks') ? adapted : adapted + guard
+    })
     return tool
   })
 }

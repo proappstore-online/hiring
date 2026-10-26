@@ -86,8 +86,10 @@ owner/recruiter authority must cover the application's requisition; missing and
 unauthorized records both return no rows. Reviewers use the restricted gateway
 model. No browser interaction is required.
 
-`change_application_stage` retains its existing parameters and zero-change denial
-semantics. The static transition map, additive stage representation and atomic
+`change_application_stage` retains its existing parameters. Invalid transitions,
+missing applications, stale versions, missing recruiter access and unapproved
+offers now return a specific database error. Exact operation retries still return
+zero changes. The static transition map, additive stage representation and atomic
 history/audit guarantees are documented in [the domain model](domain-model.md#application-stage-contract-v1-20).
 
 ## Interview tools v1 (#22)
@@ -161,6 +163,11 @@ role checks, optimistic versions and immutable audit records remain server-side.
 | `list_offer_versions` | offer_id, before_version?; up to 50 descending revisions |
 | `authorize_offer_dispatch` | offer_id, draft_id, expected_version, authorized_by?, operation_id |
 
+`record_decision` checks the current stage before writing: hiring follows an offer,
+rejection follows a review, shortlist, pending decision or offer, and withdrawal or
+deferral requires a nonterminal application. Invalid transitions, actor claims,
+scope and versions return a specific error. Exact operation retries return zero changes.
+
 Decision, submission, approval, revocation and dispatch authorization require an
 authorised owner or recruiter and an explicit UI confirmation. Draft capture and
 scoped history reads do not. The UI displays exact terms before confirmation.
@@ -188,6 +195,9 @@ expected_version, acceptance_evidence)` requires authentication by an authorised
 owner or recruiter. Tenant means organization. Evidence must be 1–10000 characters
 after trimming and must describe actual candidate acceptance. Owner/recruiter
 requisition grants, offered prior state and approved offer terms (including unpaid, internship and volunteer terms) are rechecked.
+Refused writes report whether the application, recruiter authority, version,
+offered stage, approved offer or acceptance evidence is missing. Exact retries
+remain harmless and return zero changes.
 The mutation commits acceptance, application state, stage history and audit in
 one transaction. `get_acceptance_result` takes the exact same arguments and
 returns the updated application ID, stage, version, evidence and operation ID for

@@ -80,13 +80,15 @@ test('every major sibling-brand write denies other-brand staff, mixed record IDs
     const { db, call } = seeded()
     for (const user of ['staff-a', 'outsider']) {
       const before = snapshot(db)
-      assert.equal(call(name, user, input).every(n => n === 0), true, name)
+      if (name === 'change_application_stage') assert.throws(() => call(name, user, input), /actor lacks recruiter access/, name)
+      else assert.equal(call(name, user, input).every(n => n === 0), true, name)
       assert.deepEqual(snapshot(db), before, name)
     }
     // A user with access to both brands still cannot mix record IDs and scope.
     if (input.application_id && name !== 'create_linkedin_application') {
       const before = snapshot(db)
-      assert.equal(call(name, 'owner', { ...input, brand_id: 'a' }).every(n => n === 0), true, name)
+      if (name === 'change_application_stage') assert.throws(() => call(name, 'owner', { ...input, brand_id: 'a' }), /application not found/, name)
+      else assert.equal(call(name, 'owner', { ...input, brand_id: 'a' }).every(n => n === 0), true, name)
       assert.deepEqual(snapshot(db), before, name)
     }
     db.close()
@@ -102,7 +104,8 @@ test('authorized sibling-brand writes have correct audit attribution and replay 
     const before = snapshot(db)
     assert.equal(call(name, 'staff-b', input).every(n => n === 0), true, name)
     assert.deepEqual(snapshot(db), before, name)
-    assert.equal(call(name, 'staff-b', { ...input, operation_id: 'boot-a' }).every(n => n === 0), true, name)
+    if (name === 'change_application_stage') assert.throws(() => call(name, 'staff-b', { ...input, operation_id: 'boot-a' }), /stale application version/, name)
+    else assert.equal(call(name, 'staff-b', { ...input, operation_id: 'boot-a' }).every(n => n === 0), true, name)
     assert.deepEqual(snapshot(db), before, name)
     db.close()
   }

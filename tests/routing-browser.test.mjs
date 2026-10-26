@@ -149,7 +149,7 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
     const screenshot=await content.screenshot({animations:'disabled'})
     const path=new URL(name+'-'+width+'.png',baselines)
     if(process.env.UPDATE_HIRING_VISUALS==='1')writeFileSync(path,screenshot)
-    assert.deepEqual(screenshot,readFileSync(path),'Visual changed: '+path.pathname+'; review and regenerate with UPDATE_HIRING_VISUALS=1')
+    assert.ok(screenshot.equals(readFileSync(path)),'Visual changed: '+path.pathname+'; review and regenerate with UPDATE_HIRING_VISUALS=1')
    }
   })
   await t.test('first workspace setup is confined to Settings',async()=>{
@@ -304,11 +304,11 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    for(const [role,names] of Object.entries({owner:['Overview','Vacancies','Applications','Communications','Playbook','Compliance','Settings'],recruiter:['Overview','Vacancies','Applications','Communications','Playbook','Compliance','Settings'],reviewer:['Overview','Applications'],auditor:['Overview','Compliance']})){
     await go('/recruiter/overview?organization_id=org&brand_id=brand');await page.evaluate(role=>{window.role=role;window.auth={user:{id:'staff'},loading:false};window.render()},role)
     const nav=page.getByRole('navigation',{name:'Primary navigation'});await expect(nav).toBeVisible()
-    await expect(nav.locator('.md\\:flex a')).toHaveText([...names,'Switch to Public Vacancies'])
+    await expect(nav.locator('.md\\:flex a')).toHaveText([...names,'Public vacancies'])
     await expect(nav.locator('.md\\:flex a[aria-current="page"]')).toHaveText('Overview')
     for(const link of await nav.locator('.md\\:flex a').all()){const href=await link.getAttribute('href');if(href?.startsWith('/vacancies'))continue;if(href?.includes('/organizations/'))assert.match(href,/organizations\/org\/brands\/brand\/settings/);else assert.match(href,/organization_id=org&brand_id=brand/)}
    }
-   await page.getByRole('navigation',{name:'Primary navigation'}).locator('.md\\:flex').getByRole('link',{name:'Switch to Public Vacancies'}).click();await expect(page).toHaveURL(/\/vacancies$/)
+   await page.getByRole('navigation',{name:'Primary navigation'}).locator('.md\\:flex').getByRole('link',{name:'Public vacancies'}).click();await expect(page).toHaveURL(/\/vacancies$/)
    await page.setViewportSize({width:375,height:812});await go('/recruiter/overview?organization_id=org&brand_id=brand');await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'staff'},loading:false};window.render()})
    const nav=page.getByRole('navigation',{name:'Primary navigation'});const toggle=nav.getByRole('button',{name:'Toggle primary navigation'});await expect(toggle).toHaveAttribute('aria-expanded','false');await toggle.click();await expect(toggle).toHaveAttribute('aria-expanded','true')
    await nav.locator('#primary-navigation-menu').getByRole('link',{name:'Vacancies',exact:true}).click();await expect(page).toHaveURL(/\/recruiter\/vacancies\?organization_id=org&brand_id=brand/);await expect(nav.getByRole('link',{name:'Vacancies',exact:true,includeHidden:true}).first()).toHaveAttribute('aria-current','page');await expect(toggle).toHaveAttribute('aria-expanded','false')

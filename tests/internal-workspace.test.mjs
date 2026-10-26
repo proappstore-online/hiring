@@ -86,9 +86,9 @@ test('internal LinkedIn workflow is scoped, audited, and never sends', () => {
   assert.equal(call('list_applications', 'staff-a', scope).length, 1)
   assert.equal(call('list_applications', 'outsider', scope).length, 0)
   const stage = { ...scope, application_id: 'app-a', expected_version: 1, from_stage: 'submitted', to_stage: 'in_review', reason: 'Human screening', operation_id: 'stage-a' }
-  assert.equal(call('change_application_stage', 'outsider', stage).at(-1), 0)
+  assert.throws(() => call('change_application_stage', 'outsider', stage), /actor lacks recruiter access/)
   assert.equal(call('change_application_stage', 'staff-a', stage).at(-1), 1)
-  assert.equal(call('change_application_stage', 'staff-a', { ...stage, operation_id: 'stale' }).at(-1), 0)
+  assert.throws(() => call('change_application_stage', 'staff-a', { ...stage, operation_id: 'stale' }), /stale application version/)
   assert.equal(call('list_stage_events', 'staff-a', { ...scope, application_id: 'app-a' }).length, 2)
   assert.equal(call('list_stage_events', 'outsider', { ...scope, application_id: 'app-a' }).length, 0)
   const note = { ...scope, application_id: 'app-a', note_id: 'note-a', body: 'Called on Tuesday', operation_id: 'note-op' }
@@ -191,7 +191,7 @@ test('reassignment requires a current version and in-brand staff, and preserves 
   assert.equal(call('list_assignment_events', 'outsider', { ...scope, application_id: 'app-a' }).length, 0)
   assert.equal(db.prepare('SELECT assignee_user_id,version FROM hiring_applications WHERE id=?').get('app-a').assignee_user_id, 'staff-b')
   assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.reassigned'").get().n, 1)
-  assert.equal(call('change_application_stage', 'staff-b', { ...scope, application_id: 'app-a', expected_version: 1, from_stage: 'submitted', to_stage: 'in_review', reason: 'Reviewed', operation_id: 'stale-stage' }).at(-1), 0)
+  assert.throws(() => call('change_application_stage', 'staff-b', { ...scope, application_id: 'app-a', expected_version: 1, from_stage: 'submitted', to_stage: 'in_review', reason: 'Reviewed', operation_id: 'stale-stage' }), /stale application version/)
   assert.equal(call('change_application_stage', 'staff-b', { ...scope, application_id: 'app-a', expected_version: 2, from_stage: 'submitted', to_stage: 'in_review', reason: 'Reviewed', operation_id: 'move-a' }).at(-1), 0)
   assert.equal(db.prepare('SELECT stage,version FROM hiring_applications WHERE id=?').get('app-a').stage, 'submitted')
   assert.equal(call('change_application_stage', 'staff-b', { ...scope, application_id: 'app-a', expected_version: 2, from_stage: 'submitted', to_stage: 'in_review', reason: 'Reviewed', operation_id: 'stage-after-move' }).at(-1), 1)

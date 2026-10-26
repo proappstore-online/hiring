@@ -65,11 +65,21 @@ test('human decisions are attributed, immutable, scoped and versioned',()=>{
   }finally{f.db.close()}
  }
 })
+test('decision refusals explain illegal transitions, missing records, actor and version',()=>{
+ const f=seeded();try{
+  const args={...base,disposition:'hired',expected_version:1,operation_id:'invalid-hire'}
+  assert.throws(()=>f.call('record_decision','staff-a',args),/invalid decision transition/)
+  assert.throws(()=>f.call('record_decision','staff-a',{...args,application_id:'missing'}),/application not found/)
+  assert.throws(()=>f.call('record_decision','outsider',{...args,disposition:'deferred'}),/actor lacks recruiter access/)
+  assert.throws(()=>f.call('record_decision','staff-a',{...args,disposition:'deferred',expected_version:2}),/stale application version/)
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM hiring_decisions').get().n,0)
+ }finally{f.db.close()}
+})
 test('automated and forged actor claims cannot decide or approve',()=>{
  const f=ready();try{
- for(const actor_role of ['system','automation','api_key','reviewer'])assert.ok(f.call('record_decision','staff-a',{...base,disposition:'deferred',actor_role,expected_version:1,operation_id:'forged'}).every(n=>n===0))
- assert.ok(f.call('record_decision','staff-a',{...base,disposition:'deferred',actor_id:'someone-else',expected_version:1,operation_id:'forged'}).every(n=>n===0))
- assert.ok(f.call('record_decision','system:worker',{...base,disposition:'deferred',expected_version:1,operation_id:'system'}).every(n=>n===0))
+ for(const actor_role of ['system','automation','api_key','reviewer'])assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'deferred',actor_role,expected_version:1,operation_id:'forged'}),/actor claim/)
+ assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'deferred',actor_id:'someone-else',expected_version:1,operation_id:'forged'}),/actor claim/)
+ assert.throws(()=>f.call('record_decision','system:worker',{...base,disposition:'deferred',expected_version:1,operation_id:'system'}),/actor lacks recruiter access/)
  step(f,'submit_offer_for_approval')
  assert.ok(step(f,'approve_offer',{actor_role:'automation'}).every(n=>n===0));assert.equal(offer(f).status,'pending_approval')
  for(const name of ['record_decision','approve_offer','submit_offer_for_approval','revoke_offer','authorize_offer_dispatch','record_acceptance'])assert.equal(action(name).step_up,undefined,`${name} uses role checks, explicit UI confirmation and audit rather than a device passkey`)
@@ -141,7 +151,7 @@ test('exact retries return committed records, conflicting replays never claim an
 test('final dispositions and offer payloads cannot bypass approval or immutability',()=>{
  const f=ready();try{
  f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'")
- assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'hired',expected_version:1,operation_id:'unapproved-hire'}),/approved paid/)
+ assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'hired',expected_version:1,operation_id:'unapproved-hire'}),/approved offer/)
  step(f,'submit_offer_for_approval');step(f,'approve_offer');communication(f)
  step(f,'authorize_offer_dispatch',{draft_id:'message'})
  assert.throws(()=>f.db.exec("UPDATE hiring_outbox SET recipient_email='other@example.com' WHERE id='message'"),/immutable/)
@@ -163,7 +173,7 @@ test('actual sibling grants, reviewer assignments and suspended organizations co
  assert.ok(f.call('submit_offer_for_approval','staff-b',args).every(n=>n===0))
  f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'reviewer',role:'reviewer',requisition_id:'req-a',grant_id:'reviewer',operation_id:'review-grant'})
  assert.deepEqual(f.call('get_offer','reviewer',args),[])
- assert.ok(f.call('record_decision','reviewer',{...base,disposition:'deferred',expected_version:1,operation_id:'review-decision'}).every(n=>n===0))
+ assert.throws(()=>f.call('record_decision','reviewer',{...base,disposition:'deferred',expected_version:1,operation_id:'review-decision'}),/actor lacks recruiter access/)
  f.db.exec("UPDATE hiring_organizations SET status='suspended' WHERE id='org-a'")
  assert.deepEqual(f.call('get_offer','staff-a',args),[])
  assert.ok(f.call('submit_offer_for_approval','staff-a',args).every(n=>n===0))
@@ -189,16 +199,16 @@ test('acceptance commits explicit evidence, canonical reads, filtering and exact
  const event=f.db.prepare("SELECT * FROM hiring_stage_events WHERE id='acceptance'").get();assert.equal(event.from_stage,'offered');assert.equal(event.to_stage,'accepted');assert.equal(event.actor_user_id,'staff-a');assert.equal(event.reason,acceptanceArgs.acceptance_evidence)
  assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id='acceptance'").get().n,1)
  assert.throws(()=>f.db.exec("UPDATE hiring_applications SET acceptance_evidence='forged'"),/controlled/)
- assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'deferred',expected_version:2,operation_id:'after-accept'}),/terminal/)
+ assert.throws(()=>f.call('record_decision','staff-a',{...base,disposition:'deferred',expected_version:2,operation_id:'after-accept'}),/invalid decision transition/)
  }finally{f.db.close()}
 })
 test('acceptance denies unauthorized, cross-brand, stale, blank, unapproved and non-offered requests',()=>{
  const f=acceptanceReady();try{
- for(const patch of [{expected_version:0},{brand_id:'brand-b'},{tenant_id:'other'},{acceptance_evidence:' '},{operation_id:' '}])assert.equal(f.call('record_acceptance','staff-a',{...acceptanceArgs,...patch})[0],0)
+ for(const patch of [{expected_version:0},{brand_id:'brand-b'},{tenant_id:'other'},{acceptance_evidence:' '},{operation_id:' '}])assert.throws(()=>f.call('record_acceptance','staff-a',{...acceptanceArgs,...patch}),/stale application|application not found|acceptance evidence/)
  f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'reviewer',role:'reviewer',requisition_id:'req-a',grant_id:'reviewer',operation_id:'review-grant'})
  f.call('create_workspace','staff-a',{...bootstrap,brand_id:'brand-b',requisition_id:'req-b',operation_id:'sibling-bootstrap'});f.call('add_workspace_member','staff-a',{...scope,brand_id:'brand-b',member_user_id:'sibling',role:'recruiter',operation_id:'sibling-member'});
- for(const user of ['reviewer','outsider','system:worker','sibling'])assert.equal(f.call('record_acceptance',user,acceptanceArgs)[0],0)
- for(const stage of ['submitted','interviewing','decision_pending']){f.db.prepare('UPDATE hiring_applications SET stage=?').run(stage);assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],0)}
+ for(const user of ['reviewer','outsider','system:worker','sibling'])assert.throws(()=>f.call('record_acceptance',user,acceptanceArgs),/actor lacks recruiter access/)
+ for(const stage of ['submitted','interviewing','decision_pending']){f.db.prepare('UPDATE hiring_applications SET stage=?').run(stage);assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/acceptance requires offered stage/)}
  f.db.exec("UPDATE hiring_applications SET stage='offered'");step(f,'revoke_offer');assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/approved offer/)
  }finally{f.db.close()}
 })
