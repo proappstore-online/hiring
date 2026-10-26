@@ -9,3 +9,4 @@ dist/
 .vibe-check/
 .pas.json
 .astro/
+mcp.registered.json

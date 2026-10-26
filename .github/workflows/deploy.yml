@@ -54,6 +54,7 @@ jobs:
       - name: Build
         env:
           VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_HIRING_PASSKEY_STEP_UP: ${{ vars.HIRING_PASSKEY_STEP_UP || 'off' }}
           # Self-hosted runners may have a shared cache owned by another job.
           NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache-${{ github.run_id }}
         run: |
@@ -153,10 +154,12 @@ jobs:
           OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.proappstore.online" | node scripts/deploy-json.mjs raw value)
           if [ -z "$OIDC" ] || [ "$OIDC" = "null" ]; then echo "::error::could not obtain OIDC token"; exit 1; fi
+          # Passkey step-up is OFF unless repo variable HIRING_PASSKEY_STEP_UP=on.
+          HIRING_PASSKEY_STEP_UP="${{ vars.HIRING_PASSKEY_STEP_UP || 'off' }}" node scripts/step-up-policy.mjs mcp.json mcp.registered.json
           RESP=$(curl -sS -X PUT \
             "https://api.proappstore.online/v1/apps/${{ github.event.repository.name }}/tools/oidc" \
             -H "Authorization: Bearer $OIDC" -H "Content-Type: application/json" \
-            --data-binary @mcp.json)
+            --data-binary @mcp.registered.json)
           if echo "$RESP" | node scripts/deploy-json.mjs true ok >/dev/null; then
             echo "Registered $(echo "$RESP" | node scripts/deploy-json.mjs raw registered) app tool(s)"
             echo "$RESP" | node scripts/deploy-json.mjs lines warnings '::warning::mcp.json: '
