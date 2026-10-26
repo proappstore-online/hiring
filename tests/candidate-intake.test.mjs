@@ -297,17 +297,54 @@ test('new action SQL has declared params, authenticated writes, no identity inpu
 test('staged review binds exact content and classification with versioned staff approval', () => {
   const { db, call } = fixture()
   const draft = { ...publication(), compensation_type: 'unpaid', expected_version: 0, state: 'draft', operation_id: 'draft-save' }
-  assert.deepEqual(call('save_requisition_review','staff-a',draft), [1,1])
-  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, requisition_id:B.requisition_id }), [0,0])
-  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, operation_id:'stale' }), [0,0])
+  assert.deepEqual(call('save_requisition_review','staff-a',draft), [0,1,0,0,1])
+  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, requisition_id:B.requisition_id }), [0,0,0,0,0])
+  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, operation_id:'stale' }), [0,0,0,0,0])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [0,0])
-  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, state:'pending_review', expected_version:1, operation_id:'review-submit' }), [1,1])
+  assert.deepEqual(call('save_requisition_review','staff-a',{ ...draft, state:'pending_review', expected_version:1, operation_id:'review-submit' }), [0,1,0,0,1])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid', notice_text:'changed notice' }), [0,0])
   assert.deepEqual(call('publish_job_requisition','owner',{ ...publication(), compensation_type:'unpaid' }), [1,1])
   assert.equal(call('get_public_job',null,A)[0].compensation_type,'unpaid')
   assert.throws(() => db.prepare("UPDATE hiring_job_publications SET compensation_type='paid'").run(), /immutable/)
-  assert.deepEqual(call('save_requisition_review','owner',{ ...draft, expected_version:2, operation_id:'edit-published' }), [0,0])
+  assert.throws(() => call('save_requisition_review','owner',{ ...draft, expected_version:2, operation_id:'edit-published' }), /published review may change description only/)
   db.close()
+})
+
+test('owner revises a published description with an audited version; other staff receive an error', () => {
+  const { db, call } = fixture()
+  try {
+    const original = { ...publication(), compensation_type:'unpaid', state:'pending_review', expected_version:0, operation_id:'initial-review' }
+    assert.deepEqual(call('save_requisition_review','owner',original), [0,1,0,0,1])
+    assert.deepEqual(call('publish_job_requisition','owner',{...publication(),compensation_type:'unpaid'}), [1,1])
+    const edit = {...original,description:'Revised volunteer description',expected_version:1,operation_id:'revised-review'}
+    assert.throws(() => call('save_requisition_review','staff-a',edit), /published requisition edit requires a brand owner/)
+    assert.throws(() => call('save_requisition_review','worker',edit), /published requisition edit requires a brand owner/)
+    assert.deepEqual(call('save_requisition_review','owner',edit),[0,1,1,1,1])
+    assert.equal(call('get_public_job',null,A)[0].description,edit.description)
+    assert.equal(call('get_public_job',null,A)[0].version,2)
+    assert.equal(call('get_vacancy_management','owner',A)[0].published_description,edit.description)
+    assert.equal(db.prepare('SELECT description FROM hiring_job_publications WHERE requisition_id=?').get(A.requisition_id).description,original.description)
+    assert.equal(db.prepare('SELECT action FROM hiring_audit_events WHERE operation_id=?').get(edit.operation_id).action,'requisition.description_revised')
+    assert.throws(() => call('save_requisition_review','owner',{...edit,operation_id:'unchanged',expected_version:2}),/published description is unchanged/)
+  } finally { db.close() }
+})
+
+test('published structured PD revisions are owner-only, versioned and visible to readers', () => {
+  const { db, call } = fixture()
+  try {
+    const pd = { ...A, overview:'Original overview', rolePurpose:'', responsibilities:'[]', requirements:'[]', workingArrangement:'Remote', compensation:'Unpaid', benefits:'', applicationProcess:'', privacyContact:'', expected_version:0, operation_id:'original-pd' }
+    assert.deepEqual(call('save_pd_draft','owner',pd),[0,1,0,0,1])
+    assert.deepEqual(call('publish_job_requisition','owner',publication()),[1,1])
+    const edit = {...pd,overview:'Revised overview',expected_version:1,operation_id:'revised-pd'}
+    assert.throws(() => call('hiring_v1_update_requisition','staff-a',edit),/published requisition edit requires a brand owner/)
+    assert.deepEqual(call('hiring_v1_update_requisition','owner',edit),[0,1,1,1,1])
+    const detail=call('get_vacancy_detail',null,A)[0]
+    assert.equal(JSON.parse(detail.pd_json).overview,edit.overview)
+    assert.equal(detail.pd_version,2)
+    assert.equal(detail.version,2)
+    assert.equal(call('get_public_job',null,A)[0].description,publication().description)
+    assert.equal(db.prepare('SELECT action FROM hiring_audit_events WHERE operation_id=?').get(edit.operation_id).action,'requisition.pd_revised')
+  } finally { db.close() }
 })
 
 test('pause hides discovery and denies submissions; resume and closure use optimistic versions', () => {
