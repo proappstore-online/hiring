@@ -37,12 +37,12 @@ const bootstrap = { ...scope, requisition_id: 'req-a', organization_name: 'Org A
 const candidate = { ...scope, requisition_id: 'req-a', candidate_id: 'cand-a', application_id: 'app-a', operation_id: 'create-a', candidate_name: 'A Person', email: 'a@example.com', phone: '', linkedin_url: 'https://www.linkedin.com/in/a-person', source_detail: 'LinkedIn search on 2026-10-20', basis_reference: 'recruitment legitimate interests assessment v1', contact_context: 'Public profile; email supplied directly', assignee_user_id: 'staff-a' }
 
 const transitions = JSON.parse(readFileSync(new URL('../web/src/application-stages.json', import.meta.url)))
-function seeded() {
+function seeded(compensation_type = 'paid') {
   const f = fixture()
   f.call('create_workspace', 'staff-a', bootstrap)
   f.call('create_linkedin_application', 'staff-a', candidate)
   const offerScope={tenant_id:'org-a',brand_id:'brand-a',application_id:'app-a',requisition_id:'req-a'}
-  f.call('save_offer_draft','staff-a',{...offerScope,terms_json:JSON.stringify({compensation_type:'paid',subject:'Offer',body:'Paid terms'}),expected_version:0,operation_id:'offer-fixture'})
+  f.call('save_offer_draft','staff-a',{...offerScope,terms_json:JSON.stringify({compensation_type,subject:'Offer',body:`${compensation_type} terms`}),expected_version:0,operation_id:'offer-fixture'})
   const offer=f.call('get_offer','staff-a',offerScope)[0]
   f.call('submit_offer_for_approval','staff-a',{...offerScope,offer_id:offer.id,expected_version:1,operation_id:'submit-fixture'})
   f.call('approve_offer','staff-a',{...offerScope,offer_id:offer.id,expected_version:2,operation_id:'approve-fixture'})
@@ -70,6 +70,15 @@ test('every allowed edge succeeds with canonical stage, one version, attributed 
       assert.ok(call('change_application_stage','staff-a',change(from,to)).every(n=>n===0))
     } finally {db.close()}
   }
+})
+test('approved unpaid offers allow the transition into offered', () => {
+  const { db, call } = seeded('unpaid')
+  try {
+    setStage(db, 'decision_pending')
+    assert.equal(call('change_application_stage', 'staff-a', change('decision_pending', 'offered', { operation_id: 'unpaid-offer' })).at(-1), 1)
+    assert.equal(call('get_application', 'staff-a', { ...scope, application_id: 'app-a' })[0].stage, 'offered')
+    assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_stage_events WHERE id='unpaid-offer'").get().n, 1)
+  } finally { db.close() }
 })
 test('every invalid edge including terminal, backwards, skipped and unknown stages writes nothing', () => {
   const {db,call}=seeded()
