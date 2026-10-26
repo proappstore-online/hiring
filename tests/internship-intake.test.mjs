@@ -56,6 +56,31 @@ test('internship configuration requires owner, exact direct Interns origin and a
   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_outbox').get().n,0)
  }finally{f.db.close()}
 })
+test('owner can relink to a newer approved version with immutable attribution and clear rejection',()=>{
+ const f=configured();try{
+  const args={...scope,requisition_id:'req-a',template_version:2}
+  assert.deepEqual(f.call('configure_internship_requisition','staff-a',{...config,template_version:2}),[0])
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',args),[0])
+  f.db.prepare('INSERT INTO hiring_template_approvals VALUES(?,2,?,?,?,?,?,2,?)').run('intern-template','org-a','brand-a','Your Interns invitation','Unrelated body','staff-a','approval-2')
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',args),[0])
+  f.db.prepare('INSERT INTO hiring_template_approvals VALUES(?,3,?,?,?,?,?,3,?)').run('intern-template','org-a','brand-a','Your Interns invitation','Start your Interns onboarding: '+url,'staff-a','approval-3')
+  const next={...args,template_version:3}
+  assert.deepEqual(f.call('relink_internship_requisition','outsider',next),[0])
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',{...next,brand_id:'other'}),[0])
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',next),[1])
+  assert.equal(f.call('get_internship_policy','staff-a',next)[0].template_version,3)
+  const history=f.call('list_internship_template_relinks','staff-a',next)
+  assert.equal(history.length,1)
+  assert.deepEqual([history[0].old_version,history[0].new_version,history[0].changed_by],[1,3,'staff-a'])
+  assert.ok(history[0].changed_at>0)
+  const audit=f.db.prepare("SELECT action,actor_user_id,redacted_summary FROM hiring_audit_events WHERE action='internship.template_relinked'").get()
+  assert.deepEqual([audit.action,audit.actor_user_id,audit.redacted_summary],['internship.template_relinked','staff-a','Template version 1 → 3'])
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',next),[0])
+  assert.deepEqual(f.call('relink_internship_requisition','staff-a',{...args,template_version:1}),[0])
+  assert.throws(()=>f.db.exec('UPDATE hiring_internship_template_relinks SET old_version=2'),/immutable/)
+  assert.throws(()=>f.db.exec('DELETE FROM hiring_internship_template_relinks'),/immutable/)
+ }finally{f.db.close()}
+})
 test('generic sources and forged campaigns cannot create internship candidates; recruiter intake retains provenance',()=>{
  const f=configured();try{
   for(const source of ['manual','direct','linkedin','email','referral','linkedin_campaign'])assert.ok(f.call('create_application','staff-a',{...intake,source}).every(n=>n===0))

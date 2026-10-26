@@ -330,11 +330,13 @@ test('lifecycle terminal boundaries and audit rollback preserve prior records',(
 
 test('additive lifecycle migration preserves all existing stages, versions and histories',()=>{
  const db=new DatabaseSync(':memory:');try{
- for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ const lifecycleIndex=migrations.migrations.findIndex(m=>m.name==='0050_candidate_lifecycle')
+ assert.ok(lifecycleIndex>0)
+ for(const m of migrations.migrations.slice(0,lifecycleIndex))db.exec(m.sql)
  db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1); INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1); INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req','org','brand','Role','draft',1); INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES('candidate','org','brand','Person','','owner',1)")
  for(const stage of ['submitted','interviewing','hired','rejected','withdrawn'])db.prepare("INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,created_by,created_at,updated_at) VALUES(?,'org','brand','req','candidate','linkedin','source','basis','context','owner',?,'owner',1,1)").run(stage,stage)
  const before=db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
- db.exec(migrations.migrations.at(-1).sql)
+ db.exec(migrations.migrations[lifecycleIndex].sql)
  for(const [i,row] of db.prepare('SELECT * FROM hiring_applications ORDER BY id').all().entries()){
  assert.equal(row.lifecycle_stage,null);delete row.lifecycle_stage;assert.deepEqual(row,before[i])
  }
