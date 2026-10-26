@@ -206,7 +206,7 @@ test('acceptance audit failure rolls back evidence, history and version',()=>{
  const f=acceptanceReady();try{
  f.db.exec("CREATE TRIGGER fail_acceptance BEFORE INSERT ON hiring_audit_events WHEN NEW.action='application.accepted' BEGIN SELECT RAISE(ABORT,'audit unavailable'); END")
  assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/audit unavailable/)
- assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,0)
+ assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptance_history').get().n,0)
  const a=f.call('get_application','staff-a',{...scope,application_id:'app-a'})[0];assert.equal(a.stage,'offered');assert.equal(a.version,1);assert.equal(a.acceptance_evidence,null)
  }finally{f.db.close()}
 })
@@ -254,7 +254,7 @@ test('approved unpaid, internship and volunteer offers can record candidate acce
    assert.equal(f.call('record_acceptance','staff-a',acceptanceArgs)[0],1)
    const row=f.call('get_acceptance_result','staff-a',acceptanceArgs)[0]
    assert.equal(row.stage,'accepted');assert.equal(row.acceptance_evidence,acceptanceArgs.acceptance_evidence)
-   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,1)
+   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptance_history').get().n,1)
   }finally{f.db.close()}
  }
 })
@@ -265,7 +265,7 @@ test('unapproved offers fail with an explicit approval error and preserve applic
    if(status==='revoked')step(f,'revoke_offer')
    f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app-a'")
    assert.throws(()=>f.call('record_acceptance','staff-a',acceptanceArgs),/approved offer/)
-   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,0)
+   assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptance_history').get().n,0)
    const row=f.call('get_application','staff-a',{...scope,application_id:'app-a'})[0]
    assert.equal(row.stage,'offered');assert.equal(row.version,1);assert.equal(row.acceptance_evidence,null)
   }finally{f.db.close()}
@@ -290,8 +290,8 @@ test('lifecycle progresses with completion evidence, scoped reads and exact immu
  assert.equal(f.call('list_lifecycle_events','staff-a',args).length,3)
  assert.equal(f.call('get_application','staff-a',args)[0].acceptance_evidence,acceptanceArgs.acceptance_evidence)
  assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_stage_events WHERE application_id='app-a'").get().n,5)
- assert.throws(()=>f.db.exec("UPDATE hiring_lifecycle_events SET evidence='forged'"),/immutable/)
- assert.throws(()=>f.db.exec('DELETE FROM hiring_lifecycle_events'),/immutable/)
+ assert.throws(()=>f.db.exec("UPDATE hiring_lifecycle_events_v2 SET evidence='forged'"),/immutable/)
+ assert.throws(()=>f.db.exec('DELETE FROM hiring_lifecycle_events_v2'),/immutable/)
  assert.throws(()=>f.db.exec("UPDATE hiring_applications SET lifecycle_stage='onboarding'"),/Controlled/)
  assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'onboarding',operation_id:'back'}),/Invalid/)
  }finally{f.db.close()}
@@ -317,7 +317,7 @@ test('lifecycle terminal boundaries and audit rollback preserve prior records',(
  f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,to_stage:terminal})
  assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,operation_id:'reopen',expected_version:3,from_stage:terminal}),/Invalid/)
  assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].stage,terminal)
- assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptances').get().n,1)
+ assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptance_history').get().n,1)
  }finally{f.db.close()}
  }
  const f=lifecycleReady();try{
@@ -330,11 +330,12 @@ test('lifecycle terminal boundaries and audit rollback preserve prior records',(
 
 test('additive lifecycle migration preserves all existing stages, versions and histories',()=>{
  const db=new DatabaseSync(':memory:');try{
- for(const m of migrations.migrations.slice(0,-1))db.exec(m.sql)
+ const lifecycleIndex=migrations.migrations.findIndex(m=>m.name==='0050_candidate_lifecycle')
+ for(const m of migrations.migrations.slice(0,lifecycleIndex))db.exec(m.sql)
  db.exec("INSERT INTO hiring_organizations(id,name,created_by,created_at) VALUES('org','Org','owner',1); INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES('brand','org','Brand',1); INSERT INTO hiring_requisitions(id,organization_id,brand_id,title,status,created_at) VALUES('req','org','brand','Role','draft',1); INSERT INTO hiring_candidates(id,organization_id,brand_id,name,linkedin_url,created_by,created_at) VALUES('candidate','org','brand','Person','','owner',1)")
  for(const stage of ['submitted','interviewing','hired','rejected','withdrawn'])db.prepare("INSERT INTO hiring_applications(id,organization_id,brand_id,requisition_id,candidate_id,source,source_detail,basis_reference,contact_context,assignee_user_id,stage,created_by,created_at,updated_at) VALUES(?,'org','brand','req','candidate','linkedin','source','basis','context','owner',?,'owner',1,1)").run(stage,stage)
  const before=db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
- db.exec(migrations.migrations.at(-1).sql)
+ db.exec(migrations.migrations[lifecycleIndex].sql)
  for(const [i,row] of db.prepare('SELECT * FROM hiring_applications ORDER BY id').all().entries()){
  assert.equal(row.lifecycle_stage,null);delete row.lifecycle_stage;assert.deepEqual(row,before[i])
  }
