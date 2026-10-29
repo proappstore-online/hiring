@@ -19,7 +19,7 @@ Issue #6 has no comments and exactly two original acceptance checkboxes:
 | Original criterion | Repository work delivered | Genuine unresolved acceptance / handoff |
 | --- | --- | --- |
 | Legal, security, accessibility and recovery evidence is signed off | Evidence register/validator, policy mapping, threat review, dependency patches, keyboard/mobile regression checks, incident and restore/rollback procedures | Owner identity/contact/copy approval, security and screen-reader acceptance, backup/contacts/tabletops, supported restore environment and an executed drill (#36/#37/#38/#48). External legal review remains waived; no approval is fabricated. |
-| Live two-brand end-to-end scenarios pass | All seven executable verification protocols mapped to existing SQL/browser tests; scoped operational counts, authorization/recovery regressions and failure states | Actual deployed two-brand sessions, passkey/provider/scanner evidence and protected result artifacts (#18/#38/#47). Local fixtures are not live evidence. |
+| Live two-brand end-to-end scenarios pass | All seven executable verification protocols mapped to existing SQL/browser tests; scoped operational counts, authorization/recovery regressions and failure states | Actual deployed two-brand sessions, passkey/provider/scanner evidence and protected result artifacts (#108/#38/#47). Local fixtures are not live evidence. |
 
 The actual code gaps found in this follow-up were missing candidate withdrawal
 and queue-health aggregates, an unactionable all-pending evidence template,
@@ -28,7 +28,7 @@ vacancy-search input bug exposed by the router upgrade. These are addressed here
 review and infrastructure execution cannot be implemented as a passing fixture.
 
 Pre-existing product gaps remain genuine implementation work: trusted scanner and
-brand-scoped byte serving (#18), complete-store/processor export and erasure
+brand-scoped byte serving (#108), complete-store/processor export and erasure
 (#28–#31/#45), complete restore replay (#28/#38), and configured alert delivery
 (#35). They are not relabeled as owner sign-off and are not claimed complete by
 this epic's closure. Their existing issues retain ownership; they continue to
@@ -51,7 +51,7 @@ disabled and require their own reviews; they are not approved by this checklist.
 | --- | --- | --- |
 | Identity, notices, indefinite retention, accurate role disclosures | `marketing`, `candidate-intake`, `vacancies`, `hiring-decisions` tests | #36 owner identity/contact, exact approved copy/version, processors and published URLs; no external legal review required |
 | Intake authorization, notice, idempotency and abuse controls | `candidate-intake`, `candidate-account-browser`, `runtime-gate` tests | #16 real candidate session, live throttling, notice snapshot and retry readback |
-| Private files | `candidate-intake` quarantine and denial checks | #18 trusted scanner/byte binding and scoped download evidence; synthetic clean rows do not qualify |
+| Private files | `candidate-intake` quarantine and denial checks | #108 trusted scanner/byte binding and scoped download evidence; synthetic clean rows do not qualify |
 | Brand/tenant/requisition/assignment isolation | `multibrand`, `permissions`, `gateway`, `interview-assignment`, `scorecards` tests | #37/#38 live forged-ID, direct URL, UI, export and MCP denial tests, including revocation |
 | Human decisions and MAIL recovery | `hiring-decisions`, `outbox`, `email-history`, `email-browser` tests | #35/#47 actual provider scope, quota/timeout, stale sending and reconciliation, verified no duplicate; no unsupported callback claim |
 | Subject rights, export, erasure and holds | `privacy-operations`, `erasure`, browser tests | #28–#31/#45 all stores/processors accounted for, confidential exclusions, access audit/expiry, tombstones reapplied on restore; partial core erasure is insufficient |
@@ -131,7 +131,7 @@ passed [CI](https://github.com/proappstore-online/hiring/actions/runs/4006594267
 and [Deploy](https://github.com/proappstore-online/hiring/actions/runs/40065942666).
 These are historical evidence, not approval of a subsequent revision.
 
-Remaining dependencies: #18 scanner/scoped bytes; #28–#31/#45 complete rights
+Remaining dependencies: #108 scanner/scoped bytes; #28–#31/#45 complete rights
 and restore handling; #35 alert configuration/delivery; #36 approved/public copy;
 #37 manual security/accessibility review; #47 provider evidence; #48 backup,
 contacts and exercises; #38 live scenarios/restore/owner decision. The #54 matrix

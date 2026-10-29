@@ -32,7 +32,7 @@ test('matrix sources and discoverability links resolve', () => {
 })
 
 test('verification design preserves approved policies and explicitly records manual workflow gaps', () => {
-  for (const phrase of ['No scheduled purge', 'No lawyer sign-off', 'unchecked', 'No ranking, rejection or offer solely by AI', 'immediate revocation', 'screen-reader', 'Unsupported IDs/callbacks/bounces', 'No workflow code is changed', 'not a full release-evidence interlock', 'all its checks are currently blocked', '#18', '#35', '#36', '#37', '#38', '#42', '#47', '#48', '#58']) {
+  for (const phrase of ['No scheduled purge', 'No lawyer sign-off', 'unchecked', 'No ranking, rejection or offer solely by AI', 'immediate revocation', 'screen-reader', 'Unsupported IDs/callbacks/bounces', 'No workflow code is changed', 'not a full release-evidence interlock', 'all its checks are currently blocked', '#108', '#35', '#36', '#37', '#38', '#42', '#47', '#48', '#58']) {
     assert.ok(matrix.includes(phrase), phrase)
   }
   for (const workflow of ['ci.yml', 'compliance.yml', 'deploy.yml']) assert.ok(matrix.includes(`../.github/workflows/${workflow}`))

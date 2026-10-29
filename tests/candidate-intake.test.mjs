@@ -292,6 +292,50 @@ test('private upload remains pending review until an exact brand owner releases 
   } finally { db.close() }
 })
 
+test('attachment metadata follows exact brand assignment and current membership after release', () => {
+  const { db, call, publish, advance } = fixture()
+  try {
+    publish()
+    assert.equal(call('submit_job_application','worker',application()).at(-1),1)
+    advance()
+    assert.equal(call('submit_job_application','other-worker',application(B,'b')).at(-1),1)
+    const fileA=attachment()
+    const fileB=attachment(B,'b')
+    for (const file of [fileA,fileB]) {
+      const user=file.brand_id==='a'?'worker':'other-worker'
+      assert.deepEqual(call('create_application_attachment',user,file),[1,1])
+      assert.deepEqual(call('complete_application_attachment_upload',user,{...file,operation_id:`upload-${file.brand_id}`}),[1,1])
+    }
+    assert.deepEqual(call('list_application_attachments','staff-a',fileA),[])
+    assert.deepEqual(call('list_application_attachments','staff-b',fileB),[])
+    assert.deepEqual(call('get_application_attachment','owner',fileA),[])
+    assert.deepEqual(call('get_application_attachment','owner',fileB),[])
+    assert.deepEqual(call('get_application_attachment','worker',fileB),[])
+    assert.deepEqual(call('get_application_attachment','other-worker',fileA),[])
+    assert.deepEqual(call('release_application_attachment','owner',{...fileA,operation_id:'release-a'}),[1,1])
+    assert.deepEqual(call('release_application_attachment','owner',{...fileB,operation_id:'release-b'}),[1,1])
+    assert.deepEqual(call('get_application_attachment','staff-a',fileA),[])
+    assert.deepEqual(call('get_application_attachment','staff-b',fileA),[])
+    assert.deepEqual(call('get_application_attachment','staff-a',fileB),[])
+    assert.deepEqual(call('get_application_attachment','staff-b',fileB),[])
+    assert.deepEqual(call('reassign_application','owner',{...A,application_id:fileA.application_id,from_user_id:'owner',to_user_id:'staff-a',expected_version:1,reason:'Review assignment',operation_id:'assign-a'}),[1,1,1])
+    assert.equal(call('get_application_attachment','staff-a',fileA).length,1)
+    assert.equal(call('list_application_attachments','staff-a',fileA).length,1)
+    assert.deepEqual(call('get_application_attachment','staff-b',fileA),[])
+    assert.deepEqual(call('get_application_attachment','staff-a',{...fileA,brand_id:'b'}),[])
+    assert.deepEqual(call('revoke_workspace_membership','owner',{...A,grant_id:'member-a',operation_id:'revoke-a'}),[1,1])
+    assert.deepEqual(call('get_application_attachment','staff-a',fileA),[])
+    assert.deepEqual(call('list_application_attachments','staff-a',fileA),[])
+    assert.equal(call('get_application_attachment','worker',fileA).length,1)
+    assert.equal(call('get_application_attachment','owner',fileB).length,1)
+    for (const row of [call('get_application_attachment','worker',fileA)[0],call('get_application_attachment','owner',fileB)[0]]) {
+      assert.equal('storage_path' in row,false)
+      assert.equal('url' in row,false)
+      assert.equal('bytes' in row,false)
+    }
+  } finally { db.close() }
+})
+
 test('attachment deletion denies reads first, is owner-only and audits once', () => {
   const { db, call, submit } = fixture()
   try {

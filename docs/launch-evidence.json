@@ -32,7 +32,7 @@
       "id": "intake-files",
       "gate": "intake",
       "owner": "Serge (serge-ivo)",
-      "issue": "#18",
+      "issue": "#108",
       "criterion": "Trusted scanner checks immutable bytes; only exact candidate/assigned brand staff retrieve clean private files.",
       "status": "blocked",
       "evidence": null,
@@ -44,8 +44,8 @@
       ],
       "blocker": {
         "kind": "implementation_dependency",
-        "reason": "Trusted scanner and exact-brand private byte serving are not implemented or verified. This is a real product/platform dependency, not just missing sign-off.",
-        "next_action": "Complete scanner/object binding and byte-serving integration in #18 once a supported platform route is available."
+        "reason": "Issue #18 shipped private quarantine and manual owner release. Trusted scanner and exact-brand private byte serving remain unimplemented and unverified under #108.",
+        "next_action": "Complete scanner/object binding and byte-serving integration in #108 once a supported platform route is available."
       },
       "revision": null,
       "environment": null
@@ -394,8 +394,8 @@
       ],
       "blocker": {
         "kind": "implementation_dependency",
-        "reason": "Quarantine/metadata denial tests exist; trusted scanner and scoped byte route are unresolved #18 work.",
-        "next_action": "Complete #18 integration and prove live byte denial for other candidates/unassigned staff."
+        "reason": "Quarantine, release and metadata denial tests exist; trusted scanner and scoped byte route remain #108 work.",
+        "next_action": "Complete #108 integration and prove live byte denial for other candidates/unassigned staff."
       },
       "revision": null,
       "environment": null

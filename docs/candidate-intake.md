@@ -25,12 +25,13 @@ The same link loads the current published snapshot and survives sign-in. Paused,
 closed, stale and mixed-scope jobs refuse submission. No recruiter access is
 needed or granted by this path.
 
-The independent issue #3 attachment/scanner release gate remains closed. These
-controls do not open production intake or claim scanner readiness. SQL tests
+The repository's issue #3 intake and quarantine controls are implemented. The
+production runtime gate remains closed pending the separate live intake checks.
+These controls do not claim scanner readiness. SQL tests
 exercise the endpoint's registered server batch; platform authentication and
 request throttling are provided by PAS, not simulated as HTTP tests here.
 
-Implementation revision, 21 October 2026. Issue #3 remains a release gate until the file capabilities below are verified. This document takes precedence over earlier statements that no job discovery or intake actions exist; it does not claim that intake is open.
+Implementation revision, 29 October 2026. Issue #18 supplied interim manual review; automated scanning and staff byte downloads are tracked in #108. This document takes precedence over earlier statements that no job discovery or intake actions exist; it does not claim that production intake is open.
 
 ## Published jobs
 
@@ -48,7 +49,7 @@ Legacy `source='linkedin'` remains required by an applied CHECK. The immutable i
 
 Receipts bind idempotency keys to the authenticated worker and full submitted payload. Retrying the same request writes no second records. The UI reads the caller's receipt and compares the payload before reporting success; changed payloads are conflicts. Reads expose only that worker's applications, never internal notes or other candidates. The same worker/email across brands does not cause a merge. SQL limits successful submissions to ten per rolling 24 hours and at least ten seconds apart across all brands. Platform request limits remain separate; these controls bound accepted submissions, not raw request load.
 
-## Attachment lifecycle and remaining blocker
+## Attachment lifecycle and platform follow-up
 
 `create_application_attachment` reserves an immutable private path `intake/<attachment-id>` under the uploader's platform storage namespace. Only the worker owning the exact application can reserve or delete it. Three active attachments per application, PDF/plain text metadata only, 1–5 MB and lowercase SHA-256 checksum are enforced by SQL. Filename/type/size/checksum supplied by the browser are **unverified claims**, not a trusted content check. Actual bytes upload through private `app.storage.upload`, never public or app-wide review storage.
 
@@ -56,13 +57,13 @@ All reservations start with `review_status='pending_review'`. After private `app
 
 Deletion first tombstones and audits the attachment, denying future application reads, then the uploader deletes their private object. Failed object deletion is reported and can be retried in the current UI. The deterministic path also permits operator-assisted cleanup. Reload recovery and processor erasure remain broader rights work; a tombstone alone does not prove object deletion.
 
-Automated byte inspection remains pending. `scripts/attachment-scanner.mjs` exposes a dependency-injected trusted-worker interface for a future scanner and byte reader; it is not wired to the browser or treated as production malware protection. The platform's current normal private storage is user-scoped; its review storage uses app-wide review roles, which are insufficient for Hiring brand isolation. Even after manual release, staff byte downloads remain unavailable until PAS provides immutable object/checksum binding and exact assigned-brand checked serving. No public URL or client-supplied scan result is used. The follow-up issue tracks this platform integration.
+Automated byte inspection remains pending. `scripts/attachment-scanner.mjs` exposes a dependency-injected trusted-worker interface for a future scanner and byte reader; it is not wired to the browser or treated as production malware protection. The platform's current normal private storage is user-scoped; its review storage uses app-wide review roles, which are insufficient for Hiring brand isolation. Even after manual release, staff byte downloads remain unavailable until PAS provides immutable object/checksum binding and exact assigned-brand checked serving. No public URL or client-supplied scan result is used. Issue #108 tracks this platform integration.
 
 The runtime gate stays `closed / public_intake_route_unverified`; no new action can open it. Before opening it, record production evidence for the supported file path, owner/notice configuration, authenticated submission, two-brand denial and attachment lifecycle. Updating the gate is a separate reviewed release operation. Existing applicant data stays compatible. Retention remains indefinite with explicit deletion and no legal-review gate.
 
 ## Verification
 
-`tests/candidate-intake.test.mjs` executes the registered SQL in SQLite: publication authorization, snapshots, closure, public scope/pagination, candidate ownership, consent, closed gate, stale/mixed IDs, retries, rate limits, rollback and quarantined attachment upload/release/deletion. An injected scanner stub tests the future worker interface; it does not simulate a deployed scanner. Migration tests cover populated upgrades and legacy constraints. UI source checks cover separation, escaped content, unchecked consent and private uploads. Passkey enforcement is provided by the platform, not by SQLite; an actual owner passkey ceremony and scanner/reviewer byte access require production verification before closure.
+`tests/candidate-intake.test.mjs` executes the registered SQL in SQLite: publication authorization, snapshots, closure, public scope/pagination, candidate ownership, consent, closed gate, stale/mixed IDs, retries, rate limits, rollback and quarantined attachment upload/release/deletion. It also tests exact-brand denial, assignment changes and membership revocation after release. An injected scanner stub tests the future worker interface; it does not simulate a deployed scanner. Migration tests cover populated upgrades and legacy constraints. UI source checks cover separation, escaped content, unchecked consent and private uploads. Passkey enforcement is provided by the platform, not by SQLite; an actual owner passkey ceremony and production attachment behavior require separate live verification before opening intake.
 
 Current platform evidence checked from `proappstore-online/platform` on 21 October 2026: `docs/app-actions-security.md` (public queries, SQL batch, passkey step-up), `docs/app-workers.md` (admin enablement, worker identity), `packages/backend/src/routes/passkeys.ts` (registration/assertion payloads), installed SDK storage contract (user-private and app-role review storage). These checks establish documented boundaries, not a successful authenticated production intake.
 
