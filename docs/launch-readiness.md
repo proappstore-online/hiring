@@ -1,10 +1,10 @@
 # Launch verification and evidence (#6)
 
 Production status on 24 October 2026: **HOLD**. Accountable release owner: Serge
-(`serge-ivo`, as recorded in the capability/governance register). No owner
-approval, live E2E pass or restore drill is asserted by this document.
-External legal review remains waived by #52; owner approval of public identity,
-contact, processor arrangements and notice versions is still required.
+(`serge-ivo`, as recorded in the capability/governance register). No live E2E
+pass or restore drill is asserted by this document. Owner copy approval was
+recorded on 29 October 2026 in #36; verified public identity, contact and
+processor arrangements are still required. External legal review is not required.
 
 ## Issue #6 repository completion and production approval
 
@@ -18,7 +18,7 @@ Issue #6 has no comments and exactly two original acceptance checkboxes:
 
 | Original criterion | Repository work delivered | Genuine unresolved acceptance / handoff |
 | --- | --- | --- |
-| Legal, security, accessibility and recovery evidence is signed off | Evidence register/validator, policy mapping, threat review, dependency patches, keyboard/mobile regression checks, incident and restore/rollback procedures | Owner identity/contact/copy approval, security and screen-reader acceptance, backup/contacts/tabletops, supported restore environment and an executed drill (#36/#37/#38/#48). External legal review remains waived; no approval is fabricated. |
+| Legal, security, accessibility and recovery evidence is signed off | Evidence register/validator, policy mapping, threat review, dependency patches, keyboard/mobile regression checks, incident and restore/rollback procedures | Owner identity/contact and processor details, security and screen-reader acceptance, backup/contacts/tabletops, supported restore environment and an executed drill (#36/#37/#38/#48). Copy approval is recorded in #36; external legal review is not required. |
 | Live two-brand end-to-end scenarios pass | All seven executable verification protocols mapped to existing SQL/browser tests; scoped operational counts, authorization/recovery regressions and failure states | Actual deployed two-brand sessions, passkey/provider/scanner evidence and protected result artifacts (#108/#38/#47). Local fixtures are not live evidence. |
 
 The actual code gaps found in this follow-up were missing candidate withdrawal
@@ -124,7 +124,7 @@ Read-only probes on 24 October 2026: app root returned HTTP 200; marketing root
 `https://about-hiring.proappstore.online/` returned HTTP 404. `marketing/src/site.ts`
 now explicitly marks the public copy as draft, with operator identity and contact
 unconfirmed. The exact draft and existing brand assets are hashed in
-`docs/public-copy-review.json`; no owner sign-off is recorded. Do not invent those values. Marketing publication is separate from
+`docs/public-copy-review.json`; owner copy sign-off is recorded in #36 on 29 October 2026. Do not invent missing identity/contact values. Marketing publication is separate from
 the app deploy. Existing GitHub runs for `a72c80d9113246e9954affe9fecf5d4158875d3e`
 passed [CI](https://github.com/proappstore-online/hiring/actions/runs/40065942674),
 [Platform Compliance](https://github.com/proappstore-online/hiring/actions/runs/40065942690)

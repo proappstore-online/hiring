@@ -42,15 +42,18 @@ test('public copy contains no template commercial or fulfillment promises', () =
   assert.doesNotMatch(read('marketing/src/pages/index.astro'), /<form|\/enquiries/)
 })
 
-test('unapproved public copy is visibly draft and excluded from indexing', () => {
+test('approved copy stays in draft presentation until identity and publication are verified', () => {
   assert.match(read('marketing/src/site.ts'), /approvalStatus: 'pending'/)
   assert.doesNotMatch(read('marketing/src/site.ts'), /The hiring team/)
   assert.match(read('marketing/src/layouts/Layout.astro'), /noindex, nofollow/)
   assert.match(read('marketing/src/layouts/Layout.astro'), /await owner approval/)
   assert.match(read('marketing/src/layouts/Legal.astro'), /Draft version \{site.legalVersion\}/)
   const review = JSON.parse(read('docs/public-copy-review.json'))
-  assert.equal(review.status, 'pending')
-  for (const field of ['operator', 'public_contact', 'processor_arrangements', 'reviewer', 'reviewed_at', 'approval_evidence']) assert.equal(review[field], null)
+  assert.equal(review.status, 'approved')
+  assert.equal(review.reviewer, 'Serge Ivy (owner)')
+  assert.equal(review.reviewed_at, '2026-10-29')
+  assert.equal(review.approval_evidence, 'https://github.com/proappstore-online/hiring/issues/36#issuecomment-6490651741')
+  for (const field of ['operator', 'public_contact', 'processor_arrangements']) assert.equal(review[field], null)
   const gate = JSON.parse(read('docs/launch-evidence.json')).checks.find(check => check.id === 'identity-policies')
   assert.equal(gate.status, 'blocked')
 })

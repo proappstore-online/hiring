@@ -1,13 +1,13 @@
 {
   "version": 1,
   "copy_version": "2026-10-24-draft-1",
-  "status": "pending",
+  "status": "approved",
   "operator": null,
   "public_contact": null,
   "processor_arrangements": null,
-  "reviewer": null,
-  "reviewed_at": null,
-  "approval_evidence": null,
+  "reviewer": "Serge Ivy (owner)",
+  "reviewed_at": "2026-10-29",
+  "approval_evidence": "https://github.com/proappstore-online/hiring/issues/36#issuecomment-6490651741",
   "files": {
     "marketing/public/icon-192.png": "068ce0b22606087c2bf67ee3125a7b18522f2ec95a762f5fe2be104fcacc5384",
     "marketing/src/layouts/Layout.astro": "8b0aa0a6a2e2630af6b8ac4fe00e3e1034014883acfc59dbbf753c22fa97f5f6",

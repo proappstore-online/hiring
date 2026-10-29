@@ -22,8 +22,8 @@
       ],
       "blocker": {
         "kind": "owner_action",
-        "reason": "Verified operator/contact, processor arrangements and approval of copy have not been supplied; marketing publication was unavailable.",
-        "next_action": "Owner supplies approved values/versions and arranges marketing publication under #36."
+        "reason": "Owner approved current copy and assets in #36; verified operator/contact and processor arrangements have not been supplied, and marketing publication remains unverified.",
+        "next_action": "Owner supplies verified identity/contact and processor details, then arranges marketing publication and records public URLs."
       },
       "revision": null,
       "environment": null
