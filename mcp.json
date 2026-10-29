@@ -5811,7 +5811,7 @@
     },
     {
       "name": "record_lifecycle_transition",
-      "description": "Record accepted \u2192 onboarding \u2192 onboarded \u2192 active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result.",
+      "description": "Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result.",
       "requires_auth": true,
       "operation": "execute",
       "params": {
@@ -6695,7 +6695,7 @@
     },
     {
       "name": "set_linkedin_job_id",
-      "description": "Record a LinkedIn job ID on an existing posting, with immutable ID change history. Use republish_expired_job to reactivate an expired posting.",
+      "description": "Record a LinkedIn job ID on an existing posting, with immutable ID change history. Use republish_job_requisition to reactivate an expired posting.",
       "operation": "batch",
       "requires_auth": true,
       "step_up": true,
@@ -6810,7 +6810,43 @@
       ]
     },
     {
-      "name": "republish_expired_job",
+      "name": "get_job_linkedin_status",
+      "description": "Read the effective lifecycle status, current LinkedIn job ID and expiry date for one granted requisition.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id)) LIMIT 1"
+    },
+    {
+      "name": "find_job_by_linkedin_id",
+      "description": "Search current and historical LinkedIn job IDs within an authorized brand.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "linkedin_job_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100"
+    },
+    {
+      "name": "republish_job_requisition",
       "description": "Republish an expired posting on the same requisition with a new LinkedIn job ID. Appends immutable repost history; applicants stay attached.",
       "operation": "batch",
       "requires_auth": true,
@@ -6850,7 +6886,7 @@
       ]
     },
     {
-      "name": "list_repost_history",
+      "name": "list_linkedin_repost_history",
       "description": "List immutable repost history for one granted requisition, most recent first.",
       "operation": "query",
       "requires_auth": true,
@@ -6868,10 +6904,11 @@
       "sql": "SELECT h.reposted_at,h.previous_linkedin_job_id,h.new_linkedin_job_id,h.actor_user_id,h.reason,h.operation_id FROM hiring_linkedin_repost_history h WHERE h.requisition_id=:requisition_id AND h.organization_id=:organization_id AND h.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id)) ORDER BY h.reposted_at DESC,h.operation_id DESC LIMIT 100"
     },
     {
-      "name": "get_job_linkedin_status",
-      "description": "Read the effective lifecycle status, current LinkedIn job ID and expiry date for one granted requisition.",
-      "operation": "query",
+      "name": "record_linkedin_status",
+      "description": "Record an observed LinkedIn state and optional expiry date; active and paused require a currently published posting, while expired and closed remove it from discovery.",
+      "operation": "batch",
       "requires_auth": true,
+      "step_up": true,
       "params": {
         "organization_id": {
           "type": "string"
@@ -6881,27 +6918,29 @@
         },
         "requisition_id": {
           "type": "string"
-        }
-      },
-      "sql": "SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id)) LIMIT 1"
-    },
-    {
-      "name": "find_job_by_linkedin_id",
-      "description": "Search current and historical LinkedIn job IDs within an authorized brand.",
-      "operation": "query",
-      "requires_auth": true,
-      "params": {
-        "organization_id": {
+        },
+        "linkedin_status": {
           "type": "string"
         },
-        "brand_id": {
+        "expiry_date": {
+          "type": "integer",
+          "optional": true
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
           "type": "string"
         },
-        "linkedin_job_id": {
+        "reason": {
           "type": "string"
         }
       },
-      "sql": "SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100"
+      "statements": [
+        "UPDATE hiring_job_publications SET status=CASE WHEN :linkedin_status IN ('expired','closed') THEN 'closed' ELSE 'published' END,lifecycle_status=CASE WHEN :linkedin_status='expired' THEN 'expired' WHEN :linkedin_status='closed' THEN 'closed' ELSE 'published' END,expiry_date=coalesce(:expiry_date,expiry_date),version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND :linkedin_status IN ('active','paused','expired','closed') AND length(trim(:reason)) BETWEEN 1 AND 1000 AND (:expiry_date IS NULL OR :expiry_date>0) AND (status='published' OR (:linkedin_status='closed' AND lifecycle_status='expired')) AND NOT (:linkedin_status='active' AND expiry_date IS NOT NULL AND expiry_date<=:__now AND :expiry_date IS NULL)",
+        "INSERT INTO hiring_publication_controls(requisition_id,paused) SELECT :requisition_id,CASE WHEN :linkedin_status='paused' THEN 1 ELSE 0 END FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.version=:expected_version+1 AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND changes()=1 ON CONFLICT(requisition_id) DO UPDATE SET paused=excluded.paused",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'requisition.linkedin_status_recorded',:__user_id,:operation_id,:__now,'requisition',:requisition_id,:reason WHERE changes()=1"
+      ]
     }
   ]
 }
