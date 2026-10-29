@@ -10,6 +10,7 @@ export const MUTATIONS_V1 = Object.freeze({
   hiring_v1_advance_application: 'change_application_stage',
   hiring_v1_submit_scorecard: 'save_own_scorecard',
   hiring_v1_record_decision: 'record_decision',
+  hiring_v1_record_lifecycle_transition: 'record_lifecycle_transition',
   hiring_v1_draft_message: 'create_communication_draft',
   hiring_v1_send_approved_message: 'queue_communication',
 })
@@ -20,6 +21,9 @@ export function buildMutationTools(tools) {
     if (!original) throw new Error(`Missing source action ${source}`)
     const tool = structuredClone(original)
     tool.name = name
+    // A source action registered as a single `sql` (operation: 'execute') is one statement
+    // batch; normalise it so the shared statement-rewriting below has one shape to handle.
+    if (tool.sql) { tool.statements = [tool.sql]; delete tool.sql; tool.operation = 'batch' }
     tool.description = `Hiring mutation contract v1. ${original.description} Refused stage and decision writes return an error; zero changes may indicate a retry.`
     if (tool.params.tenant_id) {
       tool.params.organization_id = tool.params.tenant_id

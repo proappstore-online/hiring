@@ -50,6 +50,17 @@ function ready(name) {
     f.db.exec("UPDATE hiring_applications SET stage='in_review' WHERE id='app'")
     args={...args,requisition_id:'req',disposition:'deferred',rationale:'Human review'}
   }
+  if(name==='hiring_v1_record_lifecycle_transition') {
+    const o={tenant_id:'org',brand_id:'brand',application_id:'app'}
+    f.call('save_offer_draft','owner',{...o,requisition_id:'req',terms_json:JSON.stringify({compensation_type:'paid',subject:'Offer',body:'Terms'}),expected_version:0,operation_id:'offer-draft'})
+    const offerArgs=()=>({...o,offer_id:f.call('get_offer','owner',o)[0].id,expected_version:f.call('get_offer','owner',o)[0].lock_version,operation_id:'offer-step-'+f.call('get_offer','owner',o)[0].lock_version})
+    f.call('submit_offer_for_approval','owner',offerArgs())
+    f.call('approve_offer','owner',offerArgs())
+    f.db.exec("UPDATE hiring_applications SET stage='offered' WHERE id='app'")
+    const appVersion=()=>f.call('get_application','owner',{organization_id:'org',brand_id:'brand',application_id:'app'})[0].version
+    f.call('record_acceptance','owner',{...o,expected_version:appVersion(),operation_id:'accept',acceptance_evidence:'Candidate explicitly accepted paid terms by signed response'})
+    args={...args,requisition_id:'req',expected_version:appVersion(),from_stage:'accepted',to_stage:'onboarding',evidence:'Setup handoff started',registration_evidence:'',requirements_evidence:'',handoff_evidence:''}
+  }
   if(name==='hiring_v1_submit_scorecard') {
     f.call('grant_workspace_access','owner',{...scope,grant_id:'reviewer',member_user_id:'reviewer',role:'reviewer',requisition_id:'req',operation_id:'grant'})
     f.call('create_interview','owner',{tenant_id:'org',brand_id:'brand',application_id:'app',interview_id:'interview',assignment_id:'assignment',reviewer_id:'reviewer',format:'video',operation_id:'interview'})
@@ -69,7 +80,7 @@ const denied = counts => assert.ok(counts.every(n=>n===0),JSON.stringify(counts)
 const deniedWrite = (call, name, user, args) => {
   try { denied(call(name, user, args)) }
   catch (error) {
-    if (!['hiring_v1_advance_application', 'hiring_v1_record_decision'].includes(name)) throw error
+    if (!['hiring_v1_advance_application', 'hiring_v1_record_decision', 'hiring_v1_record_lifecycle_transition'].includes(name)) throw error
     assert.match(error.message, /application|actor|operation|version|transition|required/)
   }
 }
@@ -129,6 +140,25 @@ test('v1 stage cannot bypass final decision workflow; scorecard is submit-only',
   } finally {f.db.close()}
   const s=ready('hiring_v1_submit_scorecard')
   try {denied(s.call('hiring_v1_submit_scorecard',s.user,{...s.args,status:'draft'}))} finally {s.db.close()}
+})
+
+test('v1 withdraws an accepted, onboarding or onboarded application; decision and stage-change tools stay refused (#1400)',()=>{
+  for(const fromStage of ['accepted','onboarding','onboarded']){
+    const f=ready('hiring_v1_record_lifecycle_transition')
+    try {
+      const application=()=>f.call('get_application','owner',{organization_id:'org',brand_id:'brand',application_id:'app'})[0]
+      if(fromStage!=='accepted') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarding-'+fromStage,expected_version:application().version,to_stage:'onboarding'})
+      if(fromStage==='onboarded') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarded-'+fromStage,expected_version:application().version,from_stage:'onboarding',to_stage:'onboarded',evidence:'Onboarding complete',registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined'})
+      assert.equal(application().stage,fromStage)
+      // The two tools Thanh Van's withdrawal was tried through (#1400) are correctly refused once the
+      // application has entered the lifecycle workflow (hiring_workflow_decision_guard, migration 0051).
+      deniedWrite(f.call,'hiring_v1_record_decision',f.user,{organization_id:'org',brand_id:'brand',requisition_id:'req',application_id:'app',expected_version:application().version,operation_id:'bad-decision-'+fromStage,disposition:'withdrawn',rationale:'Candidate withdrew'})
+      deniedWrite(f.call,'hiring_v1_advance_application',f.user,{organization_id:'org',brand_id:'brand',application_id:'app',expected_version:application().version,from_stage:fromStage,to_stage:'withdrawn',reason:'Candidate withdrew',operation_id:'bad-advance-'+fromStage})
+      const result=f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'withdraw-'+fromStage,expected_version:application().version,from_stage:fromStage,to_stage:'withdrawn',evidence:'Candidate withdrew'})
+      assert.equal(mutationResult(result).ok,true)
+      assert.equal(application().stage,'withdrawn')
+    } finally {f.db.close()}
+  }
 })
 
 test('v1 send denies edited templates and changed recipients, and never claims provider delivery',()=>{

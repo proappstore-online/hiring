@@ -6268,6 +6268,53 @@
       ]
     },
     {
+      "name": "hiring_v1_record_lifecycle_transition",
+      "description": "Hiring mutation contract v1. Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result. Refused stage and decision writes return an error; zero changes may indicate a retry.",
+      "requires_auth": true,
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "requisition_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "from_stage": {
+          "type": "string"
+        },
+        "to_stage": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "registration_evidence": {
+          "type": "string"
+        },
+        "requirements_evidence": {
+          "type": "string"
+        },
+        "handoff_evidence": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_lifecycle_events_v2 (organization_id,brand_id,requisition_id,application_id,operation_id,expected_version,from_stage,to_stage,evidence,registration_evidence,requirements_evidence,handoff_evidence,actor_user_id,created_at) SELECT :organization_id,:brand_id,:requisition_id,:application_id,:operation_id,:expected_version,:from_stage,:to_stage,:evidence,:registration_evidence,:requirements_evidence,:handoff_evidence,:__user_id,:__now WHERE NOT EXISTS(SELECT 1 FROM hiring_lifecycle_events_v2 WHERE operation_id=:operation_id) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0"
+      ]
+    },
+    {
       "name": "hiring_v1_draft_message",
       "description": "Hiring mutation contract v1. Save an unsent email draft to the internal outbox; no send capability Refused stage and decision writes return an error; zero changes may indicate a retry.",
       "operation": "batch",
