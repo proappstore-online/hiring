@@ -32,7 +32,7 @@ function fixture() {
 }
 
 test('0055 adds nullable Discord and Interns reference columns', () => {
-  assert.equal(migrations.at(-1).name, '0055_discord_interns_fields')
+  assert.ok(migrations.some(m => m.name === '0055_discord_interns_fields'))
   const f = fixture()
   try {
     const columns = f.db.prepare('PRAGMA table_info(hiring_applications)').all().map(row => row.name)

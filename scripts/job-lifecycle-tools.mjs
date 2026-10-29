@@ -1,0 +1,70 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+
+const string = { type: 'string' }
+const integer = { type: 'integer' }
+const optionalString = { type: 'string', optional: true }
+const optionalInteger = { type: 'integer', optional: true }
+const scope = { organization_id: string, brand_id: string, requisition_id: string }
+const owner = "EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL)"
+const reader = "EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=:requisition_id))"
+const validOp = "length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)"
+const status = "CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END"
+const audit = action => `INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'${action}',:__user_id,:operation_id,:__now,'requisition',:requisition_id,:reason WHERE changes()=1`
+
+export function addJobLifecycleTools(registry) {
+  const tools = registry.tools
+  const get = name => { const t=tools.find(x=>x.name===name); if (!t) throw new Error(`Missing ${name}`); return t }
+  for (const name of ['list_requisitions','gateway_list_requisitions','gateway_get_requisition','audited_gateway_list_requisitions','audited_gateway_get_requisition']) {
+    const t=get(name)
+    t.sql=t.sql.replace('r.status',`CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status`)
+      .replace('FROM hiring_requisitions r WHERE', 'FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id WHERE')
+    if(name==='list_requisitions') t.sql=t.sql.replace('SELECT id,title,status FROM hiring_requisitions WHERE','SELECT r.id,r.title,CASE WHEN j.lifecycle_status=\'expired\' THEN \'expired\' WHEN j.lifecycle_status=\'closed\' OR j.status=\'closed\' THEN \'closed\' WHEN pc.paused=1 THEN \'paused\' WHEN j.status=\'published\' THEN \'published\' ELSE \'draft\' END AS status FROM hiring_requisitions r LEFT JOIN hiring_job_publications j ON j.requisition_id=r.id LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=r.id WHERE').replaceAll('hiring_requisitions.id','r.id').replace('WHERE organization_id=:organization_id AND brand_id=:brand_id','WHERE r.organization_id=:organization_id AND r.brand_id=:brand_id').replace('ORDER BY created_at DESC','ORDER BY r.created_at DESC')
+  }
+  const management=get('get_vacancy_management')
+  management.sql=management.sql.replace('r.id,r.title,r.status,','r.id,r.title,CASE WHEN j.lifecycle_status=\'expired\' THEN \'expired\' WHEN j.lifecycle_status=\'closed\' OR j.status=\'closed\' THEN \'closed\' WHEN pc.paused=1 THEN \'paused\' WHEN j.status=\'published\' THEN \'published\' ELSE \'draft\' END AS status,')
+  for(const name of ['list_vacancy_management','get_vacancy_management','list_job_publications']) {
+    const t=get(name)
+    t.sql=t.sql.replace("WHEN j.status='closed' THEN 'closed'", "WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed'")
+    t.sql=t.sql.replace('j.version,CASE', 'j.version,j.linkedin_job_id,j.expiry_date,CASE')
+    if(name==='get_vacancy_management') t.sql=t.sql.replace('j.version AS publication_version,','j.version AS publication_version,j.linkedin_job_id,j.expiry_date,')
+    if(name==='list_vacancy_management') t.sql=t.sql.replace('r.id,r.title,CASE','r.id,r.title,j.linkedin_job_id,j.expiry_date,CASE')
+  }
+  for(const name of ['get_public_job','list_public_jobs','get_vacancy_detail','list_vacancies']) {
+    const t=get(name)
+    t.sql=t.sql.replace("j.status='published'", "j.status='published' AND coalesce(j.lifecycle_status,'published')='published' AND (j.expiry_date IS NULL OR j.expiry_date>:__now)")
+  }
+  const close=get('close_job_requisition')
+  close.statements[0]=close.statements[0].replace("SET status='closed',version=version+1", "SET status='closed',lifecycle_status='closed',version=version+1").replace("AND status='published' AND EXISTS", "AND (status='published' OR lifecycle_status='expired') AND EXISTS")
+  const submit=get('submit_job_application')
+  submit.statements[0]=submit.statements[0].replace("j.status='published' AND NOT EXISTS", "j.status='published' AND coalesce(j.lifecycle_status,'published')='published' AND (j.expiry_date IS NULL OR j.expiry_date>:__now) AND NOT EXISTS")
+  tools.push(
+    {name:'set_linkedin_job_id',description:'Record a LinkedIn job ID on an existing posting, with immutable ID change history. Use republish_expired_job to reactivate an expired posting.',operation:'batch',requires_auth:true,step_up:true,params:{...scope,linkedin_job_id:string,previous_linkedin_job_id:optionalString,expiry_date:optionalInteger,expected_version:integer,operation_id:string,reason:optionalString},statements:[
+      `INSERT INTO hiring_linkedin_repost_history(id,operation_id,requisition_id,organization_id,brand_id,previous_linkedin_job_id,new_linkedin_job_id,actor_user_id,reason,reposted_at) SELECT :operation_id,:operation_id,j.requisition_id,j.organization_id,j.brand_id,j.linkedin_job_id,:linkedin_job_id,:__user_id,coalesce(:reason,'LinkedIn job ID recorded'),:__now FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.version=:expected_version AND ${owner} AND ${validOp} AND length(trim(:linkedin_job_id)) BETWEEN 1 AND 128 AND (j.linkedin_job_id IS NULL OR j.linkedin_job_id<>:linkedin_job_id) AND (:previous_linkedin_job_id IS NULL OR j.linkedin_job_id IS :previous_linkedin_job_id) AND (:reason IS NULL OR length(trim(:reason)) BETWEEN 1 AND 1000) AND (:expiry_date IS NULL OR :expiry_date>0)`,
+      `UPDATE hiring_job_publications SET linkedin_job_id=:linkedin_job_id,expiry_date=coalesce(:expiry_date,expiry_date),version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND ${owner} AND EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.operation_id=:operation_id AND h.requisition_id=:requisition_id AND h.actor_user_id=:__user_id)`,
+      `INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'requisition.linkedin_id_set',:__user_id,:operation_id,:__now,'requisition',:requisition_id,coalesce(:reason,'LinkedIn job ID recorded') WHERE changes()=1`
+    ]},
+    {name:'set_job_expiry_date',description:'Set or clear the expected LinkedIn expiry date on an existing posting.',operation:'batch',requires_auth:true,step_up:true,params:{...scope,expiry_date:optionalInteger,expected_version:integer,operation_id:string,reason:optionalString},statements:[
+      `UPDATE hiring_job_publications SET expiry_date=:expiry_date,version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND ${owner} AND ${validOp} AND (:expiry_date IS NULL OR :expiry_date>0) AND (:reason IS NULL OR length(trim(:reason)) BETWEEN 1 AND 1000) AND expiry_date IS NOT :expiry_date`,
+      `INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'requisition.expiry_date_set',:__user_id,:operation_id,:__now,'requisition',:requisition_id,coalesce(:reason,'LinkedIn expiry date updated') WHERE changes()=1`
+    ]},
+    {name:'expire_job_requisition',description:'Record that a LinkedIn posting expired or closed after an external check or its expiry date. Removes it from public listings; preserves the requisition and applicants.',operation:'batch',requires_auth:true,step_up:true,params:{...scope,expected_version:integer,operation_id:string,reason:optionalString,observed_linkedin_status:optionalString},statements:[
+      `UPDATE hiring_job_publications SET status='closed',lifecycle_status='expired',version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND status='published' AND coalesce(lifecycle_status,'published')='published' AND version=:expected_version AND ${owner} AND ${validOp} AND (:reason IS NULL OR length(trim(:reason)) BETWEEN 1 AND 1000) AND (:observed_linkedin_status IS NULL OR :observed_linkedin_status IN ('expired','closed'))`,
+      audit('requisition.expired')
+    ]},
+    {name:'republish_expired_job',description:'Republish an expired posting on the same requisition with a new LinkedIn job ID. Appends immutable repost history; applicants stay attached.',operation:'batch',requires_auth:true,step_up:true,params:{...scope,linkedin_job_id:string,expiry_date:optionalInteger,expected_version:integer,operation_id:string,reason:optionalString},statements:[
+      `INSERT INTO hiring_linkedin_repost_history(id,operation_id,requisition_id,organization_id,brand_id,previous_linkedin_job_id,new_linkedin_job_id,actor_user_id,reason,reposted_at) SELECT :operation_id,:operation_id,j.requisition_id,j.organization_id,j.brand_id,j.linkedin_job_id,:linkedin_job_id,:__user_id,coalesce(:reason,'Reposted on LinkedIn'),:__now FROM hiring_job_publications j WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND j.lifecycle_status='expired' AND j.version=:expected_version AND ${owner} AND ${validOp} AND length(trim(:linkedin_job_id)) BETWEEN 1 AND 128 AND (j.linkedin_job_id IS NULL OR j.linkedin_job_id<>:linkedin_job_id) AND (:reason IS NULL OR length(trim(:reason)) BETWEEN 1 AND 1000) AND (:expiry_date IS NULL OR :expiry_date>:__now)`,
+      `UPDATE hiring_job_publications SET status='published',lifecycle_status='published',linkedin_job_id=:linkedin_job_id,expiry_date=:expiry_date,version=version+1 WHERE requisition_id=:requisition_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.operation_id=:operation_id AND h.requisition_id=:requisition_id AND h.actor_user_id=:__user_id)`,
+      `INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'requisition.reposted',:__user_id,:operation_id,:__now,'requisition',:requisition_id,coalesce(:reason,'Reposted on LinkedIn') WHERE changes()=1`
+    ]},
+    {name:'list_repost_history',description:'List immutable repost history for one granted requisition, most recent first.',operation:'query',requires_auth:true,params:scope,sql:`SELECT h.reposted_at,h.previous_linkedin_job_id,h.new_linkedin_job_id,h.actor_user_id,h.reason,h.operation_id FROM hiring_linkedin_repost_history h WHERE h.requisition_id=:requisition_id AND h.organization_id=:organization_id AND h.brand_id=:brand_id AND ${reader} ORDER BY h.reposted_at DESC,h.operation_id DESC LIMIT 100`},
+    {name:'get_job_linkedin_status',description:'Read the effective lifecycle status, current LinkedIn job ID and expiry date for one granted requisition.',operation:'query',requires_auth:true,params:scope,sql:`SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,${status} AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.requisition_id=:requisition_id AND j.organization_id=:organization_id AND j.brand_id=:brand_id AND ${reader} LIMIT 1`},
+    {name:'find_job_by_linkedin_id',description:'Search current and historical LinkedIn job IDs within an authorized brand.',operation:'query',requires_auth:true,params:{organization_id:string,brand_id:string,linkedin_job_id:string},sql:`SELECT j.requisition_id,j.linkedin_job_id,j.expiry_date,j.version,${status} AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100`}
+  )
+  return registry
+}
+
+if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
+  const path=new URL('../mcp.json',import.meta.url)
+  writeFileSync(path,JSON.stringify(addJobLifecycleTools(JSON.parse(readFileSync(path,'utf8'))),null,2)+'\n')
+}
