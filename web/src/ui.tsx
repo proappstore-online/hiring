@@ -1,6 +1,8 @@
 import type { FormEvent, ReactNode } from 'react'
 
-export const date = (ms: number) => new Date(ms).toLocaleString()
+// The hiring business operates in Australia/Sydney; show every timestamp in that
+// zone rather than the viewer's browser locale (#1395).
+export const date = (ms: number) => new Date(ms).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })
 export const field = 'w-full rounded-lg border border-[var(--line-strong)] bg-[var(--paper)] px-3 py-2 text-sm'
 export const panel = 'hiring-section bg-[var(--panel)]'
 export const button = 'inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] disabled:opacity-50'

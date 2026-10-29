@@ -203,3 +203,9 @@ test('rejected and no-op queue and claim calls append no status events', () => {
  }
  f.db.close()
 })
+
+test('#1395: every occurred_at param is declared timestamp_ms, so PAS normalises/rejects seconds-based input instead of storing a 1970 date', () => {
+ for (const name of ['record_candidate_email', 'record_worker_candidate_email', 'record_agent_activity']) {
+  assert.equal(action(name).params.occurred_at.type, 'timestamp_ms', name)
+ }
+})

@@ -586,7 +586,7 @@
           "optional": true
         },
         "occurred_at": {
-          "type": "integer"
+          "type": "timestamp_ms"
         },
         "agent_instance_id": {
           "type": "string"
@@ -660,7 +660,7 @@
           "optional": true
         },
         "occurred_at": {
-          "type": "integer"
+          "type": "timestamp_ms"
         },
         "agent_instance_id": {
           "type": "string"
@@ -727,7 +727,7 @@
           "type": "string"
         },
         "occurred_at": {
-          "type": "integer"
+          "type": "timestamp_ms"
         },
         "agent_instance_id": {
           "type": "string"
