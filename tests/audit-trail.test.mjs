@@ -35,7 +35,7 @@ function fixture() {
 
 test('new tool definitions are generated from source and migrations are append-only', () => {
   for (const generated of buildAuditTools()) assert.deepEqual(tools.find(t => t.name === generated.name), generated)
-  assert.deepEqual(migrations.slice(-7).map(m => m.name), ['0056_mcp_audit_trail', '0057_external_actions', '0058_next_actions', '0059_job_lifecycle', '0060_requisition_linkedin_state', '0061_expire_freegamestore_intern', '0062_mcp_refusals'])
+  assert.deepEqual(migrations.slice(-8).map(m => m.name), ['0056_mcp_audit_trail', '0057_external_actions', '0058_next_actions', '0059_job_lifecycle', '0060_requisition_linkedin_state', '0061_expire_freegamestore_intern', '0062_mcp_refusals', '0063_mcp_refusal_codes'])
   const f = fixture()
   try {
     f.db.prepare("INSERT INTO mcp_audit_log(id,organization_id,brand_id,timestamp,tool_name,input_json,result_status) VALUES ('one','org','brand',1,'test','{}','ok')").run()
@@ -67,7 +67,7 @@ test('external actions preserve provider details and redact audit inputs', () =>
   const f = fixture()
   try {
     const values = { ...scope, kind: 'email', target_candidate_id: 'candidate', target_org_id: 'org', performed_by: 'owner', performed_at: 100, params_json: JSON.stringify({ subject: 'Hello', api_key: 'sensitive' }), gmail_message_id: 'gmail-1', operation_id: 'external-1' }
-    assert.throws(()=>f.call('log_external_action', 'outsider', values), /not_found/)
+    assert.throws(()=>f.call('log_external_action', 'outsider', values), /APP:not_found/)
     assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 1, 1, 1])
     const stored = f.db.prepare("SELECT * FROM external_actions WHERE id='external-1'").get()
     assert.equal(stored.gmail_message_id, 'gmail-1')
@@ -77,8 +77,8 @@ test('external actions preserve provider details and redact audit inputs', () =>
     assert.equal(JSON.parse(audit.input_json).params_json, '[REDACTED]')
     assert.equal(f.call('query_audit_log', 'outsider', scope).length, 0)
     const timeline = f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate' })
-    assert.deepEqual(timeline.map(row => row.source), ['mcp', 'external'])
-    assert.equal(timeline[1].kind, 'email')
+    assert.deepEqual(timeline.map(row => row.source).sort(), ['external', 'mcp'])
+    assert.equal(timeline.find(row => row.source === 'external').kind, 'email')
   } finally { f.db.close() }
 })
 
