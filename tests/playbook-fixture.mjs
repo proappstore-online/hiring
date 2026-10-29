@@ -11,7 +11,7 @@ export function fixture() {
   const call = (name, user, values = {}) => {
     const t = tools.find(t => t.name === name)
     assert.equal(t.requires_auth, true)
-    const params = { ...values, __user_id: user, __now: 123 }
+    const params = { ...Object.fromEntries(Object.entries(t.params).filter(([, param]) => param.optional).map(([key]) => [key, null])), ...values, __user_id: user, __now: 123 }
     db.exec('BEGIN')
     try {
       const results = (t.statements ?? [t.sql]).map(statement => {

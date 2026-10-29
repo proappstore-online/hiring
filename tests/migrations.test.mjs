@@ -181,7 +181,7 @@ test('generic sources upgrade populated applications without relabelling history
   const before = db.prepare('SELECT * FROM hiring_applications ORDER BY id').all()
   db.exec('CREATE TABLE hiring_application_sources (application_id TEXT PRIMARY KEY REFERENCES hiring_applications(id), source TEXT NOT NULL CHECK(length(trim(source)) BETWEEN 1 AND 100), profile_url TEXT CHECK(profile_url IS NULL OR (length(profile_url)<=2000 AND (profile_url LIKE \'https://%\' OR profile_url LIKE \'http://%\'))))')
   apply(db, migrations); db.exec(migrations.find(m => m.name === '0016_generic_application_sources').sql); apply(db, migrations)
-  assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), before.map(row => Object.assign(row, {stage_extension:null,accepted_stage:null,acceptance_evidence:null,lifecycle_stage:null,workflow_stage:null,workflow_acceptance_evidence:null,discord_handle:null,interns_app_id:null,interns_invite_status:'not_started',interns_registration_status:null})))
+  assert.deepEqual(db.prepare('SELECT * FROM hiring_applications ORDER BY id').all(), before.map(row => Object.assign(row, {stage_extension:null,accepted_stage:null,acceptance_evidence:null,lifecycle_stage:null,workflow_stage:null,workflow_acceptance_evidence:null,discord_handle:null,interns_app_id:null,interns_invite_status:'not_started',interns_registration_status:null,links_json:'[]'})))
   assert.equal(db.prepare('SELECT count(*) n FROM hiring_application_sources').get().n, 0)
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [])
   db.close()

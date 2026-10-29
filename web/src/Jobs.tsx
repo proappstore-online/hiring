@@ -9,6 +9,7 @@ import { CandidateApplications, applicationLink } from './CandidateAccount'
 import { button, field, panel, val } from './ui'
 import { DiscoveryFilters } from './DiscoveryFilters'
 import { applyUrl, safeBack, vacancyUrl, withBack } from './routes'
+import { validateApplicationLinks, type ApplicationLink } from './application-links'
 
 export function PublishJob({ scope, requisitions, onChanged }: { scope: Scope; requisitions: Requisition[]; onChanged?: () => Promise<void> }) {
   const [failed, setFailed] = useState(false)
@@ -90,6 +91,7 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [receipt, setReceipt] = useState<IntakeReceipt | null>(null)
+  const [links, setLinks] = useState<ApplicationLink[]>([{ url: '', label: 'Portfolio' }])
   // Kept for retries of this form, never regenerated after an uncertain response.
   const ids = useRef({ application_id: id(), candidate_id: id(), operation_id: id(), idempotency_key: id() })
   const submittedPayload = useRef<string | null>(null)
@@ -103,9 +105,10 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
     if (submitting.current) return
     submitting.current = true
     setBusy(true); setError('')
-    const p = { ...ids.current, organization_id: job.organization_id, brand_id: job.brand_id, requisition_id: job.requisition_id, candidate_name: val(f, 'candidate_name'), email: val(f, 'email').toLowerCase(), phone: val(f, 'phone'), statement: val(f, 'statement'), notice_version: job.notice_version, expected_version: job.version, notice_acknowledged: f.has('notice_acknowledged') ? 1 : 0, talent_pool_consent: f.has('talent_pool_consent') ? 1 : 0, communications_consent: f.has('communications_consent') ? 1 : 0, website: val(f, 'website') }
-    const payload = { name: p.candidate_name, email: p.email, phone: p.phone, statement: p.statement, notice_version: p.notice_version, publication_version: p.expected_version, notice_acknowledged: p.notice_acknowledged, talent_pool_consent: p.talent_pool_consent, communications_consent: p.communications_consent, requisition_id: p.requisition_id, brand_id: p.brand_id, organization_id: p.organization_id }
     try {
+      const links_json = validateApplicationLinks(links.filter(link => link.url.trim() || (link.label?.trim() && link.label.trim() !== 'Portfolio')))
+      const p = { ...ids.current, organization_id: job.organization_id, brand_id: job.brand_id, requisition_id: job.requisition_id, candidate_name: val(f, 'candidate_name'), email: val(f, 'email').toLowerCase(), phone: val(f, 'phone'), statement: val(f, 'statement'), notice_version: job.notice_version, expected_version: job.version, notice_acknowledged: f.has('notice_acknowledged') ? 1 : 0, talent_pool_consent: f.has('talent_pool_consent') ? 1 : 0, communications_consent: f.has('communications_consent') ? 1 : 0, website: val(f, 'website'), links_json }
+      const payload = { name: p.candidate_name, email: p.email, phone: p.phone, statement: p.statement, notice_version: p.notice_version, publication_version: p.expected_version, notice_acknowledged: p.notice_acknowledged, talent_pool_consent: p.talent_pool_consent, communications_consent: p.communications_consent, requisition_id: p.requisition_id, brand_id: p.brand_id, organization_id: p.organization_id, links: JSON.parse(links_json) }
       if (submittedPayload.current && submittedPayload.current !== JSON.stringify(payload)) throw new Error('A previous submission may have been saved. Restore the original form values and retry to check its receipt before starting another application.')
       await write('save_my_worker_profile', { display_name: p.candidate_name })
       submittedPayload.current = JSON.stringify(payload)
@@ -135,6 +138,7 @@ function CandidateForm({ job, onSaved }: { job: PublicJob; onSaved: () => Promis
         <label className="block text-sm">Email<input className={field} aria-label="Email" name="email" type="email" autoComplete="email" required maxLength={320} aria-describedby={description} /></label>
         <label className="block text-sm">Phone (optional)<input className={field} aria-label="Phone (optional)" name="phone" type="tel" autoComplete="tel" maxLength={100} aria-describedby={description} /></label>
         <label className="block text-sm">Application statement (optional)<textarea name="statement" className={field} maxLength={10000} aria-describedby={description} /></label>
+        <section aria-label="Portfolio and other links" className="space-y-2"><h4 className="font-medium">Portfolio and other links</h4><p className="text-sm">Add URLs that support your application. Files can also be attached after submission.</p>{links.map((link, index) => <div key={index} className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]"><label className="text-sm">Label (optional)<input className={field} value={link.label ?? ''} maxLength={100} onChange={e => setLinks(rows => rows.map((row, i) => i === index ? { ...row, label: e.target.value } : row))} /></label><label className="text-sm">URL<input className={field} type="url" value={link.url} maxLength={2000} placeholder="https://" onChange={e => setLinks(rows => rows.map((row, i) => i === index ? { ...row, url: e.target.value } : row))} /></label><button className={button} type="button" aria-label={`Remove link ${index + 1}`} onClick={() => setLinks(rows => rows.filter((_, i) => i !== index))}>Remove</button></div>)}<button className={button} type="button" disabled={links.length >= 10} onClick={() => setLinks(rows => [...rows, { url: '', label: '' }])}>Add another link</button></section>
         <label className="block min-h-[44px] text-sm"><input name="notice_acknowledged" type="checkbox" required aria-describedby={description} /> I acknowledge the {job.brand_name} privacy notice, version {job.notice_version}, for processing this application.</label>
         <label className="block min-h-[44px] text-sm"><input name="talent_pool_consent" type="checkbox" /> I separately agree to future contact by this brand for 180 days, as described in the notice. I can withdraw talent-pool consent in My Applications.</label>
         <label className="block min-h-[44px] text-sm"><input name="communications_consent" type="checkbox" /> I separately agree to optional communications described in the notice.</label>

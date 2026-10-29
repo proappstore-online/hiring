@@ -18,7 +18,7 @@ window.auth={user:{id:'candidate'},loading:false};window.calls=[];window.gate='o
 const jobs=['a','b'].map(brand=>({requisition_id:'job-'+brand,organization_id:'org',brand_id:brand,title:brand==='a'?'Engineer':'Designer',brand_name:'Brand '+brand,organization_name:'Org',location:'Remote',description:'Approved role',arrangement:'Remote',notice_text:'Approved privacy notice',notice_version:'v1',version:1}));
 const applications=jobs.map((j,i)=>({...j,application_id:'app-'+j.brand_id,created_at:1000+i,stage:i?'in_review':'submitted',version:1}));
 window.rights=[];window.read=async(name,p={})=>{if(name==='list_my_rights_requests')return window.rights.filter(r=>r.application_id===p.application_id);window.calls.push({name,p});if(window.fail)throw Error('Unavailable');if(name==='list_public_jobs'||name==='list_vacancies')return jobs;if(name==='get_public_job'||name==='get_vacancy_detail'){if(window.loadHold)await new Promise(resolve=>window.finishLoad=resolve);if(window.unpublished)return [];return jobs.filter(j=>j.requisition_id===p.requisition_id&&(!p.brand_id||j.brand_id===p.brand_id)&&(!p.organization_id||j.organization_id===p.organization_id))};if(name==='get_hiring_runtime_gate')return [{intake_status:window.gate}];if(name==='list_my_job_applications')return window.empty?[]:applications;if(name==='get_candidate_application_status') {if(window.detailFail)throw Error('not registered');return applications.filter(a=>a.application_id===p.application_id)};if(name==='get_my_application_receipt'||name==='get_my_requisition_receipt'){if(window.receiptFail){window.receiptFail=false;throw Error('Receipt connection lost')}return window.receipt?[window.receipt]:[]};if(name==='list_application_attachments')return [{id:'file',filename:'resume.pdf',size_bytes:100,mime_type:'application/pdf',scan_state:'pending',uploader_user_id:'candidate'}];return []};
-window.write=async(name,p)=>{window.calls.push({name,p});if(name==='submit_my_rights_request'){if(!window.rights.some(r=>r.request_id===p.request_id))window.rights.push({...p,status:'received',deadline_at:null});throw Error('Lost acknowledgement')};if(name==='withdraw_candidate_application'){if(window.withdrawFail)throw Error('No write');const a=applications.find(a=>a.application_id===p.application_id);if(a&&a.version===p.expected_version){a.stage='withdrawn';a.version++}if(window.withdrawLost)throw Error('Lost response');return}if(name==='submit_job_application'){if(window.rejectSubmission)throw Error(window.rejectSubmission);if(window.holdSubmit)await new Promise(resolve=>window.finishSubmit=resolve);const payload={name:p.candidate_name,email:p.email,phone:p.phone,statement:p.statement,notice_version:p.notice_version,publication_version:p.expected_version,notice_acknowledged:p.notice_acknowledged,talent_pool_consent:p.talent_pool_consent,communications_consent:p.communications_consent,requisition_id:p.requisition_id,brand_id:p.brand_id,organization_id:p.organization_id};window.receipt={...p,application_id:'app-'+p.brand_id,payload_json:JSON.stringify(payload),stage:'submitted'};if(window.uncertain)throw Error('Submission connection lost')}};
+window.write=async(name,p)=>{window.calls.push({name,p});if(name==='submit_my_rights_request'){if(!window.rights.some(r=>r.request_id===p.request_id))window.rights.push({...p,status:'received',deadline_at:null});throw Error('Lost acknowledgement')};if(name==='withdraw_candidate_application'){if(window.withdrawFail)throw Error('No write');const a=applications.find(a=>a.application_id===p.application_id);if(a&&a.version===p.expected_version){a.stage='withdrawn';a.version++}if(window.withdrawLost)throw Error('Lost response');return}if(name==='submit_job_application'){if(window.rejectSubmission)throw Error(window.rejectSubmission);if(window.holdSubmit)await new Promise(resolve=>window.finishSubmit=resolve);const payload={name:p.candidate_name,email:p.email,phone:p.phone,statement:p.statement,notice_version:p.notice_version,publication_version:p.expected_version,notice_acknowledged:p.notice_acknowledged,talent_pool_consent:p.talent_pool_consent,communications_consent:p.communications_consent,requisition_id:p.requisition_id,brand_id:p.brand_id,organization_id:p.organization_id,links:JSON.parse(p.links_json||'[]')};window.receipt={...p,application_id:'app-'+p.brand_id,payload_json:JSON.stringify(payload),stage:'submitted'};if(window.uncertain)throw Error('Submission connection lost')}};
 const root=createRoot(document.getElementById('root'));window.render=()=>root.render(<App/>);window.render();`
 
 test('candidate account and application journey', async t => {
@@ -100,6 +100,18 @@ test('candidate account and application journey', async t => {
    await expect.poll(()=>page.evaluate(()=>typeof window.finishSubmit)).toBe('function');await page.evaluate(()=>window.finishSubmit())
    await expect(page.getByText(/Application saved for Brand a/)).toBeVisible();await page.getByRole('link',{name:'View application status'}).click();await expect(page).toHaveURL(/my-applications\/app-a$/)
   })
+  await t.test('portfolio and other links are submitted together with the application',async()=>{
+   await go('/vacancies/job-a/apply');await fillForm()
+   await expect(page.getByLabel('Label (optional)')).toHaveValue('Portfolio')
+   await page.getByLabel('URL',{exact:true}).fill('https://portfolio.example/work')
+   await page.getByRole('button',{name:'Add another link'}).click()
+   await page.getByLabel('Label (optional)').nth(1).fill('GitHub')
+   await page.getByLabel('URL',{exact:true}).nth(1).fill('https://github.com/candidate')
+   await page.getByRole('button',{name:'Submit application',exact:true}).click()
+   await expect(page.getByText(/Application saved for Brand a/)).toBeVisible()
+   const submitted=await page.evaluate(()=>window.calls.find(c=>c.name==='submit_job_application').p)
+   assert.deepEqual(JSON.parse(submitted.links_json),[{url:'https://portfolio.example/work',label:'Portfolio'},{url:'https://github.com/candidate',label:'GitHub'}])
+  })
   await t.test('receipt email state is separate from saved application and refresh never resubmits',async()=>{
    await go('/vacancies/job-a/apply');await fillForm()
    await page.getByRole('button',{name:'Submit application',exact:true}).click()
@@ -146,6 +158,10 @@ test('candidate account and application journey', async t => {
    await name.focus();await page.keyboard.press('Tab');await expect(email).toBeFocused()
    await page.keyboard.press('Tab');await expect(page.getByLabel('Phone (optional)',{exact:true})).toBeFocused()
    await page.keyboard.press('Tab');await expect(page.getByLabel('Application statement (optional)',{exact:true})).toBeFocused()
+   await page.keyboard.press('Tab');await expect(page.getByLabel('Label (optional)')).toBeFocused()
+   await page.keyboard.press('Tab');await expect(page.getByLabel('URL',{exact:true})).toBeFocused()
+   await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'Remove link 1'})).toBeFocused()
+   await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'Add another link'})).toBeFocused()
    await page.keyboard.press('Tab');await expect(page.locator('[name=notice_acknowledged]')).toBeFocused();await page.keyboard.press('Space')
    await page.keyboard.press('Tab');await expect(page.locator('[name=talent_pool_consent]')).toBeFocused()
    await page.keyboard.press('Tab');await expect(page.locator('[name=communications_consent]')).toBeFocused()

@@ -259,6 +259,10 @@
     {
       "name": "0065_attachment_manual_review",
       "sql": "ALTER TABLE hiring_attachments ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending_review' CHECK(review_status IN ('pending_review','approved')); ALTER TABLE hiring_attachments ADD COLUMN uploaded_at INTEGER; ALTER TABLE hiring_attachments ADD COLUMN reviewed_by TEXT; ALTER TABLE hiring_attachments ADD COLUMN reviewed_at INTEGER; CREATE TRIGGER hiring_attachment_approval_complete BEFORE UPDATE OF review_status ON hiring_attachments WHEN NEW.review_status='approved' AND (OLD.review_status<>'pending_review' OR OLD.scan_state NOT IN ('pending','clean') OR OLD.uploaded_at IS NULL OR NEW.reviewed_by IS NULL OR NEW.reviewed_at IS NULL) BEGIN SELECT RAISE(ABORT,'invalid attachment release'); END;"
+    },
+    {
+      "name": "0066_application_links",
+      "sql": "ALTER TABLE hiring_applications ADD COLUMN links_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(links_json) AND json_type(links_json)='array');"
     }
   ]
 }
