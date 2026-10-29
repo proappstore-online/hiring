@@ -62,6 +62,35 @@ test('scoped read and versioned update expose both fields, reject outsiders and 
   } finally { f.db.close() }
 })
 
+test('0064 adds a nullable interns registration status column with its own enum', () => {
+  assert.ok(migrations.some(m => m.name === '0064_interns_registration_status'))
+  const f = fixture()
+  try {
+    const columns = f.db.prepare('PRAGMA table_info(hiring_applications)').all().map(row => row.name)
+    assert.ok(columns.includes('interns_registration_status'))
+    assert.equal(f.db.prepare("SELECT interns_registration_status FROM hiring_applications WHERE id='app'").get().interns_registration_status, null)
+    assert.throws(() => f.db.exec("UPDATE hiring_applications SET interns_registration_status='bogus' WHERE id='app'"))
+  } finally { f.db.close() }
+})
+
+test('update_invite_status sets the manual registration status, audits it, and surfaces it on reads; rejects outsiders, stale versions and unknown statuses', () => {
+  const f = fixture()
+  try {
+    const update = { organization_id: 'org', brand_id: 'brand', application_id: 'app', expected_version: 1, operation_id: 'invite-1', status: 'registered' }
+    assert.deepEqual(f.call('update_invite_status', 'outsider', update), [0, 0])
+    assert.deepEqual(f.call('update_invite_status', 'owner', { ...update, operation_id: 'invite-bad', status: 'bogus' }), [0, 0])
+    assert.deepEqual(f.call('update_invite_status', 'owner', update), [1, 1])
+    const row = f.call('get_application', 'owner', update)[0]
+    assert.equal(row.interns_registration_status, 'registered')
+    assert.equal(row.version, 2)
+    assert.equal(f.call('list_applications', 'owner', { organization_id: 'org', brand_id: 'brand' })[0].interns_registration_status, 'registered')
+    assert.deepEqual(f.call('update_invite_status', 'owner', { ...update, operation_id: 'stale' }), [0, 0])
+    assert.deepEqual(f.call('update_invite_status', 'owner', { ...update, expected_version: 2, operation_id: 'invite-2', status: 'expired' }), [1, 1])
+    assert.equal(f.call('get_application', 'owner', update)[0].interns_registration_status, 'expired')
+    assert.equal(f.db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.invite_status_updated'").get().n, 2)
+  } finally { f.db.close() }
+})
+
 test('cross reference returns only authorized onboarding applications', () => {
   const f = fixture()
   try {
