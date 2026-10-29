@@ -260,6 +260,41 @@ test('attachment reservation is worker-owned, quarantined, size/type/checksum li
   } finally { db.close() }
 })
 
+test('organization upload toggle blocks reservation and completion while preserving files and links', () => {
+  const { db, call, submit, advance } = fixture()
+  try {
+    submit()
+    assert.equal(call('get_candidate_upload_settings', 'worker', attachment())[0].allow_candidate_file_uploads, 1)
+    assert.deepEqual(call('get_candidate_upload_settings', 'other-worker', attachment()), [])
+    const existing = attachment()
+    assert.deepEqual(call('create_application_attachment', 'worker', existing), [1, 1])
+    assert.deepEqual(call('complete_application_attachment_upload', 'worker', { ...existing, operation_id: 'existing-upload' }), [1, 1])
+    const pending = attachment(A, 'pending')
+    pending.application_id = existing.application_id
+    assert.deepEqual(call('create_application_attachment', 'worker', pending), [1, 1])
+    const toggle = { ...A, allow_candidate_file_uploads: 0, operation_id: 'disable-uploads' }
+    for (const user of ['worker', 'staff-a', 'outsider']) assert.deepEqual(call('set_candidate_file_uploads', user, { ...toggle, operation_id: `denied-${user}` }), [0, 0])
+    assert.deepEqual(call('set_candidate_file_uploads', 'owner', { ...toggle, organization_id: 'forged', operation_id: 'forged-toggle' }), [0, 0])
+    assert.deepEqual(call('set_candidate_file_uploads', 'owner', toggle), [1, 1])
+    assert.equal(call('get_candidate_upload_settings', 'worker', existing)[0].allow_candidate_file_uploads, 0)
+    assert.throws(() => call('create_application_attachment', 'worker', { ...attachment(A, 'blocked'), application_id: existing.application_id }), /Candidate file uploads are disabled/)
+    assert.throws(() => call('complete_application_attachment_upload', 'worker', { ...pending, operation_id: 'blocked-completion' }), /Candidate file uploads are disabled/)
+    assert.equal(call('list_application_attachments', 'worker', existing).length, 2)
+    assert.equal(call('list_application_attachments', 'worker', existing)[0].review_status, 'pending_review')
+    advance()
+    const links = JSON.stringify([{ label: 'Portfolio', url: 'https://portfolio.example.test' }])
+    assert.equal(call('submit_job_application', 'worker', { ...application(B, 'links'), links_json: links }).at(-1), 1)
+    assert.equal(call('get_my_application', 'worker', { application_id: 'application-links' })[0].links_json, links)
+    assert.deepEqual(call('set_candidate_file_uploads', 'owner', { ...toggle, operation_id: 'replay-toggle' }), [0, 0])
+    assert.deepEqual(call('set_candidate_file_uploads', 'owner', { ...toggle, allow_candidate_file_uploads: 1, operation_id: 'enable-uploads' }), [1, 1])
+    assert.deepEqual(call('complete_application_attachment_upload', 'worker', { ...pending, operation_id: 'complete-after-enable' }), [1, 1])
+    const events = db.prepare("SELECT redacted_summary FROM hiring_audit_events WHERE action='organization.candidate_file_uploads_changed' ORDER BY created_at,operation_id").all()
+    assert.equal(events.length, 2)
+    assert.ok(events.some(event => event.redacted_summary === 'Candidate file uploads disabled'))
+    assert.ok(events.some(event => event.redacted_summary === 'Candidate file uploads enabled'))
+  } finally { db.close() }
+})
+
 test('private upload remains pending review until an exact brand owner releases it with audit', () => {
   const { db, call, submit } = fixture()
   try {

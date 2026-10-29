@@ -1145,6 +1145,24 @@
       "sql": "SELECT r.application_id,r.organization_id,r.brand_id,r.requisition_id,r.created_at,a.version,COALESCE(a.workflow_stage,a.lifecycle_stage,a.accepted_stage,a.stage_extension,a.stage) AS stage,q.title,b.name AS brand_name FROM hiring_intake_receipts r JOIN hiring_applications a ON a.id=r.application_id AND a.organization_id=r.organization_id AND a.brand_id=r.brand_id JOIN hiring_requisitions q ON q.id=r.requisition_id JOIN hiring_brands b ON b.id=r.brand_id WHERE r.worker_user_id=:__user_id ORDER BY r.created_at DESC,r.application_id LIMIT 100"
     },
     {
+      "name": "get_candidate_upload_settings",
+      "description": "Candidate-owned application upload setting; returns only the current organization upload permission.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT o.allow_candidate_file_uploads FROM hiring_intake_receipts r JOIN hiring_organizations o ON o.id=r.organization_id WHERE r.application_id=:application_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND r.worker_user_id=:__user_id LIMIT 1"
+    },
+    {
       "name": "create_application_attachment",
       "description": "Reserve a private uploader-scoped object with pending_review quarantine. Bytes remain inaccessible to staff until manager release and a checked serving path exists.",
       "operation": "batch",
@@ -1569,6 +1587,30 @@
       ]
     },
     {
+      "name": "set_candidate_file_uploads",
+      "description": "Organization owner enables or disables new candidate file uploads across all brands. Existing files and application links remain available.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "allow_candidate_file_uploads": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_organizations SET allow_candidate_file_uploads=:allow_candidate_file_uploads WHERE id=:organization_id AND allow_candidate_file_uploads<>:allow_candidate_file_uploads AND :allow_candidate_file_uploads IN (0,1) AND (created_by=:__user_id OR EXISTS (SELECT 1 FROM hiring_grants g WHERE g.organization_id=:organization_id AND g.brand_id IS NULL AND g.requisition_id IS NULL AND g.user_id=:__user_id AND g.role='owner' AND g.status='active')) AND status='active' AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) AND EXISTS (SELECT 1 FROM hiring_brands b WHERE b.id=:brand_id AND b.organization_id=:organization_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,'organization.candidate_file_uploads_changed',:__user_id,:operation_id,:__now,'organizations',:organization_id,CASE WHEN :allow_candidate_file_uploads=1 THEN 'Candidate file uploads enabled' ELSE 'Candidate file uploads disabled' END WHERE changes()=1"
+      ]
+    },
+    {
       "name": "get_admin_settings",
       "description": "Owner reads current organization and brand settings",
       "operation": "query",
@@ -1581,7 +1623,7 @@
           "type": "string"
         }
       },
-      "sql": "SELECT o.name AS organization_name,o.verified_contact,b.name AS brand_name,b.slug,b.notice_version,b.reply_identity,(o.created_by=:__user_id) AS can_manage_organization FROM hiring_organizations o JOIN hiring_brands b ON b.organization_id=o.id WHERE o.id=:organization_id AND b.id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1"
+      "sql": "SELECT o.name AS organization_name,o.verified_contact,o.allow_candidate_file_uploads,b.name AS brand_name,b.slug,b.notice_version,b.reply_identity,(o.created_by=:__user_id) AS can_manage_organization,(o.created_by=:__user_id OR EXISTS (SELECT 1 FROM hiring_grants g WHERE g.organization_id=o.id AND g.brand_id IS NULL AND g.requisition_id IS NULL AND g.user_id=:__user_id AND g.role='owner' AND g.status='active')) AS can_manage_candidate_uploads FROM hiring_organizations o JOIN hiring_brands b ON b.organization_id=o.id WHERE o.id=:organization_id AND b.id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1"
     },
     {
       "name": "list_organization_members",

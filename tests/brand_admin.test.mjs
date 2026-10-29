@@ -157,3 +157,16 @@ test('brand ownership alone cannot administer organization identity or organizat
     assert.deepEqual(call('update_brand_settings','owner',{...B,...values,operation_id:'duplicate-slug'}),[0,0])
   } finally {db.close()}
 })
+
+test('organization owner grants can manage upload policy across sibling brands', () => {
+  const { db, call } = fixture()
+  try {
+    db.exec("INSERT INTO hiring_grants(id,organization_id,brand_id,user_id,role,granted_by,created_at) VALUES('org-owner','org',NULL,'org-owner','owner','owner',1)")
+    assert.equal(call('get_admin_settings', 'org-owner', A)[0].can_manage_candidate_uploads, 1)
+    assert.equal(call('get_admin_settings', 'org-owner', A)[0].can_manage_organization, 0)
+    assert.deepEqual(call('set_candidate_file_uploads', 'org-owner', { ...A, allow_candidate_file_uploads: 0, operation_id: 'org-owner-disable' }), [1, 1])
+    assert.equal(call('get_admin_settings', 'owner', B)[0].allow_candidate_file_uploads, 0)
+    db.exec("UPDATE hiring_grants SET status='revoked' WHERE id='org-owner'")
+    assert.deepEqual(call('set_candidate_file_uploads', 'org-owner', { ...A, allow_candidate_file_uploads: 1, operation_id: 'revoked-owner-enable' }), [0, 0])
+  } finally { db.close() }
+})

@@ -17,10 +17,10 @@ test('attachment scope changes discard filenames and late mutation results; keyb
     resolveId(id) { if (id === '/fixture.jsx') return '\0security-fixture.jsx' },
     load(id) {
       if (id === '\0security-fixture.jsx') return `import React from 'react';import{createRoot}from'react-dom/client';import{Attachments}from'/src/attachments.tsx';
-      const root=createRoot(document.getElementById('root'));window.calls=[];window.deletes=[];window.pending=[];window.hold=false;
+      const root=createRoot(document.getElementById('root'));window.calls=[];window.deletes=[];window.pending=[];window.hold=false;window.uploadAllowed=true;
       window.row=(name)=>({id:name,filename:name+'.pdf',size_bytes:10,scan_state:'pending',uploader_user_id:'candidate'});
       window.render=(brand='a',user='candidate')=>root.render(React.createElement(Attachments,{scope:{organization_id:'org',brand_id:brand},applicationId:'app-'+brand,userId:user}));window.render();`
-      if (id === web + 'src/api.ts') return `export const id=()=>crypto.randomUUID();export const read=async(name,p)=>{window.calls.push(p);if(window.hold)return new Promise(resolve=>window.pending.push({p,resolve}));return [window.row(p.brand_id)]};export const write=async(name,p)=>{window.deletes.push(p);};export const app={storage:{delete:async()=>new Promise(resolve=>window.finishDelete=resolve)}};`
+      if (id === web + 'src/api.ts') return `export const id=()=>crypto.randomUUID();export const read=async(name,p)=>{if(name==='get_candidate_upload_settings')return[{allow_candidate_file_uploads:window.uploadAllowed?1:0}];window.calls.push(p);if(window.hold)return new Promise(resolve=>window.pending.push({p,resolve}));return [window.row(p.brand_id)]};export const write=async(name,p)=>{window.deletes.push(p);};export const app={storage:{delete:async()=>new Promise(resolve=>window.finishDelete=resolve)}};`
     },
     configureServer(s) { s.middlewares.use(async (req,res,next) => { if(req.url === '/review') { res.setHeader('Content-Type','text/html'); res.end(await s.transformIndexHtml(req.url,'<html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/fixture.jsx"></script></body></html>')) } else next() }) }
   }], server: { host:'127.0.0.1',port:0 } })
@@ -53,5 +53,9 @@ test('attachment scope changes discard filenames and late mutation results; keyb
     await expect.poll(()=>page.evaluate(()=>window.pending.length)).toBe(3)
     await page.evaluate(()=>window.pending[2].resolve([]))
     await expect(page.getByRole('button',{name:/Delete attachment/})).toHaveCount(0)
+    await page.evaluate(()=>{window.hold=false;window.uploadAllowed=false;window.render('a','candidate')})
+    await expect(page.getByText('Candidate file uploads are disabled for this organization. Existing files remain listed below.')).toBeVisible()
+    await expect(page.getByText('a.pdf')).toBeVisible()
+    await expect(page.locator('input[type="file"]')).toHaveCount(0)
   } finally { await browser?.close();await server.close();rmSync(cacheDir,{recursive:true,force:true}) }
 })

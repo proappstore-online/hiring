@@ -263,6 +263,10 @@
     {
       "name": "0066_application_links",
       "sql": "ALTER TABLE hiring_applications ADD COLUMN links_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(links_json) AND json_type(links_json)='array');"
+    },
+    {
+      "name": "0067_candidate_upload_setting",
+      "sql": "ALTER TABLE hiring_organizations ADD COLUMN allow_candidate_file_uploads INTEGER NOT NULL DEFAULT 1 CHECK(allow_candidate_file_uploads IN (0,1)); CREATE TRIGGER hiring_attachment_uploads_allowed_insert BEFORE INSERT ON hiring_attachments WHEN (SELECT allow_candidate_file_uploads FROM hiring_organizations WHERE id=NEW.organization_id)=0 BEGIN SELECT RAISE(ABORT,'Candidate file uploads are disabled for this organization.'); END; CREATE TRIGGER hiring_attachment_uploads_allowed_complete BEFORE UPDATE OF uploaded_at ON hiring_attachments WHEN NEW.uploaded_at IS NOT NULL AND OLD.uploaded_at IS NULL AND (SELECT allow_candidate_file_uploads FROM hiring_organizations WHERE id=NEW.organization_id)=0 BEGIN SELECT RAISE(ABORT,'Candidate file uploads are disabled for this organization.'); END;"
     }
   ]
 }
