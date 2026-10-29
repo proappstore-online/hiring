@@ -142,3 +142,39 @@ test('closed posting refusals, text actor, and second-based activity filters use
     assert.equal(db.prepare("SELECT status FROM hiring_job_publications WHERE requisition_id=?").get(B.requisition_id).status,'published')
   } finally { db.close() }
 })
+
+test('log_external_action refuses a blank or oversized operation_id instead of silently applying nothing (#1396)', () => {
+  const { db, call } = fixture()
+  try {
+    const base = { organization_id:A.organization_id, brand_id:A.brand_id, kind:'linkedin', performed_by:'owner', performed_at:1_000_000_000_000, params_json:'{}' }
+    const auditBefore = db.prepare('SELECT count(*) AS n FROM hiring_audit_events').get().n
+    for (const operation_id of ['', '   ', 'x'.repeat(200)]) {
+      assert.throws(()=>call('log_external_action','owner',{...base,operation_id}),/APP:operation_conflict/,JSON.stringify(operation_id))
+      assert.equal(db.prepare('SELECT count(*) AS n FROM external_actions').get().n,0)
+      assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_audit_events').get().n,auditBefore)
+      assert.equal(db.prepare('SELECT count(*) AS n FROM mcp_audit_log').get().n,0)
+    }
+    assert.deepEqual(call('log_external_action','owner',{...base,operation_id:'external-valid'}),[0,1,1,1])
+  } finally { db.close() }
+})
+
+test('every write tool gated by hiring_mcp_refusals refuses a blank operation_id explicitly, never a silent no-op (#1396)', () => {
+  const { db, call, publish } = fixture()
+  try {
+    publish()
+    const invalid = { organization_id:A.organization_id, brand_id:A.brand_id, requisition_id:A.requisition_id, expected_version:1, operation_id:'' }
+    const attempts = [
+      ['set_linkedin_job_id', { ...invalid, linkedin_job_id:'111' }],
+      ['set_job_expiry_date', { ...invalid, expiry_date:2_000_000_000 }],
+      ['expire_job_requisition', { ...invalid, reason:'test' }],
+      ['record_linkedin_status', { ...invalid, linkedin_status:'paused', reason:'test' }],
+      ['republish_job_requisition', { ...invalid, linkedin_job_id:'111' }],
+      ['log_external_action', { organization_id:A.organization_id, brand_id:A.brand_id, kind:'linkedin', performed_by:'owner', performed_at:1_000_000_000_000, params_json:'{}', operation_id:'' }],
+    ]
+    for (const [name, args] of attempts) {
+      assert.throws(()=>call(name,'owner',args),/APP:/,name)
+      assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE operation_id=''").get().n,0,name)
+    }
+    assert.equal(db.prepare("SELECT version FROM hiring_job_publications WHERE requisition_id=?").get(A.requisition_id).version,1,'nothing partially applied')
+  } finally { db.close() }
+})
