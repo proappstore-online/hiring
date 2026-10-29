@@ -35,7 +35,7 @@ function fixture() {
 
 test('new tool definitions are generated from source and migrations are append-only', () => {
   for (const generated of buildAuditTools()) assert.deepEqual(tools.find(t => t.name === generated.name), generated)
-  assert.deepEqual(migrations.slice(-9).map(m => m.name), ['0056_mcp_audit_trail', '0057_external_actions', '0058_next_actions', '0059_job_lifecycle', '0060_requisition_linkedin_state', '0061_expire_freegamestore_intern', '0062_mcp_refusals', '0063_mcp_refusal_codes', '0064_interns_registration_status'])
+  assert.deepEqual(migrations.slice(-10).map(m => m.name), ['0056_mcp_audit_trail', '0057_external_actions', '0058_next_actions', '0059_job_lifecycle', '0060_requisition_linkedin_state', '0061_expire_freegamestore_intern', '0062_mcp_refusals', '0063_mcp_refusal_codes', '0064_interns_registration_status', '0065_attachment_manual_review'])
   const f = fixture()
   try {
     f.db.prepare("INSERT INTO mcp_audit_log(id,organization_id,brand_id,timestamp,tool_name,input_json,result_status) VALUES ('one','org','brand',1,'test','{}','ok')").run()

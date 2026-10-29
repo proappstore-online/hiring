@@ -1136,7 +1136,7 @@
     },
     {
       "name": "create_application_attachment",
-      "description": "Reserve private uploader-scoped object path; pending scan, never a reviewer download authorization. Metadata is unverified until trusted scanner integration.",
+      "description": "Reserve a private uploader-scoped object with pending_review quarantine. Bytes remain inaccessible to staff until manager release and a checked serving path exists.",
       "operation": "batch",
       "params": {
         "attachment_id": {
@@ -1175,7 +1175,7 @@
     },
     {
       "name": "list_application_attachments",
-      "description": "Attachment metadata for uploader or exact assigned brand member; private paths never returned.",
+      "description": "Scoped attachment metadata and review state; private paths and bytes are never returned.",
       "operation": "query",
       "params": {
         "organization_id": {
@@ -1189,7 +1189,7 @@
         }
       },
       "requires_auth": true,
-      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.scan_state,x.uploader_user_id,x.created_at FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.application_id=:application_id AND x.scan_state<>'deleted' AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))))) ORDER BY x.created_at LIMIT 3"
+      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.scan_state,x.review_status,x.uploaded_at,x.reviewed_by,x.reviewed_at,x.uploader_user_id,x.created_at FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.application_id=:application_id AND x.scan_state IN ('pending','clean') AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))))) ORDER BY x.created_at LIMIT 3"
     },
     {
       "name": "delete_application_attachment",
@@ -1220,7 +1220,7 @@
     },
     {
       "name": "get_application_attachment",
-      "description": "Clean attachment authorization only; no storage capability URL. Trusted scan and reviewer byte-serving integration still required.",
+      "description": "Approved attachment metadata for uploader or exact assigned brand staff; never returns a storage path, URL or bytes.",
       "operation": "query",
       "params": {
         "attachment_id": {
@@ -1237,7 +1237,7 @@
         }
       },
       "requires_auth": true,
-      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.checksum FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.id=:attachment_id AND x.application_id=:application_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.scan_state='clean' AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))))) LIMIT 1"
+      "sql": "SELECT x.id,x.filename,x.mime_type,x.size_bytes,x.checksum FROM hiring_attachments x JOIN hiring_applications a ON a.id=x.application_id AND a.organization_id=x.organization_id AND a.brand_id=x.brand_id WHERE x.id=:attachment_id AND x.application_id=:application_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND x.review_status='approved' AND x.uploaded_at IS NOT NULL AND x.scan_state IN ('pending','clean') AND (x.uploader_user_id=:__user_id OR (a.assignee_user_id=:__user_id AND EXISTS (SELECT 1 FROM hiring_applications pa WHERE pa.id=:application_id AND pa.organization_id=:organization_id AND pa.brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=pa.requisition_id))))) LIMIT 1"
     },
     {
       "name": "list_job_publications",
@@ -5811,7 +5811,7 @@
     },
     {
       "name": "record_lifecycle_transition",
-      "description": "Record accepted \u2192 onboarding \u2192 onboarded \u2192 active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result.",
+      "description": "Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result.",
       "requires_auth": true,
       "operation": "execute",
       "params": {
@@ -6998,6 +6998,60 @@
         }
       },
       "sql": "SELECT j.requisition_id,j.linkedin_job_id,(CASE WHEN abs(j.expiry_date)<10000000000 THEN j.expiry_date*1000 ELSE j.expiry_date END) AS expiry_date,j.version AS expected_version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100"
+    },
+    {
+      "name": "complete_application_attachment_upload",
+      "description": "Uploader records successful private object upload; attachment remains pending_review and unserved.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "attachment_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE hiring_attachments SET uploaded_at=:__now WHERE id=:attachment_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND uploader_user_id=:__user_id AND review_status='pending_review' AND scan_state<>'deleted' AND uploaded_at IS NULL AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attachment.uploaded',:__user_id,:operation_id,:__now,'attachment',:attachment_id,'Private attachment uploaded pending manager review' WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "release_application_attachment",
+      "description": "Brand owner manually releases one uploaded quarantined attachment after review. Records reviewer and time in the audit trail. No byte-serving capability is issued.",
+      "operation": "batch",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "attachment_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "statements": [
+        "UPDATE hiring_attachments SET review_status='approved',reviewed_by=:__user_id,reviewed_at=:__now WHERE id=:attachment_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND review_status='pending_review' AND scan_state IN ('pending','clean') AND uploaded_at IS NOT NULL AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attachment.released',:__user_id,:operation_id,:__now,'attachment',:attachment_id,'Manager released attachment from quarantine' WHERE changes()=1"
+      ]
     }
   ]
 }

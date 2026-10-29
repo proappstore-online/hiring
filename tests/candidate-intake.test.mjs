@@ -243,18 +243,52 @@ test('attachment reservation is worker-owned, quarantined, size/type/checksum li
     assert.deepEqual(call('create_application_attachment','worker',attachment()),[0,0])
     const row=call('list_application_attachments','worker',attachment())[0]
     assert.equal(row.scan_state,'pending')
+    assert.equal(row.review_status,'pending_review')
+    assert.equal(row.uploaded_at,null)
     assert.equal('storage_path' in row,false)
     for (const user of ['worker','owner','staff-a','other-worker']) assert.deepEqual(call('get_application_attachment',user,attachment()),[])
     for (const user of ['staff-a','staff-b','other-worker']) assert.deepEqual(call('list_application_attachments',user,attachment()),[])
     assert.equal(call('list_application_attachments','owner',attachment()).length,1)
     assert.deepEqual(call('list_application_attachments','owner',{...attachment(),brand_id:'b'}),[])
-    // Simulate a future trusted scanner directly; no user action can set clean.
+    // Even a scanner verdict cannot release a quarantined attachment.
     assert.ok(!tools.some(t => /UPDATE hiring_attachments SET scan_state='clean'/.test(JSON.stringify(t))))
     db.exec("UPDATE hiring_attachments SET scan_state='clean'")
-    assert.equal(call('get_application_attachment','owner',attachment()).length,1)
+    assert.deepEqual(call('get_application_attachment','owner',attachment()),[])
     assert.deepEqual(call('get_application_attachment','staff-a',attachment()),[])
     assert.deepEqual(call('get_application_attachment','owner',{...attachment(),brand_id:'b'}),[])
     assert.throws(() => db.exec("UPDATE hiring_attachments SET storage_path='swapped'"),/immutable/)
+  } finally { db.close() }
+})
+
+test('private upload remains pending review until an exact brand owner releases it with audit', () => {
+  const { db, call, submit } = fixture()
+  try {
+    submit()
+    const p=attachment()
+    call('create_application_attachment','worker',p)
+    const release={...p,operation_id:'release-file'}
+    assert.deepEqual(call('release_application_attachment','owner',release),[0,0]) // bytes not uploaded
+    assert.deepEqual(call('complete_application_attachment_upload','other-worker',{...p,operation_id:'wrong-uploader'}),[0,0])
+    assert.deepEqual(call('complete_application_attachment_upload','worker',{...p,operation_id:'upload-file'}),[1,1])
+    assert.deepEqual(call('complete_application_attachment_upload','worker',{...p,operation_id:'upload-file'}),[0,0])
+    db.exec("UPDATE hiring_attachments SET scan_state='infected' WHERE id='file-a'")
+    assert.deepEqual(call('release_application_attachment','owner',release),[0,0])
+    db.exec("UPDATE hiring_attachments SET scan_state='pending' WHERE id='file-a'")
+    assert.equal(call('list_application_attachments','worker',p)[0].review_status,'pending_review')
+    for (const user of ['worker','owner','staff-a','staff-b','other-worker']) assert.deepEqual(call('get_application_attachment',user,p),[])
+    for (const user of ['worker','staff-a','staff-b','other-worker']) assert.deepEqual(call('release_application_attachment',user,release),[0,0])
+    assert.deepEqual(call('release_application_attachment','owner',{...release,brand_id:'b'}),[0,0])
+    assert.deepEqual(call('release_application_attachment','owner',release),[1,1])
+    assert.deepEqual(call('release_application_attachment','owner',release),[0,0])
+    const row=call('list_application_attachments','owner',p)[0]
+    assert.equal(row.review_status,'approved')
+    assert.equal(row.reviewed_by,'owner')
+    assert.ok(row.reviewed_at>0)
+    assert.equal(call('get_application_attachment','owner',p).length,1)
+    for (const user of ['staff-a','staff-b','other-worker']) assert.deepEqual(call('get_application_attachment',user,p),[])
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE action='attachment.uploaded'").get().n,1)
+    assert.deepEqual({...db.prepare("SELECT actor_user_id,object_id FROM hiring_audit_events WHERE action='attachment.released'").get()},{actor_user_id:'owner',object_id:'file-a'})
+    assert.equal('storage_path' in call('get_application_attachment','owner',p)[0],false)
   } finally { db.close() }
 })
 
