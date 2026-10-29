@@ -243,6 +243,10 @@
     {
       "name": "0061_expire_freegamestore_intern",
       "sql": "CREATE TRIGGER hiring_expire_freegamestore_intern AFTER INSERT ON hiring_audit_events\nWHEN NEW.id='migration:0061:expire-freegamestore-developer-intern' AND NEW.action='requisition.expired_data_fix'\nBEGIN\n  UPDATE hiring_job_publications SET status='closed',lifecycle_status='expired',version=version+1\n  WHERE requisition_id=NEW.object_id AND organization_id=NEW.organization_id AND brand_id=NEW.brand_id\n    AND status='published' AND coalesce(lifecycle_status,'published')='published';\nEND;\nINSERT INTO hiring_audit_events(id,organization_id,brand_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary)\nSELECT 'migration:0061:expire-freegamestore-developer-intern',r.organization_id,r.brand_id,\n  'requisition.expired_data_fix','migration:0061','migration:0061:expire-freegamestore-developer-intern',\n  cast(strftime('%s','now') AS INTEGER),'requisition',r.id,\n  'FreeGameStore Developer Intern LinkedIn posting observed closed; mark expired'\nFROM hiring_requisitions r\nJOIN hiring_brands b ON b.id=r.brand_id AND b.organization_id=r.organization_id\nJOIN hiring_job_publications j ON j.requisition_id=r.id AND j.organization_id=r.organization_id AND j.brand_id=r.brand_id\nWHERE r.id LIKE '658e8dce%' AND r.title LIKE '%Developer Intern%' AND b.name='FreeGameStore'\n  AND j.status='published' AND coalesce(j.lifecycle_status,'published')='published'\n  AND (SELECT count(*) FROM hiring_requisitions r2 JOIN hiring_brands b2 ON b2.id=r2.brand_id AND b2.organization_id=r2.organization_id WHERE r2.id LIKE '658e8dce%' AND r2.title LIKE '%Developer Intern%' AND b2.name='FreeGameStore')=1;\n"
+    },
+    {
+      "name": "0062_mcp_refusals",
+      "sql": "CREATE TABLE hiring_mcp_refusals (message TEXT NOT NULL CHECK(json_extract('{}',message) IS NULL));\n"
     }
   ]
 }
