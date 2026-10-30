@@ -9,6 +9,7 @@ import { id, read, write, stageLabel, type AgentActivity, type Application, type
 import { ApplicationFilters } from './ApplicationFilters'
 import { WorkspaceSearch } from './WorkspaceSearch'
 import { ApplicationDetail } from './ApplicationDetail'
+import { ActivityTimeline } from './ActivityTimeline'
 import { AdminCommunications } from './AdminCommunications'
 import { PlaybookEditor } from './PlaybookEditor'
 import { OperationalDiagnostics } from './OperationalDiagnostics'
@@ -101,7 +102,7 @@ export function CommunicationsScreen() {
   return <RowsState loading={data.loading || exact.loading} error={data.error || exact.error} retry={() => { data.retry(); exact.retry() }}><AdminCommunications scope={scope} brandName={space.brand_name} applications={applications} canManageTemplates={Boolean(space.can_manage_templates)} /></RowsState>
 }
 export function PlaybookScreen() { const { space } = useWorkspace(); return <Screen title="Playbook"><PlaybookEditor organizationId={space.organization_id} role={space.role} isCreator={Boolean(space.can_create_brand)} /></Screen> }
-export function OperationsScreen() { const { space } = useWorkspace(); return <Page title="Settings"><SettingsNavigation /><OperationalDiagnostics scope={scopeOf(space)} /></Page> }
+export function OperationsScreen() { const { space } = useWorkspace(); const scope = scopeOf(space); return <Page title="Settings"><SettingsNavigation /><OperationalDiagnostics scope={scope} /><ActivityTimeline key={JSON.stringify(scope)} scope={scope} /></Page> }
 export function ComplianceScreen() { const { space } = useWorkspace(); return <ErasureRequest key={space.organization_id + ':' + space.brand_id} scope={scopeOf(space)} role={space.role} /> }
 export function SettingsScreen() {
   const { space, reloadSpaces } = useWorkspace(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('')

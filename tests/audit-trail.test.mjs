@@ -9,14 +9,14 @@ const migrations = JSON.parse(readFileSync(new URL('../migrations.json', import.
 const tools = JSON.parse(readFileSync(new URL('../mcp.json', import.meta.url))).tools
 const scope = { organization_id: 'org', brand_id: 'brand' }
 
-function fixture() {
+function fixture(now = 2_000_000) {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys=ON')
   for (const migration of migrations) db.exec(migration.sql)
   const call = (name, user, values = {}) => {
     const tool = tools.find(t => t.name === name)
     assert.ok(tool, name)
-    const params = { ...Object.fromEntries(Object.entries(tool.params ?? {}).filter(([, spec]) => spec.optional).map(([key]) => [key, null])), ...values, __user_id: user, __now: 2_000_000, __uuid: crypto.randomUUID() }
+    const params = { ...Object.fromEntries(Object.entries(tool.params ?? {}).filter(([, spec]) => spec.optional).map(([key]) => [key, null])), ...values, __user_id: user, __now: now, __uuid: crypto.randomUUID() }
     db.exec('BEGIN')
     try {
       const results = (tool.statements ?? [tool.sql]).map(statement => {
@@ -79,6 +79,74 @@ test('external actions preserve provider details and redact audit inputs', () =>
     const timeline = f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate' })
     assert.deepEqual(timeline.map(row => row.source).sort(), ['external', 'mcp'])
     assert.equal(timeline.find(row => row.source === 'external').kind, 'email')
+  } finally { f.db.close() }
+})
+
+test('activity timeline pages through tied timestamps without losing older rows or crossing scope', () => {
+  const f = fixture()
+  try {
+    const insert = f.db.prepare('INSERT INTO mcp_audit_log(id,organization_id,brand_id,candidate_id,timestamp,tool_name,input_json,result_status) VALUES (?,?,?,?,?,?,?,?)')
+    for (let index = 0; index < 125; index++) insert.run(`timeline-${String(index).padStart(3, '0')}`, 'org', 'brand', 'candidate', 1_793_246_400_000, 'test', '{}', 'completed')
+    insert.run('other-candidate', 'org', 'brand', 'other', 1_793_246_400_000, 'test', '{}', 'completed')
+    f.db.prepare("INSERT INTO external_actions(id,organization_id,brand_id,target_candidate_id,target_org_id,performed_at,kind,params_json,performed_by,operation_id) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      .run('timeline-075', 'org', 'brand', 'candidate', 'org', 1_793_246_400_000, 'linkedin', '{}', 'assistant', 'external-timeline-075')
+    const seen = []
+    let cursor = {}
+    for (let pageNumber = 0; pageNumber < 3; pageNumber++) {
+      const page = f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate', limit: 50, ...cursor })
+      assert.equal(page.length, pageNumber === 2 ? 26 : 50)
+      seen.push(...page.map(row => `${row.source}:${row.id}`))
+      const last = page.at(-1)
+      cursor = { before_ts: last.ts, before_id: last.id, before_source: last.source }
+    }
+    assert.equal(new Set(seen).size, 126)
+    assert.equal(seen.includes('external:timeline-075'), true)
+    assert.equal(seen.includes('mcp:timeline-075'), true)
+    assert.equal(seen.includes('mcp:other-candidate'), false)
+    assert.deepEqual(f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate', limit: 50, ...cursor }), [])
+    assert.deepEqual(f.call('get_activity_timeline', 'outsider', { ...scope, candidate_id: 'candidate', limit: 50 }), [])
+  } finally { f.db.close() }
+})
+
+test('manual journal records distinguish occurrence, server recording, recorder and claimed performer with exact replay and correction', () => {
+  const recordedAt = 1_794_000_000_000
+  const f = fixture(recordedAt)
+  try {
+    const values = { ...scope, kind: 'journal', target_candidate_id: 'candidate', application_id: 'app', performed_by: 'assistant-claimed', performed_at: 1_793_246_400_000,
+      notes: 'Reviewed the application; decision awaits approval.',
+      params_json: JSON.stringify({ entry_type: 'decision', outcome: 'Review completed', uncertainty: 'Approval pending', next_step: 'Ask the owner', receipt_ref: 'receipt-123', approval_ref: 'approval-456' }),
+      operation_id: 'journal-1' }
+    assert.throws(() => f.call('log_external_action', 'outsider', values), /APP:not_found/)
+    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 1])
+    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 0])
+    assert.equal(f.db.prepare('SELECT count(*) AS n FROM external_actions').get().n, 0)
+    const rows = f.call('query_audit_log', 'owner', { ...scope, tool_name: 'manual_journal', operation_id: 'journal-1' })
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].timestamp, recordedAt)
+    const payload = JSON.parse(rows[0].input_json)
+    assert.equal(payload.occurred_at, values.performed_at)
+    assert.equal(payload.recorder_user_id, 'owner')
+    assert.equal(payload.claimed_performer, 'assistant-claimed')
+    assert.equal(payload.application_id, 'app')
+    assert.equal(payload.candidate_id, 'candidate')
+    const timeline = f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate' })
+    const entry = timeline.find(row => row.operation_id === 'journal-1')
+    assert.equal(entry.source, 'journal')
+    assert.equal(entry.kind, 'journal')
+    assert.equal(entry.ts, values.performed_at)
+    assert.equal(entry.recorded_at, recordedAt)
+    assert.equal(entry.actor, 'owner')
+    assert.equal(entry.claimed_performer, 'assistant-claimed')
+    assert.equal(entry.outcome, 'Review completed')
+    assert.equal(entry.next_step, 'Ask the owner')
+    assert.throws(() => f.call('log_external_action', 'owner', { ...values, notes: 'Changed text' }), /APP:operation_conflict/)
+    assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-secret', params_json: JSON.stringify({ entry_type: 'observation', api_key: 'secret' }) }), /APP:invalid_params_json/)
+    assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-provider-id', gmail_message_id: 'gmail-1' }), /APP:invalid_params_json/)
+    assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-wrong-app', application_id: 'missing' }), /APP:not_found/)
+    assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-missing-correction', params_json: JSON.stringify({ entry_type: 'correction', correction_of: 'missing' }) }), /APP:not_found/)
+    const correction = { ...values, operation_id: 'journal-2', notes: 'Correction: approval was received.', params_json: JSON.stringify({ entry_type: 'correction', correction_of: 'journal-1', outcome: 'Approved' }) }
+    assert.deepEqual(f.call('log_external_action', 'owner', correction), [0, 0, 0, 1])
+    assert.equal(f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate' }).find(row => row.operation_id === 'journal-2').correction_of, 'journal-1')
   } finally { f.db.close() }
 })
 
