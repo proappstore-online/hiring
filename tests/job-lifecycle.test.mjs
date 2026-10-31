@@ -107,7 +107,7 @@ test('accepted lifecycle and external writes appear in audit, timeline, and sess
     assert.equal(call('find_job_by_linkedin_id','owner',{organization_id:A.organization_id,brand_id:A.brand_id,linkedin_job_id:'linkedin-2'})[0].expected_version,6)
     assert.equal(call('list_requisitions','owner',{organization_id:A.organization_id,brand_id:A.brand_id}).find(r=>r.id===A.requisition_id).expected_version,6)
     const external = { organization_id:A.organization_id,brand_id:A.brand_id,kind:'linkedin',target_org_id:A.organization_id,performed_by:'owner',performed_at:1_000_000_000_000,params_json:'{}',operation_id:'external-e2e' }
-    assert.deepEqual(call('log_external_action','owner',external),[0,1,1,1])
+    assert.deepEqual(call('log_external_action','owner',external),[0,1,1,1,0])
     assert.equal(db.prepare("SELECT performed_at FROM external_actions WHERE id='external-e2e'").get().performed_at,1_000_000_000_000)
     assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id='external-e2e'").get().n,1)
     assert.equal(call('get_activity_timeline','owner',{organization_id:A.organization_id,brand_id:A.brand_id}).filter(r=>r.operation_id==='external-e2e').length,2)
@@ -131,7 +131,7 @@ test('closed posting refusals, text actor, and second-based activity filters use
     assert.throws(()=>call('record_linkedin_status','owner',scoped('pause-closed-live',3,{linkedin_status:'paused',reason:'Observed pause'})),/APP:invalid_transition/)
     assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE operation_id IN ('expire-closed-live','pause-closed-live')").get().n,0)
     const external={organization_id:A.organization_id,brand_id:A.brand_id,kind:'linkedin',target_org_id:A.organization_id,performed_by:'Serge',performed_at:1_793_246_400,params_json:'{"channel":"linkedin"}',notes:'Posted update',operation_id:'linkedin-external-live'}
-    assert.deepEqual(call('log_external_action','owner',external),[0,1,1,1])
+    assert.deepEqual(call('log_external_action','owner',external),[0,1,1,1,0])
     assert.equal(db.prepare("SELECT performed_at FROM external_actions WHERE operation_id='linkedin-external-live'").get().performed_at,1_793_246_400_000)
     const scope={organization_id:A.organization_id,brand_id:A.brand_id}
     assert.equal(call('get_activity_timeline','owner',{...scope,from_ts:1_793_246_400}).filter(row=>row.operation_id===external.operation_id).length,2)
@@ -154,7 +154,7 @@ test('log_external_action refuses a blank or oversized operation_id instead of s
       assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_audit_events').get().n,auditBefore)
       assert.equal(db.prepare('SELECT count(*) AS n FROM mcp_audit_log').get().n,0)
     }
-    assert.deepEqual(call('log_external_action','owner',{...base,operation_id:'external-valid'}),[0,1,1,1])
+    assert.deepEqual(call('log_external_action','owner',{...base,operation_id:'external-valid'}),[0,1,1,1,0])
   } finally { db.close() }
 })
 

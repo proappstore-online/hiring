@@ -35,6 +35,9 @@ function fixture(now = 2_000_000) {
 
 test('new tool definitions are generated from source and migrations are append-only', () => {
   for (const generated of buildAuditTools()) assert.deepEqual(tools.find(t => t.name === generated.name), generated)
+  const externalAction = tools.find(t => t.name === 'log_external_action')
+  assert.match(externalAction.params.kind.description, /email, linkedin, discord, journal/)
+  assert.ok(externalAction.statements.every(sql => [...sql.matchAll(/:[a-z_][a-z0-9_]*/gi)].length <= 100), 'each statement must fit D1’s 100 bound parameter limit')
   assert.deepEqual(migrations.slice(-12).map(m => m.name), ['0056_mcp_audit_trail', '0057_external_actions', '0058_next_actions', '0059_job_lifecycle', '0060_requisition_linkedin_state', '0061_expire_freegamestore_intern', '0062_mcp_refusals', '0063_mcp_refusal_codes', '0064_interns_registration_status', '0065_attachment_manual_review', '0066_application_links', '0067_candidate_upload_setting'])
   const f = fixture()
   try {
@@ -68,7 +71,7 @@ test('external actions preserve provider details and redact audit inputs', () =>
   try {
     const values = { ...scope, kind: 'email', target_candidate_id: 'candidate', target_org_id: 'org', performed_by: 'owner', performed_at: 100, params_json: JSON.stringify({ subject: 'Hello', api_key: 'sensitive' }), gmail_message_id: 'gmail-1', operation_id: 'external-1' }
     assert.throws(()=>f.call('log_external_action', 'outsider', values), /APP:not_found/)
-    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 1, 1, 1])
+    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 1, 1, 1, 0])
     const stored = f.db.prepare("SELECT * FROM external_actions WHERE id='external-1'").get()
     assert.equal(stored.gmail_message_id, 'gmail-1')
     assert.deepEqual(JSON.parse(stored.params_json), { subject: 'Hello', api_key: 'sensitive' })
@@ -117,8 +120,8 @@ test('manual journal records distinguish occurrence, server recording, recorder 
       params_json: JSON.stringify({ entry_type: 'decision', outcome: 'Review completed', uncertainty: 'Approval pending', next_step: 'Ask the owner', receipt_ref: 'receipt-123', approval_ref: 'approval-456' }),
       operation_id: 'journal-1' }
     assert.throws(() => f.call('log_external_action', 'outsider', values), /APP:not_found/)
-    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 1])
-    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 0])
+    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 0, 1])
+    assert.deepEqual(f.call('log_external_action', 'owner', values), [0, 0, 0, 0, 0])
     assert.equal(f.db.prepare('SELECT count(*) AS n FROM external_actions').get().n, 0)
     const rows = f.call('query_audit_log', 'owner', { ...scope, tool_name: 'manual_journal', operation_id: 'journal-1' })
     assert.equal(rows.length, 1)
@@ -145,8 +148,17 @@ test('manual journal records distinguish occurrence, server recording, recorder 
     assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-wrong-app', application_id: 'missing' }), /APP:not_found/)
     assert.throws(() => f.call('log_external_action', 'owner', { ...values, operation_id: 'journal-missing-correction', params_json: JSON.stringify({ entry_type: 'correction', correction_of: 'missing' }) }), /APP:not_found/)
     const correction = { ...values, operation_id: 'journal-2', notes: 'Correction: approval was received.', params_json: JSON.stringify({ entry_type: 'correction', correction_of: 'journal-1', outcome: 'Approved' }) }
-    assert.deepEqual(f.call('log_external_action', 'owner', correction), [0, 0, 0, 1])
+    assert.deepEqual(f.call('log_external_action', 'owner', correction), [0, 0, 0, 0, 1])
     assert.equal(f.call('get_activity_timeline', 'owner', { ...scope, candidate_id: 'candidate' }).find(row => row.operation_id === 'journal-2').correction_of, 'journal-1')
+
+    const hostedShape = { ...scope, kind: 'journal', target_candidate_id: 'candidate', application_id: 'app', performed_by: 'dot (Hiring journal verification)', performed_at: 1_793_246_400_000,
+      params_json: JSON.stringify({ entry_type: 'observation', outcome: 'Application was reviewed', next_step: 'Verify the journal readback' }),
+      notes: 'The application exists and was readable.', operation_id: 'journal-hosted-shape' }
+    assert.deepEqual(f.call('log_external_action', 'owner', hostedShape), [0, 0, 0, 0, 1])
+    assert.deepEqual(f.call('log_external_action', 'owner', hostedShape), [0, 0, 0, 0, 0])
+    assert.equal(f.call('query_audit_log', 'owner', { ...scope, operation_id: hostedShape.operation_id })[0].tool_name, 'manual_journal')
+    assert.throws(() => f.call('log_external_action', 'owner', { ...hostedShape, operation_id: 'journal-pending-missing', params_json: JSON.stringify({ entry_type: 'pending' }) }), /APP:invalid_params_json/)
+    assert.deepEqual(f.call('log_external_action', 'owner', { ...hostedShape, operation_id: 'journal-pending', params_json: JSON.stringify({ entry_type: 'pending', next_step: 'Await confirmation' }) }), [0, 0, 0, 0, 1])
   } finally { f.db.close() }
 })
 
