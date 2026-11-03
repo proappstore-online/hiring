@@ -82,14 +82,14 @@ test('requisition grants filter lists and reject forged sibling IDs on every bus
   assert.equal(call('gateway_get_requisition', 'limited', { ...A, requisition_id: 'req-other' }).length, 0)
   for (const [name, input] of writes(B)) {
     const before = snapshot(db)
-    if (name === 'change_application_stage') assert.throws(() => call(name, 'limited', { ...input, role: 'owner', user_id: 'owner' }), /actor lacks recruiter access/, name)
+    if (name === 'change_application_stage') assert.throws(() => call(name, 'limited', { ...input, role: 'owner', user_id: 'owner' }), /APP:forbidden/, name)
     else assert.ok(call(name, 'limited', { ...input, role: 'owner', user_id: 'owner' }).every(n => n === 0), name)
     assert.deepEqual(snapshot(db), before, name)
   }
   for (const [name, input] of writes(A)) {
     if (!input.application_id || name === 'create_linkedin_application') continue
     const before = snapshot(db)
-    if (name === 'change_application_stage') assert.throws(() => call(name, 'limited', { ...input, application_id: 'other-app' }), /actor lacks recruiter access/, name)
+    if (name === 'change_application_stage') assert.throws(() => call(name, 'limited', { ...input, application_id: 'other-app' }), /APP:forbidden/, name)
     else assert.ok(call(name, 'limited', { ...input, application_id: 'other-app' }).every(n => n === 0), name)
     assert.deepEqual(snapshot(db), before, name)
   }
@@ -112,7 +112,7 @@ test('reviewer access follows current assignment and never authorizes full reads
   }
   for (const [name, input] of writes(A)) {
     const before = snapshot(db)
-    if (name === 'change_application_stage') assert.throws(() => call(name, 'reviewer', input), /actor lacks recruiter access/, name)
+    if (name === 'change_application_stage') assert.throws(() => call(name, 'reviewer', input), /APP:forbidden/, name)
     else assert.ok(call(name, 'reviewer', input).every(n => n === 0), name)
     assert.deepEqual(snapshot(db), before, name)
   }
@@ -140,7 +140,7 @@ test('revocation immediately removes legacy and scoped access without cached or 
   assert.equal(appRead(call, 'staff-a').length, 0)
   assert.ok(call('add_application_note', 'staff-a', note).every(n => n === 0))
   for (const [name, input] of writes(A)) {
-    if (name === 'change_application_stage') assert.throws(() => call(name, 'staff-a', input), /actor lacks recruiter access/, name)
+    if (name === 'change_application_stage') assert.throws(() => call(name, 'staff-a', input), /APP:forbidden/, name)
     else assert.ok(call(name, 'staff-a', input).every(n => n === 0), name)
   }
   assert.deepEqual(call('list_workspace_members', 'owner', A).map(m => m.user_id), ['owner'])

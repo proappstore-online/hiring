@@ -81,7 +81,7 @@ const deniedWrite = (call, name, user, args) => {
   try { denied(call(name, user, args)) }
   catch (error) {
     if (!['hiring_v1_advance_application', 'hiring_v1_record_decision', 'hiring_v1_record_lifecycle_transition'].includes(name)) throw error
-    assert.match(error.message, /application|actor|operation|version|transition|required/)
+    assert.match(error.message, /application|actor|operation|version|transition|required|^APP:(?:not_found|forbidden|duplicate_operation_id|version_mismatch|invalid_transition)$/)
   }
 }
 

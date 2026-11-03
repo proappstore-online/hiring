@@ -87,7 +87,7 @@ test('every invalid edge including terminal, backwards, skipped and unknown stag
       if(transitions[from].includes(to))continue
       setStage(db,from)
       const before=db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n
-      assert.throws(()=>call('change_application_stage','staff-a',change(from,to)),/invalid application stage transition/,from+' -> '+to)
+      assert.throws(()=>call('change_application_stage','staff-a',change(from,to)),/APP:invalid_transition/,from+' -> '+to)
       assert.equal(call('get_application','staff-a',{...scope,application_id:'app-a'})[0].version,1)
       assert.equal(db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n,before)
     }
@@ -97,22 +97,22 @@ test('stale version, forged prior state, blank reason/operation and unauthorized
  const {db,call}=seeded()
  try {
   for(const patch of [{expected_version:0},{expected_version:2},{from_stage:'offered'},{reason:' '},{operation_id:' '},{application_id:'forged'},{brand_id:'brand-b'},{organization_id:'org-b'}])
-   assert.throws(()=>call('change_application_stage','staff-a',change('submitted','in_review',patch)),/stale application|reason and operation_id|required|application not found/)
-  assert.throws(()=>call('change_application_stage','outsider',change('submitted','in_review')),/actor lacks recruiter access/)
+   assert.throws(()=>call('change_application_stage','staff-a',change('submitted','in_review',patch)),/APP:version_mismatch|reason and operation_id|required|APP:not_found/)
+  assert.throws(()=>call('change_application_stage','outsider',change('submitted','in_review')),/APP:forbidden/)
   assert.equal(call('get_application','staff-a',{...scope,application_id:'app-a'})[0].version,1)
  } finally {db.close()}
 })
-test('stage refusals expose stable APP codes and preserve the submitted transition details', () => {
+test('stage refusals expose exact APP codes without changing state', () => {
  const {db,call}=seeded()
  try {
   const base=change('submitted','in_review')
-  assert.throws(()=>call('change_application_stage','staff-a',{...base,application_id:'missing'}),/APP:not_found application not found in brand/)
-  assert.throws(()=>call('change_application_stage','outsider',base),/APP:forbidden actor lacks recruiter access for application/)
-  assert.throws(()=>call('change_application_stage','staff-a',{...base,expected_version:0}),/APP:version_mismatch stale application version or from_stage/)
-  assert.throws(()=>call('change_application_stage','staff-a',change('submitted','screening')),/APP:invalid_transition invalid application stage transition from 'submitted' to 'screening'/)
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,application_id:'missing'}),{message:'APP:not_found'})
+  assert.throws(()=>call('change_application_stage','outsider',base),{message:'APP:forbidden'})
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,expected_version:0}),{message:'APP:version_mismatch'})
+  assert.throws(()=>call('change_application_stage','staff-a',change('submitted','screening')),{message:'APP:invalid_transition'})
   assert.equal(call('change_application_stage','staff-a',base).at(-1),1)
   assert.ok(call('change_application_stage','staff-a',base).every(n=>n===0))
-  assert.throws(()=>call('change_application_stage','staff-a',{...base,to_stage:'rejected'}),/APP:duplicate_operation_id operation_id already used for a different stage change/)
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,to_stage:'rejected'}),{message:'APP:duplicate_operation_id'})
   assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_stage_events WHERE id='transition'").get().n,1)
  } finally {db.close()}
 })
@@ -142,12 +142,12 @@ test('direct full detail works outside the queue and denies sibling brands, tena
   call('create_linkedin_application','staff-b',{...candidate,...B,requisition_id:'req-b',candidate_id:'cand-b',application_id:'app-b',assignee_user_id:'staff-b',operation_id:'create-b'})
   for(const params of [{...scope,application_id:'app-b'},{...scope,application_id:'missing'},{organization_id:'forged',brand_id:'brand-a',application_id:'app-a'}])assert.equal(call('get_application','staff-a',params).length,0)
   assert.equal(call('get_application','staff-b',{...scope,application_id:'app-a'}).length,0)
-  assert.throws(()=>call('change_application_stage','staff-b',change('submitted','in_review')),/actor lacks recruiter access/)
+  assert.throws(()=>call('change_application_stage','staff-b',change('submitted','in_review')),/APP:forbidden/)
   call('grant_workspace_access','staff-a',{...scope,requisition_id:'req-a',member_user_id:'reviewer',role:'reviewer',grant_id:'reviewer',operation_id:'grant-reviewer'})
   call('reassign_application','staff-a',{...scope,application_id:'app-a',expected_version:1,from_user_id:'staff-a',to_user_id:'reviewer',reason:'Review',operation_id:'assign-reviewer'})
   assert.equal(call('gateway_get_application','reviewer',{...scope,application_id:'app-a'}).length,1)
   assert.equal(call('get_application','reviewer',{...scope,application_id:'app-a'}).length,0)
-  assert.throws(()=>call('change_application_stage','reviewer',change('submitted','in_review',{expected_version:2})),/actor lacks recruiter access/)
+  assert.throws(()=>call('change_application_stage','reviewer',change('submitted','in_review',{expected_version:2})),/APP:forbidden/)
  } finally {db.close()}
 })
 

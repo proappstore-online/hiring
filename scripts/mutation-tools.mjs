@@ -50,7 +50,7 @@ export function buildMutationTools(tools) {
     tool.statements = tool.statements.map(sql => {
       const adapted = sql.replaceAll(':tenant_id', ':organization_id')
         .replaceAll(':actor_id', 'NULL').replaceAll(':actor_role', 'NULL')
-      return adapted.startsWith('INSERT INTO hiring_mutation_checks') || adapted.startsWith('INSERT INTO hiring_stage_checks_v2') ? adapted : adapted + guard
+      return adapted.startsWith('INSERT INTO hiring_mutation_checks') || adapted.startsWith('INSERT INTO hiring_stage_checks_v3') ? adapted : adapted + guard
     })
     return tool
   })

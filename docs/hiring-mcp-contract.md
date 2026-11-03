@@ -92,16 +92,19 @@ offers now return a specific database error. Exact operation retries still retur
 zero changes. The static transition map, additive stage representation and atomic
 history/audit guarantees are documented in [the domain model](domain-model.md#application-stage-contract-v1-20).
 
-The stage-check entry point emits these passthrough refusal codes, followed by a
-human-readable reason: `APP:not_found` (application outside the selected brand),
+The stage-check entry point emits these exact passthrough refusal codes:
+`APP:not_found` (application outside the selected brand),
 `APP:forbidden` (no current recruiter access), `APP:duplicate_operation_id`
 (operation ID reused for a different stage change), `APP:version_mismatch`
-(stale version or `from_stage`), and `APP:invalid_transition` (disallowed edge,
-with the submitted `from_stage` and `to_stage`). These are SQL refusals rather
-than zero-change results. The additive `0069_stage_refusal_codes` migration adds
-`hiring_stage_checks_v2` because the deploy migration gate disallows dropping
+(stale version or `from_stage`), and `APP:invalid_transition` (disallowed edge).
+The platform returns these as `app.<code>` with the fixed message `action rejected
+by the app`; it does not return trigger prose or the submitted stage values.
+The caller should show the corresponding explanation here alongside its known
+`from_stage` and `to_stage`. These are SQL refusals rather than zero-change
+results. The additive `0070_stage_refusal_exact_codes` migration adds
+`hiring_stage_checks_v3` because the deploy migration gate disallows dropping
 the historical `hiring_stage_check` trigger; both registered stage actions use
-the new entry point.
+the new entry point. Migration `0069` remains applied but is not called by them.
 
 ## Interview tools v1 (#22)
 
