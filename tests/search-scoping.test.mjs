@@ -18,7 +18,11 @@ function fixture() {
    const results=(tool.statements??[tool.sql]).map(statement=>{
     const binds=[];const sql=statement.replace(/:([a-z_][a-z0-9_]*)/gi,(_,k)=>{assert.notEqual(p[k],undefined,k);binds.push(p[k]);return '?'})
     const prepared=db.prepare(sql)
-    return prepared.columns().length?{rows:prepared.all(...binds).map(r=>({...r}))}:{meta:{changes:prepared.run(...binds).changes}}
+    if(prepared.columns().length){
+     const rows=prepared.all(...binds).map(r=>({...r}))
+     return {rows,meta:{changes:db.prepare('SELECT changes() AS n').get().n}}
+    }
+    return {meta:{changes:prepared.run(...binds).changes}}
    })
    db.exec('COMMIT');return tool.operation==='query'?{rows:results[0].rows}:{results}
   }catch(e){db.exec('ROLLBACK');throw e}
@@ -48,6 +52,19 @@ test('registered search definitions match generator and enforce current brand/re
  assert.deepEqual(Object.keys((await f.search('search_candidates')).rows[0]).sort(),['id','full_name','email','created_at','next_cursor'].sort())
  assert.equal((await f.search('search_candidates')).rows[0].email,null)
  assert.equal((await f.search('search_applications','recruiter',{stage:'hired'})).rows.length,0)
+ }finally{f.db.close()}
+})
+test('empty and populated search receipts report zero changes while the shared budget advances',()=>{
+ const f=fixture();try{
+  for(const name of ['search_candidates','search_applications']){
+   for(const [q,length] of [['no matching person',0],['Person',4]]){
+    const result=f.call(name,'recruiter',{...scope,q}).results[0]
+    assert.equal(result.meta.changes,0)
+    assert.equal(JSON.parse(result.rows[0].rows_json).length,length)
+    assert.equal(result.rows[0].status,200)
+   }
+  }
+  assert.equal(f.db.prepare("SELECT requests FROM hiring_search_budget WHERE user_id='recruiter'").get().requests,4)
  }finally{f.db.close()}
 })
 test('interview assignment, scheduled state, grant revocation and direct fetch all recheck current authority',async()=>{
@@ -86,6 +103,7 @@ test('shared persistent budget denies request 31 with status 429, including dire
  const f=fixture();try {
  for(let i=0;i<30;i++)await f.search(i%2?'search_candidates':'search_applications','recruiter',{brand_id:i%3?'a':'forged'})
  const response=f.call('search_applications','recruiter',{...scope,q:'Person'})
+ assert.equal(response.results[0].meta.changes,0)
  assert.equal(response.results[0].rows[0].status,429);assert.deepEqual(JSON.parse(response.results[0].rows[0].rows_json),[])
  await assert.rejects(f.search('get_search_application','recruiter',{id:'app-a-0'}),e=>e.status===429)
  assert.equal((await f.search('search_applications','limited')).rows.length,4)

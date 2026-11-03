@@ -267,6 +267,10 @@
     {
       "name": "0067_candidate_upload_setting",
       "sql": "ALTER TABLE hiring_organizations ADD COLUMN allow_candidate_file_uploads INTEGER NOT NULL DEFAULT 1 CHECK(allow_candidate_file_uploads IN (0,1)); CREATE TRIGGER hiring_attachment_uploads_allowed_insert BEFORE INSERT ON hiring_attachments WHEN (SELECT allow_candidate_file_uploads FROM hiring_organizations WHERE id=NEW.organization_id)=0 BEGIN SELECT RAISE(ABORT,'Candidate file uploads are disabled for this organization.'); END; CREATE TRIGGER hiring_attachment_uploads_allowed_complete BEFORE UPDATE OF uploaded_at ON hiring_attachments WHEN NEW.uploaded_at IS NOT NULL AND OLD.uploaded_at IS NULL AND (SELECT allow_candidate_file_uploads FROM hiring_organizations WHERE id=NEW.organization_id)=0 BEGIN SELECT RAISE(ABORT,'Candidate file uploads are disabled for this organization.'); END;"
+    },
+    {
+      "name": "0068_search_budget_gate",
+      "sql": "CREATE VIEW hiring_search_budget_gate AS\nSELECT user_id,window_start,requests FROM hiring_search_budget WHERE 0;\n\nCREATE TRIGGER hiring_search_budget_gate_insert\nINSTEAD OF INSERT ON hiring_search_budget_gate\nBEGIN\n  INSERT INTO hiring_search_budget(user_id,window_start,requests)\n  VALUES (NEW.user_id,NEW.window_start,1)\n  ON CONFLICT(user_id) DO UPDATE SET\n    window_start=excluded.window_start,\n    requests=CASE WHEN hiring_search_budget.window_start<>excluded.window_start\n      THEN 1 ELSE min(hiring_search_budget.requests+1,31) END;\nEND;"
     }
   ]
 }
