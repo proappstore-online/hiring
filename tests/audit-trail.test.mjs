@@ -183,3 +183,22 @@ test('next action lifecycle and session summary stay scoped', () => {
     assert.equal(JSON.parse(session.open_actions).length, 0)
   } finally { f.db.close() }
 })
+
+test('next actions cannot be assigned to candidates or interns', () => {
+  const f = fixture()
+  try {
+    for (const owner of ['candidate', 'Person', 'person@example.com', 'intern']) {
+      const operation_id = `forbidden-${owner}`
+      assert.deepEqual(f.call('create_next_action', 'owner', { ...scope, candidate_id: 'candidate', action: 'Hiring team follow-up', due_at: 100, owner, operation_id }), [0, 0])
+      assert.equal(f.call('list_next_actions', 'owner', { ...scope, candidate_id: 'candidate' }).length, 0)
+      assert.equal(f.call('query_audit_log', 'owner', { ...scope, operation_id }).length, 0)
+    }
+    assert.deepEqual(f.call('create_next_action', 'owner', { ...scope, candidate_id: 'candidate', action: 'Hiring team follow-up', due_at: 100, owner: 'Serge', operation_id: 'team-action' }), [1, 1])
+    for (const owner of ['candidate', 'Person', 'person@example.com', 'intern']) {
+      const operation_id = `reassign-${owner}`
+      assert.deepEqual(f.call('update_next_action', 'owner', { ...scope, id: 'team-action', owner, operation_id }), [0, 0])
+      assert.equal(f.call('list_next_actions', 'owner', { ...scope, candidate_id: 'candidate' })[0].owner, 'Serge')
+      assert.equal(f.call('query_audit_log', 'owner', { ...scope, operation_id }).length, 0)
+    }
+  } finally { f.db.close() }
+})

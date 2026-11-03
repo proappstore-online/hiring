@@ -2,6 +2,17 @@
 
 The public `get_hiring_runtime_gate` action remains a bounded non-sensitive read. Authenticated internal actions now implement workspace bootstrap, membership grants, draft requisitions, LinkedIn application creation, stage and assignment history, notes, unsent drafts and audit reads. All private actions require PAS auth and SQL membership checks for the exact organization and brand. See [internal workspace](internal-workspace.md) for the deployed subset. The table below describes the overall contract; the versioned mutation surface shipped in #34 is specified separately below.
 
+## Hiring-team next actions
+
+The `create_next_action`, `update_next_action`, `complete_next_action`,
+`list_next_actions`, and `session_start` tools manage **internal hiring-team
+reminders and work history**. They let Serge and the hiring bot see open and
+overdue work each day and retain completed work as an audit trail. `owner` is
+restricted by the write SQL to `Serge` or `bot` (the hiring bot) on creation or
+reassignment. `candidate_id` is a record link only: it never assigns a task to
+or displays one for the candidate or intern. Candidate-facing actions must not
+expose these internal records. See [the audit and task contract](mcp-audit-trail.md).
+
 ## Common envelope
 
 Candidate mail archives support two existing transports without rewriting history:

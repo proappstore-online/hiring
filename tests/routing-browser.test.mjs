@@ -124,7 +124,7 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    mkdirSync(baselines,{recursive:true})
    for(const width of [375,1280]) for(const [name,route,ready] of [
     ['applications','applications','Alex Morgan'],
-    ['candidate','applications/full','Next action'],
+    ['candidate','applications/full','Hiring team next step'],
     ['vacancies','vacancies','Senior Software Engineer'],
     ['settings','organizations/org/brands/brand/settings','Brand settings'],
    ]) {

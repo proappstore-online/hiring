@@ -7,6 +7,18 @@ unverified; local green tests are not a live mail roundtrip. No unstable rebased
 Tracking: [FAS email epic #58](https://github.com/proappstore-online/hiring/issues/58).
 The [Hiring MCP contract](hiring-mcp-contract.md) remains the application authorization contract.
 
+## Internal tasks and daily review
+
+`create_next_action`, `update_next_action`, `complete_next_action`,
+`list_next_actions`, and `session_start` support the hiring team's daily review.
+Use open actions as reminders of what Serge or the hiring bot must do, and
+completed actions as an internal record of work done. Set `owner` only to
+`Serge` or `bot` (the hiring bot). The tools enforce these values on creation
+and reassignment. A `candidate_id` only links the work to a candidate record;
+it never assigns a task to that candidate or an intern. Do not present these
+actions as candidate or intern to-dos. Review open and overdue actions at the
+start of each day, then mark completed work done so the team can see progress.
+
 ## Objective
 
 The PAGS Hiring agent handles candidate mail addressed to `admin@freeappstore.online`,

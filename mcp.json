@@ -6697,7 +6697,7 @@
     },
     {
       "name": "create_next_action",
-      "description": "Create an open next action linked to a candidate or organization and optionally an audit event.",
+      "description": "Create an internal hiring-team reminder linked to a candidate or organization for daily follow-up and audit history. Never assign work to candidates or interns.",
       "operation": "batch",
       "requires_auth": true,
       "params": {
@@ -6722,7 +6722,8 @@
           "type": "integer"
         },
         "owner": {
-          "type": "string"
+          "type": "string",
+          "description": "Hiring team owner only: Serge or bot (the hiring bot). Never use a candidate or intern identity."
         },
         "triggering_event_id": {
           "type": "string",
@@ -6733,13 +6734,13 @@
         }
       },
       "statements": [
-        "INSERT INTO next_actions(id,organization_id,brand_id,candidate_id,org_id,action,due_at,owner,status,triggering_event_id,created_at,updated_at,operation_id) SELECT :operation_id,:organization_id,:brand_id,:candidate_id,coalesce(:org_id,:organization_id),:action,:due_at,:owner,'open',:triggering_event_id,:__now,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND (:candidate_id IS NULL OR EXISTS (SELECT 1 FROM hiring_candidates c WHERE c.id=:candidate_id AND c.organization_id=:organization_id AND c.brand_id=:brand_id)) AND (:org_id IS NULL OR :org_id=:organization_id) AND (:triggering_event_id IS NULL OR EXISTS (SELECT 1 FROM mcp_audit_log a WHERE a.id=:triggering_event_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id)) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM next_actions WHERE operation_id=:operation_id)",
+        "INSERT INTO next_actions(id,organization_id,brand_id,candidate_id,org_id,action,due_at,owner,status,triggering_event_id,created_at,updated_at,operation_id) SELECT :operation_id,:organization_id,:brand_id,:candidate_id,coalesce(:org_id,:organization_id),:action,:due_at,:owner,'open',:triggering_event_id,:__now,:__now,:operation_id WHERE EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND :owner IN ('Serge','bot') AND (:candidate_id IS NULL OR EXISTS (SELECT 1 FROM hiring_candidates c WHERE c.id=:candidate_id AND c.organization_id=:organization_id AND c.brand_id=:brand_id)) AND (:org_id IS NULL OR :org_id=:organization_id) AND (:triggering_event_id IS NULL OR EXISTS (SELECT 1 FROM mcp_audit_log a WHERE a.id=:triggering_event_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id)) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM next_actions WHERE operation_id=:operation_id)",
         "INSERT INTO mcp_audit_log(id,organization_id,brand_id,candidate_id,entity_id,timestamp,caller_agent_id,caller_session_id,tool_name,input_json,result_status,result_summary,affected_entity_ids_json,operation_id) SELECT lower(hex(randomblob(16))),:organization_id,:brand_id,:candidate_id,:operation_id,(CASE WHEN abs(:__now)<10000000000 THEN :__now*1000 ELSE :__now END),NULL,NULL,'create_next_action',json_object('candidate_id',:candidate_id,'org_id',:org_id,'action',:action,'due_at',:due_at,'owner',:owner,'triggering_event_id',:triggering_event_id,'operation_id',:operation_id),'completed','SQL mutation completed',json_array(:operation_id),:operation_id WHERE changes()=1 AND :__user_id IS NOT NULL"
       ]
     },
     {
       "name": "update_next_action",
-      "description": "Update an existing next action, including blocker state and due date.",
+      "description": "Update an internal hiring-team reminder, including blocker state and due date. Owner may be Serge or the hiring bot only; candidates and interns are never task owners.",
       "operation": "batch",
       "requires_auth": true,
       "params": {
@@ -6762,6 +6763,7 @@
         },
         "owner": {
           "type": "string",
+          "description": "Hiring team owner only: Serge or bot (the hiring bot). Never use a candidate or intern identity.",
           "optional": true
         },
         "status": {
@@ -6777,13 +6779,13 @@
         }
       },
       "statements": [
-        "UPDATE next_actions SET action=coalesce(:action,action),due_at=coalesce(:due_at,due_at),owner=coalesce(:owner,owner),status=coalesce(:status,status),blocker_reason=CASE WHEN :status='blocked' THEN :blocker_reason WHEN :status IS NOT NULL THEN NULL ELSE coalesce(:blocker_reason,blocker_reason) END,updated_at=:__now,operation_id=:operation_id WHERE id=:id AND organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND status<>'done' AND (:status IS NULL OR :status IN ('open','done','blocked')) AND (:status IS NULL OR :status<>'blocked' OR length(trim(:blocker_reason))>0) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM next_actions n WHERE n.operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM mcp_audit_log a WHERE a.operation_id=:operation_id)",
+        "UPDATE next_actions SET action=coalesce(:action,action),due_at=coalesce(:due_at,due_at),owner=coalesce(:owner,owner),status=coalesce(:status,status),blocker_reason=CASE WHEN :status='blocked' THEN :blocker_reason WHEN :status IS NOT NULL THEN NULL ELSE coalesce(:blocker_reason,blocker_reason) END,updated_at=:__now,operation_id=:operation_id WHERE id=:id AND organization_id=:organization_id AND brand_id=:brand_id AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND (:owner IS NULL OR :owner IN ('Serge','bot')) AND status<>'done' AND (:status IS NULL OR :status IN ('open','done','blocked')) AND (:status IS NULL OR :status<>'blocked' OR length(trim(:blocker_reason))>0) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS (SELECT 1 FROM next_actions n WHERE n.operation_id=:operation_id) AND NOT EXISTS (SELECT 1 FROM mcp_audit_log a WHERE a.operation_id=:operation_id)",
         "INSERT INTO mcp_audit_log(id,organization_id,brand_id,candidate_id,entity_id,timestamp,caller_agent_id,caller_session_id,tool_name,input_json,result_status,result_summary,affected_entity_ids_json,operation_id) SELECT lower(hex(randomblob(16))),:organization_id,:brand_id,NULL,:id,(CASE WHEN abs(:__now)<10000000000 THEN :__now*1000 ELSE :__now END),NULL,NULL,'update_next_action',json_object('id',:id,'action',:action,'due_at',:due_at,'owner',:owner,'status',:status,'blocker_reason',:blocker_reason,'operation_id',:operation_id),'completed','SQL mutation completed',json_array(:id),:operation_id WHERE changes()=1 AND :__user_id IS NOT NULL"
       ]
     },
     {
       "name": "complete_next_action",
-      "description": "Mark one scoped next action done.",
+      "description": "Mark a hiring-team reminder done and retain its completion in the internal audit history. This does not assign anything to a candidate or intern.",
       "operation": "batch",
       "requires_auth": true,
       "params": {
@@ -6807,7 +6809,7 @@
     },
     {
       "name": "list_next_actions",
-      "description": "List scoped next actions by candidate, organization, status, and owner.",
+      "description": "List internal hiring-team reminders and completed work records by linked candidate, organization, status, or team owner. Linked candidates and interns are never task assignees.",
       "operation": "query",
       "requires_auth": true,
       "params": {
@@ -6831,6 +6833,7 @@
         },
         "owner": {
           "type": "string",
+          "description": "Hiring team owner only: Serge or bot (the hiring bot). Never use a candidate or intern identity.",
           "optional": true
         },
         "limit": {
@@ -6842,7 +6845,7 @@
     },
     {
       "name": "session_start",
-      "description": "Resume work with open actions, overdue actions, and recent audit or external activity since a timestamp.",
+      "description": "Start the hiring team day with open and overdue internal reminders plus recent audit or external activity. These are for Serge and the hiring bot, never candidate or intern tasks.",
       "operation": "query",
       "requires_auth": true,
       "params": {
