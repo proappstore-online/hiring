@@ -28,8 +28,8 @@ function fixture({ open = true } = {}) {
         return t.operation === 'query' ? db.prepare(sql).all(...bindings).map(r => ({ ...r })) : db.prepare(sql).run(...bindings).changes
       })
       db.exec('COMMIT')
-      return t.operation === 'query' ? results[0] : results
-    } catch (e) { db.exec('ROLLBACK'); throw e }
+      return t.operation === 'query' ? results[0] : results.filter((_,index)=>!t.statements?.[index]?.includes('RETURNING tool_name'))
+    } catch (e) { try { db.exec('ROLLBACK') } catch {} throw e }
   }
   for (const scope of [A,B]) call('create_workspace','owner', { ...scope, organization_name: 'Org', brand_name: `Brand ${scope.brand_id}`, requisition_title: 'Engineer', operation_id: `boot-${scope.brand_id}` })
   call('add_workspace_member','owner', { ...A, member_user_id: 'staff-a', role: 'recruiter', operation_id: 'member-a' })

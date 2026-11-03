@@ -4,6 +4,86 @@ import { readFileSync } from 'node:fs'
 import { fixture, A, B } from './receipt-fixture.mjs'
 
 const scoped = (operation_id, expected_version, extra = {}) => ({ ...A, operation_id, expected_version, ...extra })
+const outcome = result => result.at(-1)[0]
+
+test('owner reopens closed requisition with version and audit, preserving LinkedIn and pipeline data', () => {
+  const { db, call, callDetailed, submit } = fixture()
+  try {
+    submit()
+    call('set_linkedin_job_id','owner',scoped('linkedin-before-reopen',1,{linkedin_job_id:'4483241641'}))
+    db.prepare("INSERT INTO hiring_offers(id,tenant_id,brand_id,requisition_id,application_id,created_at,updated_at,operation_id) VALUES('offer-a','org','a','req-a','application-a',1000000000,1000000000,'offer-seed')").run()
+    call('record_linkedin_status','owner',scoped('close-before-reopen',2,{linkedin_status:'closed',reason:'External LinkedIn posting closed'}))
+    const before = db.prepare('SELECT linkedin_job_id,expiry_date,description,notice_text FROM hiring_job_publications WHERE requisition_id=?').get(A.requisition_id)
+    const reposts = db.prepare('SELECT count(*) n FROM hiring_linkedin_repost_history').get().n
+    const result = callDetailed('reopen_job_requisition','owner',scoped('reopen-a',3,{reason:'Continue internal hiring'}))
+    assert.deepEqual(result.slice(0,-1),[1,1,1])
+    assert.deepEqual(outcome(result),{tool_name:'reopen_job_requisition',status:'applied',reason_code:null,current_state:'published',current_version:4,target_state:'published',operation_id:'reopen-a'})
+    assert.equal(call('get_job_linkedin_status','owner',A)[0].expected_version,4)
+    assert.equal(call('get_job_linkedin_status','owner',A)[0].status,'published')
+    assert.equal(db.prepare('SELECT lifecycle_status FROM hiring_requisitions WHERE id=?').get(A.requisition_id).lifecycle_status,'published')
+    assert.deepEqual(db.prepare('SELECT linkedin_job_id,expiry_date,description,notice_text FROM hiring_job_publications WHERE requisition_id=?').get(A.requisition_id),before)
+    assert.equal(db.prepare('SELECT count(*) n FROM hiring_linkedin_repost_history').get().n,reposts)
+    assert.equal(db.prepare('SELECT count(*) n FROM external_actions').get().n,0)
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_applications WHERE id='application-a' AND requisition_id='req-a'").get().n,1)
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_offers WHERE id='offer-a' AND requisition_id='req-a'").get().n,1)
+    assert.equal(db.prepare("SELECT action,actor_user_id,object_id FROM hiring_audit_events WHERE operation_id='reopen-a'").get().action,'requisition.reopened')
+    assert.equal(db.prepare("SELECT count(*) n FROM mcp_audit_log WHERE operation_id='reopen-a' AND tool_name='reopen_job_requisition'").get().n,1)
+    call('change_application_stage','staff-a',{...A,application_id:'application-a',expected_version:1,from_stage:'submitted',to_stage:'in_review',reason:'Review after reopening',operation_id:'stage-after-reopen'})
+    assert.equal(db.prepare("SELECT stage FROM hiring_applications WHERE id='application-a'").get().stage,'in_review')
+  } finally { db.close() }
+})
+
+test('reopen is owner-only, idempotent and returns scoped transition reasons', () => {
+  const { db, call, callDetailed, publish } = fixture()
+  try {
+    const draft = outcome(callDetailed('reopen_job_requisition','owner',scoped('draft-reopen',0)))
+    assert.equal(draft.status,'refused')
+    assert.equal(draft.reason_code,'invalid_transition')
+    assert.equal(draft.current_state,'draft')
+    assert.equal(draft.current_version,0)
+    publish()
+    const open = outcome(callDetailed('reopen_job_requisition','owner',scoped('open-reopen',1)))
+    assert.equal(open.status,'already_open')
+    assert.equal(open.reason_code,'already_open')
+    assert.equal(open.current_version,1)
+    call('record_linkedin_status','owner',scoped('close-reopen-test',1,{linkedin_status:'closed',reason:'Closed externally'}))
+    for (const user of ['staff-a','staff-b','worker']) {
+      const denied = outcome(callDetailed('reopen_job_requisition',user,scoped(`denied-${user}`,2)))
+      assert.equal(denied.reason_code,'not_found')
+      assert.equal(denied.current_state,null)
+      assert.equal(denied.current_version,null)
+    }
+    const stale = outcome(callDetailed('reopen_job_requisition','owner',scoped('stale-reopen',1)))
+    assert.equal(stale.reason_code,'version_mismatch')
+    assert.equal(stale.current_state,'closed')
+    assert.equal(stale.current_version,2)
+    const applied = outcome(callDetailed('reopen_job_requisition','owner',scoped('reopen-once',2)))
+    assert.equal(applied.status,'applied')
+    const replay = outcome(callDetailed('reopen_job_requisition','owner',scoped('reopen-once',2)))
+    assert.equal(replay.status,'already_applied')
+    assert.equal(replay.current_version,3)
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id='reopen-once'").get().n,1)
+    assert.equal(db.prepare("SELECT count(*) n FROM mcp_audit_log WHERE operation_id='reopen-once'").get().n,2)
+    assert.equal(db.prepare("SELECT version FROM hiring_job_publications WHERE requisition_id='req-a'").get().version,3)
+  } finally { db.close() }
+})
+
+test('publish, resume and reopen report structured refusals with current state and version', () => {
+  const { db, call, callDetailed, publish } = fixture()
+  try {
+    publish()
+    const published = outcome(callDetailed('publish_job_requisition','owner',{
+      ...A,description:'Duplicate',location:'Remote',arrangement:'Full time',compensation:'Paid',notice_version:'v1',notice_text:'Notice',contact:'Contact',operation_id:'publish-again'
+    }))
+    assert.deepEqual([published.status,published.reason_code,published.current_state,published.current_version],['refused','invalid_transition','published',1])
+    const resume = outcome(callDetailed('resume_job_requisition','owner',scoped('resume-unpaused',1)))
+    assert.deepEqual([resume.status,resume.reason_code,resume.current_state,resume.current_version],['refused','invalid_transition','published',1])
+    call('record_linkedin_status','owner',scoped('close-transitions',1,{linkedin_status:'closed',reason:'External posting closed'}))
+    const closedResume = outcome(callDetailed('resume_job_requisition','owner',scoped('resume-closed',2)))
+    assert.deepEqual([closedResume.status,closedResume.reason_code,closedResume.current_state,closedResume.current_version],['refused','invalid_transition','closed',2])
+    assert.equal(db.prepare("SELECT count(*) n FROM hiring_audit_events WHERE operation_id IN ('publish-again','resume-unpaused','resume-closed')").get().n,0)
+  } finally { db.close() }
+})
 
 test('LinkedIn expiry and repost preserve the requisition and attached applicants', () => {
   const { db, call, submit } = fixture()

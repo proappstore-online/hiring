@@ -16,7 +16,7 @@ function fixture({ open = true } = {}) {
   db.exec('PRAGMA foreign_keys=ON')
   for (const m of migrations) db.exec(m.sql)
   let now = 1_000_000_000
-  const call = (name, user = 'worker', values = {}) => {
+  const execute = (name, user = 'worker', values = {}, detailed = false) => {
     const t = tool(name)
     const params = { ...Object.fromEntries(Object.entries(t.params).filter(([,p]) => p.optional).map(([k]) => [k,null])), ...values, __user_id: user, __now: now, __uuid: crypto.randomUUID() }
     db.exec('BEGIN')
@@ -24,12 +24,14 @@ function fixture({ open = true } = {}) {
       const results = (t.statements ?? [t.sql]).map(statement => {
         const bindings = []
         const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { assert.notEqual(params[key], undefined, `${name}: ${key}`); bindings.push(params[key]); return '?' })
-        return t.operation === 'query' ? db.prepare(sql).all(...bindings).map(r => ({ ...r })) : db.prepare(sql).run(...bindings).changes
+        return t.operation === 'query' || (detailed && statement.includes('RETURNING tool_name')) ? db.prepare(sql).all(...bindings).map(r => ({ ...r })) : db.prepare(sql).run(...bindings).changes
       })
       db.exec('COMMIT')
-      return t.operation === 'query' ? results[0] : results
-    } catch (e) { db.exec('ROLLBACK'); throw e }
+      return t.operation === 'query' ? results[0] : detailed ? results : results.filter((_,index)=>!t.statements?.[index]?.includes('RETURNING tool_name'))
+    } catch (e) { try { db.exec('ROLLBACK') } catch {} throw e }
   }
+  const call = (name, user = 'worker', values = {}) => execute(name,user,values)
+  const callDetailed = (name, user = 'worker', values = {}) => execute(name,user,values,true)
   for (const scope of [A,B]) call('create_workspace','owner', { ...scope, organization_name: 'Org', brand_name: `Brand ${scope.brand_id}`, requisition_title: 'Engineer', operation_id: `boot-${scope.brand_id}` })
   call('add_workspace_member','owner', { ...A, member_user_id: 'staff-a', role: 'recruiter', operation_id: 'member-a' })
   call('add_workspace_member','owner', { ...B, member_user_id: 'staff-b', role: 'recruiter', operation_id: 'member-b' })
@@ -38,7 +40,7 @@ function fixture({ open = true } = {}) {
   if (open) db.exec("UPDATE hiring_runtime_gate SET intake_status='open' WHERE id=1")
   const publish = () => { for (const scope of [A,B]) assert.deepEqual(call('publish_job_requisition','owner',publication(scope)), [1,1]) }
   const submit = () => { publish(); assert.deepEqual(call('submit_job_application','worker',application()), [1,1,1,1,0,1,1]) }
-  return { db, call, publish, submit, advance: (ms = 10001) => { now += ms } }
+  return { db, call, callDetailed, publish, submit, advance: (ms = 10001) => { now += ms } }
 }
 
 export { fixture, A, B, publication, application }
