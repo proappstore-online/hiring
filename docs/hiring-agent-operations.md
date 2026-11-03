@@ -15,6 +15,29 @@ application. Filter unrelated mail before it reaches the model and skip processe
 on later runs. Operational access uses PAGS and PAS MCP. The owner permits Himalaya only
 as an independent test check; it is not the agent's integration.
 
+## Valid stage transitions
+
+Use `change_application_stage` for these pipeline edges (the approved-offer
+guard still applies when moving to `offered` or `hired`):
+
+| From | Allowed next stages |
+| --- | --- |
+| `submitted` | `in_review` |
+| `in_review` | `shortlisted`, `interviewing`, `rejected` |
+| `shortlisted` | `offered`, `interviewing`, `rejected` |
+| `interviewing` | `decision_pending` |
+| `decision_pending` | `offered`, `rejected` |
+| `offered` | `hired`, `rejected` |
+
+`screening` is not a stage. `withdrawn` is not a target of
+`change_application_stage`. Handle duplicate people with `merge_candidates`.
+After acceptance, use `record_lifecycle_transition` for `accepted` →
+`onboarding` → `onboarded` → `active`. Staff withdrawal uses that lifecycle tool
+only from `accepted`, `onboarding`, or `onboarded`; the same three stages also
+allow rejection. `hired`, `rejected`, `withdrawn`, and `active` are terminal.
+The agent mutation `hiring_v1_advance_application` further reserves final
+dispositions for the dedicated decision action.
+
 ## Canonical instance and account
 
 | Item | Verified value |

@@ -102,6 +102,20 @@ test('stale version, forged prior state, blank reason/operation and unauthorized
   assert.equal(call('get_application','staff-a',{...scope,application_id:'app-a'})[0].version,1)
  } finally {db.close()}
 })
+test('stage refusals expose stable APP codes and preserve the submitted transition details', () => {
+ const {db,call}=seeded()
+ try {
+  const base=change('submitted','in_review')
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,application_id:'missing'}),/APP:not_found application not found in brand/)
+  assert.throws(()=>call('change_application_stage','outsider',base),/APP:forbidden actor lacks recruiter access for application/)
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,expected_version:0}),/APP:version_mismatch stale application version or from_stage/)
+  assert.throws(()=>call('change_application_stage','staff-a',change('submitted','screening')),/APP:invalid_transition invalid application stage transition from 'submitted' to 'screening'/)
+  assert.equal(call('change_application_stage','staff-a',base).at(-1),1)
+  assert.ok(call('change_application_stage','staff-a',base).every(n=>n===0))
+  assert.throws(()=>call('change_application_stage','staff-a',{...base,to_stage:'rejected'}),/APP:duplicate_operation_id operation_id already used for a different stage change/)
+  assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_stage_events WHERE id='transition'").get().n,1)
+ } finally {db.close()}
+})
 test('stage evidence rejects update and delete; audit failure rolls back transition',()=>{
  const {db,call}=seeded()
  try {
