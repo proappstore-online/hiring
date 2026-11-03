@@ -13,7 +13,7 @@ const transpile=s=>ts.transpile(s,{jsx:ts.JsxEmit.React,module:ts.ModuleKind.ESN
 const web=new URL('../web/',import.meta.url).pathname
 const fixture=`import React from 'react';import {createRoot} from 'react-dom/client';import {CandidateDuplicates} from '/src/CandidateDuplicates.tsx';
 window.calls=[];window.mergeHistory=[];window.owner=true;window.reject=false;
-window.read=async(name,p)=>{window.calls.push({name,p});return name==='list_candidate_merges'?window.mergeHistory:window.mergeHistory.length?[]:[{id:'b',name:'Duplicate',email:'same@example.com',phone:'123',linkedin_url:''}]};
+window.read=async(name,p)=>{window.calls.push({name,p});return name==='list_candidate_merges'?window.mergeHistory:window.mergeHistory.length?[]:[{id:'b',name:'Duplicate',email:'same@example.com',phone:'123',linkedin_url:'https://www.linkedin.com/in/synthetic-test'}]};
 window.write=async(name,p)=>{window.calls.push({name,p});if(!window.reject)window.mergeHistory=[{...p,field_sources_json:JSON.stringify({name:p.name_source,email:p.email_source,phone:p.phone_source,linkedin_url:p.linkedin_url_source}),name:'Current',email:'same@example.com'}];throw Error('Lost response')};
 const root=createRoot(document.getElementById('root'));window.render=()=>root.render(<CandidateDuplicates key={String(window.owner)} scope={{organization_id:'org',brand_id:'brand'}} application={{id:'app',candidate_id:'a',candidate_name:'Current',email:'same@example.com'}} owner={window.owner}/>);window.render();`
 test('duplicate review requires explicit confirmation; uncertain response reads provenance',async()=>{

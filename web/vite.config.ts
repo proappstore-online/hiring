@@ -10,6 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'inline',
       workbox: {
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,wasm,json}'],

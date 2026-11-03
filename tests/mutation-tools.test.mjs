@@ -40,7 +40,7 @@ const scope = { organization_id:'org', brand_id:'brand', application_id:'app' }
 function ready(name) {
   const f=fixture()
   f.call('create_workspace','owner',{...scope,requisition_id:'req',organization_name:'Org',brand_name:'Brand',requisition_title:'Role',operation_id:'boot'})
-  f.call('create_linkedin_application','owner',{...scope,requisition_id:'req',candidate_id:'person',candidate_name:'Person',email:'person@example.com',phone:'',linkedin_url:'',source_detail:'Source',basis_reference:'Basis',contact_context:'Context',assignee_user_id:'owner',operation_id:'person'})
+  f.call('create_linkedin_application','owner',{...scope,requisition_id:'req',candidate_id:'person',candidate_name:'Person',email:'person@example.com',phone:'',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'Source',basis_reference:'Basis',contact_context:'Context',assignee_user_id:'owner',operation_id:'person'})
   let user='owner'
   let args={...scope,expected_version:1,operation_id:'mutation'}
   if(name==='hiring_v1_create_requisition') args={...args,requisition_id:'new-req',title:'New role',expected_version:0}

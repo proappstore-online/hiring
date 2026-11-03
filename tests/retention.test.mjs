@@ -26,7 +26,7 @@ function fixture() {
   const b=s.brand_id
   call('create_workspace','root',{...s,requisition_id:'req-'+b,organization_name:'Org',brand_name:b,requisition_title:'Role',operation_id:'boot-'+b})
   db.prepare("INSERT INTO hiring_memberships(id,organization_id,brand_id,user_id,role,created_at) VALUES (?,?,?,?,'owner',0)").run('owner-'+b,s.organization_id,b,'owner-'+b)
-  call('create_linkedin_application','owner-'+b,{...s,requisition_id:'req-'+b,candidate_id:'candidate-'+b,application_id:'app-'+b,candidate_name:'PRIVATE PERSON',email:'private@example.test',phone:'123',linkedin_url:'https://linkedin.com/private',source_detail:'PRIVATE SOURCE',basis_reference:'basis',contact_context:'PRIVATE CONTEXT',assignee_user_id:'owner-'+b,operation_id:'person-'+b})
+  call('create_linkedin_application','owner-'+b,{...s,requisition_id:'req-'+b,candidate_id:'candidate-'+b,application_id:'app-'+b,candidate_name:'PRIVATE PERSON',email:'private@example.test',phone:'123',linkedin_url:'https://linkedin.com/in/synthetic-test',source_detail:'PRIVATE SOURCE',basis_reference:'basis',contact_context:'PRIVATE CONTEXT',assignee_user_id:'owner-'+b,operation_id:'person-'+b})
  }
  const ownerActions=(name,p)=>Promise.resolve(call(name,'owner-a',p))
  const actions=(name,p)=>Promise.resolve(call(name,'system:worker',p))
@@ -144,7 +144,7 @@ test('signed private ledger restores tombstones and active holds before access; 
  const source=fixture();attachment(source)
  const requestId=erase(source);source.call('request_store_deletion','owner-a',{...A,request_id:requestId})
  // A different subject in the same brand is held; the erased subject can replay.
- source.call('create_linkedin_application','owner-a',{...A,requisition_id:'req-a',candidate_id:'held-person',application_id:'held-app',candidate_name:'PRIVATE HELD',email:'',phone:'',linkedin_url:'',source_detail:'source',basis_reference:'basis',contact_context:'context',assignee_user_id:'owner-a',operation_id:'held-person'})
+ source.call('create_linkedin_application','owner-a',{...A,requisition_id:'req-a',candidate_id:'held-person',application_id:'held-app',candidate_name:'PRIVATE HELD',email:'',phone:'',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'source',basis_reference:'basis',contact_context:'context',assignee_user_id:'owner-a',operation_id:'held-person'})
  source.call('record_store_hold','owner-a',{...A,application_id:'held-app',operation_id:'hold-restored',state:'active',reason_reference:'opaque-case',review_at:1})
  const artifact=await exportRetentionLedger({ownerActions:source.ownerActions,scope:A,secret})
  assert.doesNotMatch(artifact.body,/PRIVATE|private@example/)

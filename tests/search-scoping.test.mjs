@@ -26,7 +26,7 @@ function fixture() {
  for(const brand of ['a','b']) {
   const s={organization_id:'org',brand_id:brand,requisition_id:'req-'+brand}
   call('create_workspace','root',{...s,organization_name:'Org',brand_name:brand,requisition_title:'Role',operation_id:'boot-'+brand})
-  for(let i=0;i<4;i++)call('create_linkedin_application','root',{...s,candidate_id:`c-${brand}-${i}`,application_id:`app-${brand}-${i}`,candidate_name:'Person '+i,email:'same'+i+'@example.test',phone:'secret',linkedin_url:'',source_detail:'PRIVATE',basis_reference:'basis',contact_context:'PRIVATE',assignee_user_id:'root',operation_id:`create-${brand}-${i}`})
+  for(let i=0;i<4;i++)call('create_linkedin_application','root',{...s,candidate_id:`c-${brand}-${i}`,application_id:`app-${brand}-${i}`,candidate_name:'Person '+i,email:'same'+i+'@example.test',phone:'secret',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'PRIVATE',basis_reference:'basis',contact_context:'PRIVATE',assignee_user_id:'root',operation_id:`create-${brand}-${i}`})
  }
  const grant=(user,role='recruiter',req=null)=>call('grant_workspace_access','root',{...scope,grant_id:user,member_user_id:user,role,requisition_id:req,operation_id:'grant-'+user})
  grant('recruiter');grant('interviewer','reviewer');grant('auditor','auditor');grant('limited','recruiter','req-a')

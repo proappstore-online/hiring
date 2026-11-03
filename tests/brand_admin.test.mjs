@@ -42,6 +42,27 @@ function fixture({ open = true } = {}) {
 }
 const counts = db => ['hiring_candidates','hiring_applications','hiring_intake_receipts','hiring_consent_records','hiring_stage_events','hiring_audit_events'].map(t => db.prepare(`SELECT count(*) AS n FROM ${t}`).get().n)
 
+test('workspace discovery lists every granted legacy brand without widening scoped admin reads', () => {
+  const { db, call } = fixture()
+  try {
+    call('update_brand_settings', 'owner', { ...B, name: 'FreeGameStore', slug: 'freegamestore', notice_version: 'v1', reply_identity: 'FGS', operation_id: 'legacy-name' })
+    const insertBrand = db.prepare('INSERT INTO hiring_brands(id,organization_id,name,created_at) VALUES (?, ?, ?, 1)')
+    const insertGrant = db.prepare("INSERT INTO hiring_memberships(id,organization_id,brand_id,user_id,role,created_at) VALUES (?, ?, ?, 'owner', 'owner', 1)")
+    for (let i = 0; i < 101; i++) {
+      const id = `legacy-${i}`
+      insertBrand.run(id, A.organization_id, id)
+      insertGrant.run(`owner-${id}`, A.organization_id, id)
+    }
+    const owned = call('list_my_workspaces', 'owner').filter(row => row.organization_id === A.organization_id)
+    assert.equal(new Set(owned.map(row => row.brand_id)).size, 103)
+    assert.equal(owned.find(row => row.brand_id === B.brand_id).brand_name, 'FreeGameStore')
+    assert.deepEqual(call('list_my_workspaces', 'staff-a').map(row => row.brand_id), [A.brand_id])
+    assert.deepEqual(call('get_admin_settings', 'staff-a', B), [])
+    assert.deepEqual(call('list_workspace_grants', 'staff-a', B), [])
+    assert.equal(call('get_admin_settings', 'owner', B)[0].brand_name, 'FreeGameStore')
+  } finally { db.close() }
+})
+
 
 test('identity editors enforce ownership, reject replay and forged scopes, and audit atomically', () => {
   const { db, call } = fixture()

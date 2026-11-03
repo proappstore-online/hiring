@@ -63,7 +63,7 @@ test('brand withdrawal covers independently created profiles owned by the same w
     f.advance()
     f.call('submit_job_application','worker',{...application(B,'b'),talent_pool_consent:1})
     // Separate imported application/profile still belongs to the same signed-in candidate.
-    f.call('create_linkedin_application','owner',{...A,candidate_id:'second',application_id:'second-app',candidate_name:'Second',email:'second@example.com',phone:'',linkedin_url:'',source_detail:'manual',basis_reference:'basis',contact_context:'context',assignee_user_id:'owner',operation_id:'second-create'})
+    f.call('create_linkedin_application','owner',{...A,candidate_id:'second',application_id:'second-app',candidate_name:'Second',email:'second@example.com',phone:'',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'manual',basis_reference:'basis',contact_context:'context',assignee_user_id:'owner',operation_id:'second-create'})
     f.db.exec("UPDATE hiring_candidates SET worker_user_id='worker' WHERE id='second'; INSERT INTO hiring_consent_records(id,organization_id,brand_id,application_id,purpose,legal_basis,notice_version,evidence_reference,actor_user_id,recorded_at) VALUES('second-consent','org','a','second-app','talent_pool','consent','v1','affirmative','worker',1000010001)")
     assert.equal(f.call('list_talent_pool','owner',A).length,2)
     f.call('withdraw_my_talent_pool','worker',{...A,application_id:'application-a',operation_id:'all-brand'})

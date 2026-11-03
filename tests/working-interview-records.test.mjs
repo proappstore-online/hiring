@@ -6,7 +6,7 @@ const invitation = { ...scope, record_id:'working', invitation:'Observe daily st
 const outcome = { ...scope, record_id:'working', expected_version:1, outcome:'Proceed', exceptions:'None', operation_id:'outcome' }
 function setup(configured=true) {
  const f=fixture()
- f.call('create_linkedin_application','owner-a',{...scope,requisition_id:'req-a',candidate_id:'candidate',candidate_name:'Alex',email:'alex@example.com',phone:'',linkedin_url:'',campaign_id:null,source_detail:'Recruiter',basis_reference:'Basis',contact_context:'Context',assignee_user_id:'recruiter',operation_id:'application'})
+ f.call('create_linkedin_application','owner-a',{...scope,requisition_id:'req-a',candidate_id:'candidate',candidate_name:'Alex',email:'alex@example.com',phone:'',linkedin_url:'https://www.linkedin.com/in/synthetic-test',campaign_id:null,source_detail:'Recruiter',basis_reference:'Basis',contact_context:'Context',assignee_user_id:'recruiter',operation_id:'application'})
  if(configured) f.save(0,'owner-a',JSON.stringify({meeting:{time:'09:30',timezone:'Australia/Melbourne',secret_meeting_reference:'private',nested:[{MEETING_PASSWORD:'password'}]}}))
  return f
 }

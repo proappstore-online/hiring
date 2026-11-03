@@ -19,7 +19,7 @@ function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={
   }catch(e){db.exec('ROLLBACK');throw e}
  }
  call('create_workspace','owner',{...scope,organization_name:'Org',brand_name:'Brand',requisition_title:'Role',operation_id:'boot'})
- call('create_linkedin_application','owner',{...scope,candidate_id:'candidate',operation_id:'candidate',candidate_name:'Person',email:'person@example.com',phone:'',linkedin_url:'',source_detail:'Applicant',basis_reference:'Applicant initiated',contact_context:'Applicant supplied',assignee_user_id:'owner'})
+ call('create_linkedin_application','owner',{...scope,candidate_id:'candidate',operation_id:'candidate',candidate_name:'Person',email:'person@example.com',phone:'',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'Applicant',basis_reference:'Applicant initiated',contact_context:'Applicant supplied',assignee_user_id:'owner'})
  call('save_offer_draft','owner',{tenant_id:'org',brand_id:'brand',application_id:'app',requisition_id:'req',terms_json:JSON.stringify({compensation_type:compensation,subject:'Original offer',body:legacyAcceptance?'Erroneous paid test terms, not sent':'Unpaid volunteer role'}),expected_version:0,operation_id:'offer-draft'})
  const offer=db.prepare('SELECT * FROM hiring_offers').get()
  for(const [name,version] of [['submit_offer_for_approval',1],['approve_offer',2]])call(name,'owner',{tenant_id:'org',brand_id:'brand',offer_id:offer.id,expected_version:version,operation_id:name})

@@ -27,7 +27,7 @@ function fixture() {
     } catch (error) { db.exec('ROLLBACK'); throw error }
   }
   call('create_workspace', 'owner', { ...scope, organization_name: 'Org', brand_name: 'Brand', requisition_title: 'Intern', operation_id: 'bootstrap' })
-  call('create_linkedin_application', 'owner', { ...scope, candidate_id: 'candidate', operation_id: 'candidate', candidate_name: 'Person', email: 'person@example.com', phone: '', linkedin_url: '', source_detail: 'Applicant', basis_reference: 'Applicant initiated', contact_context: 'Applicant supplied', assignee_user_id: 'owner' })
+  call('create_linkedin_application', 'owner', { ...scope, candidate_id: 'candidate', operation_id: 'candidate', candidate_name: 'Person', email: 'person@example.com', phone: '', linkedin_url: 'https://www.linkedin.com/in/synthetic-test', source_detail: 'Applicant', basis_reference: 'Applicant initiated', contact_context: 'Applicant supplied', assignee_user_id: 'owner' })
   return { db, call }
 }
 

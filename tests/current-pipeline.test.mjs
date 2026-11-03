@@ -31,7 +31,7 @@ test('current pipeline respects requisition grants, reviewer assignments, revoke
       f.call('grant_workspace_access', 'owner', { ...A, grant_id: user, member_user_id: user, role, requisition_id: A.requisition_id, operation_id: user })
     }
     f.call('create_requisition', 'owner', { ...A, requisition_id: 'second', title: 'Second role', operation_id: 'second-role' })
-    f.call('create_linkedin_application', 'staff-a', { ...A, requisition_id: 'second', candidate_id: 'second-candidate', application_id: 'second-application', operation_id: 'second-application', candidate_name: 'Second', email: '', phone: '', linkedin_url: '', source_detail: 'Manual', basis_reference: 'Policy', contact_context: 'Direct', assignee_user_id: 'staff-a' })
+    f.call('create_linkedin_application', 'staff-a', { ...A, requisition_id: 'second', candidate_id: 'second-candidate', application_id: 'second-application', operation_id: 'second-application', candidate_name: 'Second', email: '', phone: '', linkedin_url: 'https://www.linkedin.com/in/synthetic-test', source_detail: 'Manual', basis_reference: 'Policy', contact_context: 'Direct', assignee_user_id: 'staff-a' })
     assert.deepEqual(counts(f.call('get_current_pipeline', 'owner', A)), { submitted: 2 })
     assert.deepEqual(counts(f.call('get_current_pipeline', 'limited', A)), { submitted: 1 })
     assert.deepEqual(f.call('get_current_pipeline', 'reviewer', A), [])

@@ -35,7 +35,7 @@ function fixture() {
 const A = { organization_id: 'org', brand_id: 'a' }
 const B = { organization_id: 'org', brand_id: 'b' }
 const boot = (scope, operation_id = `boot-${scope.brand_id}`) => ({ ...scope, organization_name: 'Organization', brand_name: scope.brand_id, requisition_id: `req-${scope.brand_id}`, requisition_title: 'Engineer', operation_id })
-const person = s => ({ ...s, requisition_id: `req-${s.brand_id}`, candidate_id: `candidate-${s.brand_id}`, application_id: `app-${s.brand_id}`, operation_id: `person-${s.brand_id}`, candidate_name: 'Person', email: 'person@example.com', phone: '', linkedin_url: '', source_detail: 'Sourcing', basis_reference: 'Policy', contact_context: 'Direct', assignee_user_id: `staff-${s.brand_id}` })
+const person = s => ({ ...s, requisition_id: `req-${s.brand_id}`, candidate_id: `candidate-${s.brand_id}`, application_id: `app-${s.brand_id}`, operation_id: `person-${s.brand_id}`, candidate_name: 'Person', email: 'person@example.com', phone: '', linkedin_url: 'https://www.linkedin.com/in/synthetic-test', source_detail: 'Sourcing', basis_reference: 'Policy', contact_context: 'Direct', assignee_user_id: `staff-${s.brand_id}` })
 const snapshot = db => db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(({ name }) => [name, db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all()])
 function seeded() {
   const f = fixture()

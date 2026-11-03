@@ -24,7 +24,7 @@ export function correctionFixture() {
     const b=s.brand_id
     call('create_workspace','root',{...s,requisition_id:'req-'+b,organization_name:'Org',brand_name:b,requisition_title:'Role',operation_id:'boot-'+b})
     db.prepare("INSERT INTO hiring_memberships(id,organization_id,brand_id,user_id,role,created_at) VALUES (?,'org',?,?,'owner',0)").run('owner-'+b,b,'owner-'+b)
-    call('create_linkedin_application','owner-'+b,{...s,requisition_id:'req-'+b,candidate_id:'c-'+b,candidate_name:'Private '+b,email:b+'@example.test',phone:'123',linkedin_url:'',source_detail:'CONFIDENTIAL SOURCE',basis_reference:'basis',contact_context:'CONFIDENTIAL CONTEXT',assignee_user_id:'owner-'+b,operation_id:'person-'+b})
+    call('create_linkedin_application','owner-'+b,{...s,requisition_id:'req-'+b,candidate_id:'c-'+b,candidate_name:'Private '+b,email:b+'@example.test',phone:'123',linkedin_url:'https://www.linkedin.com/in/synthetic-test',source_detail:'CONFIDENTIAL SOURCE',basis_reference:'basis',contact_context:'CONFIDENTIAL CONTEXT',assignee_user_id:'owner-'+b,operation_id:'person-'+b})
   }
   return {db,call,advance:ms=>{now+=ms}}
 }

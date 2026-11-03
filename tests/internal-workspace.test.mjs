@@ -10,12 +10,14 @@ function fixture() {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys=ON')
   for (const migration of migrations.migrations) db.exec(migration.sql)
+  let returned = []
   const call = (name, user, values = {}) => {
     const tool = action(name)
     const optional = Object.fromEntries(Object.entries(tool.params ?? {}).filter(([, schema]) => schema.optional).map(([key]) => [key, null]))
     const params = { ...optional, ...values, __user_id: user, __now: Date.now(), __uuid: crypto.randomUUID() }
     const statements = tool.statements ?? [tool.sql]
     const result = []
+    returned = []
     db.exec('BEGIN')
     try {
       for (const statement of statements) {
@@ -24,13 +26,18 @@ function fixture() {
         const binds = []
         const sql = statement.replace(/:([a-z_][a-z0-9_]*)/gi, (_, key) => { binds.push(params[key]); return '?' })
         assert.ok(binds.every(v => v !== undefined), `${name}: missing param`)
-        result.push(tool.operation === 'query' ? db.prepare(sql).all(...binds) : db.prepare(sql).run(...binds).changes)
+        if (tool.operation === 'query') result.push(db.prepare(sql).all(...binds))
+        else if (['create_linkedin_application','add_application_note'].includes(name) && /\bRETURNING\b/i.test(sql)) {
+          const rows = db.prepare(sql).all(...binds)
+          returned.push(...rows.map(row => ({ ...row })))
+          result.push(rows.length)
+        } else result.push(db.prepare(sql).run(...binds).changes)
       }
       db.exec('COMMIT')
       return tool.operation === 'query' ? result[0] : result
     } catch (e) { db.exec('ROLLBACK'); throw e }
   }
-  return { db, call }
+  return { db, call, returned: () => returned }
 }
 const scope = { organization_id: 'org-a', brand_id: 'brand-a' }
 const bootstrap = { ...scope, requisition_id: 'req-a', organization_name: 'Org A', brand_name: 'Brand A', requisition_title: 'Engineer', operation_id: 'bootstrap-a' }
@@ -40,7 +47,7 @@ test('generic application creation preserves any source, optional profile, assig
   const { db, call } = fixture()
   call('create_workspace', 'staff-a', bootstrap)
   for (const source of ['linkedin', 'email', 'referral', 'job_board', 'recruiter_import', 'manual', 'community meetup']) {
-    const input = { ...candidate, source, profile_url: 'https://example.org/profile', candidate_id: `candidate-${source}`, application_id: `application-${source}`, operation_id: `operation-${source}` }
+    const input = { ...candidate, source, profile_url: source === 'linkedin' ? 'https://www.linkedin.com/in/synthetic-test' : 'https://example.org/profile', candidate_id: `candidate-${source}`, application_id: `application-${source}`, operation_id: `operation-${source}` }
     assert.deepEqual(call('create_application', 'outsider', input), [0,0,0,0,0])
     assert.deepEqual(call('create_application', 'staff-a', input), [1,1,1,1,1])
     const record = call('list_applications', 'staff-a', scope).find(r => r.id === input.application_id)
@@ -125,22 +132,57 @@ test('authorized LinkedIn create accepts the bare host and makes an application 
   assert.equal(call('list_applications', 'staff-a', scope).length, 1)
 })
 
-test('authorized LinkedIn create stores a missing profile URL as NULL and preserves audit and scope', () => {
+test('audited LinkedIn and note writes return their text identities, with no replay receipt', () => {
+  const { db, call, returned } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  assert.deepEqual(call('create_linkedin_application', 'staff-a', candidate), [1, 1, 1, 1])
+  assert.deepEqual(returned(), [{ candidate_id: candidate.candidate_id, application_id: candidate.application_id }])
+  assert.deepEqual(call('create_linkedin_application', 'staff-a', candidate), [0, 0, 0, 0])
+  assert.deepEqual(returned(), [])
+  const note = { ...scope, application_id: candidate.application_id, note_id: 'note-text-id', body: 'Private note', operation_id: 'note-operation' }
+  assert.deepEqual(call('add_application_note', 'staff-a', note), [1, 1])
+  assert.deepEqual(returned(), [{ note_id: note.note_id, application_id: note.application_id }])
+  assert.equal(db.prepare('SELECT id FROM hiring_notes WHERE operation_id=?').get(note.operation_id).id, note.note_id)
+  assert.deepEqual(call('add_application_note', 'staff-a', note), [0, 0])
+  assert.deepEqual(returned(), [])
+})
+
+test('LinkedIn profile URLs are preserved and invalid URLs cannot create partial applications', () => {
+  const { db, call } = fixture()
+  call('create_workspace', 'staff-a', bootstrap)
+  for (const [i, url] of ['https://example.org/in/forged', 'http://linkedin.com/in/insecure', 'https://linkedin.com/in/', 'https://linkedin.com/in/name @example.test'].entries()) {
+    const input = { ...candidate, candidate_id: `bad-${i}`, application_id: `bad-app-${i}`, operation_id: `bad-op-${i}`, linkedin_url: url }
+    assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [0, 0, 0, 0])
+  }
+  assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_candidates').get().n, 0)
+  assert.deepEqual(call('create_linkedin_application', 'staff-a', candidate), [1, 1, 1, 1])
+  const row = call('get_application', 'staff-a', { ...scope, application_id: candidate.application_id })[0]
+  assert.equal(row.linkedin_url, candidate.linkedin_url)
+  assert.equal(row.profile_url, candidate.linkedin_url)
+  const generic = { ...candidate, candidate_id: 'generic', application_id: 'generic-app', operation_id: 'generic-op', source: 'linkedin', profile_url: 'https://linkedin.com/in/generic-applicant' }
+  assert.deepEqual(call('create_application', 'staff-a', generic), [1, 1, 1, 1, 1])
+  const genericRow = call('get_application', 'staff-a', { ...scope, application_id: generic.application_id })[0]
+  assert.equal(genericRow.linkedin_url, generic.profile_url)
+  assert.equal(genericRow.profile_url, generic.profile_url)
+  assert.deepEqual(call('create_application', 'staff-a', { ...generic, candidate_id: 'missing', application_id: 'missing', operation_id: 'missing', profile_url: '' }), [0, 0, 0, 0, 0])
+})
+
+test('LinkedIn create rejects a missing profile URL without partial records or audit', () => {
   for (const url of ['', '   ', null, undefined]) {
     const { db, call } = fixture()
     call('create_workspace', 'staff-a', bootstrap)
     const input = { ...candidate, linkedin_url: url, source_detail: 'LinkedIn sourcing event recorded by recruiter', contact_context: 'No profile URL or contact details available' }
     if (url === undefined) delete input.linkedin_url
-    assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [1, 1, 1, 1])
-    assert.equal(db.prepare('SELECT linkedin_profile_url FROM hiring_candidates WHERE id=?').get(input.candidate_id).linkedin_profile_url, null)
+    if (url === undefined) assert.equal(tools.find(t=>t.name==='create_linkedin_application').params.linkedin_url.optional, false)
+    else {
+    assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [0, 0, 0, 0])
+    assert.equal(db.prepare('SELECT count(*) AS n FROM hiring_candidates').get().n, 0)
     const rows = call('list_applications', 'staff-a', scope)
-    assert.equal(rows.length, 1)
-    assert.equal(rows[0].linkedin_url, null)
-    assert.equal(rows[0].source_detail, input.source_detail)
-    assert.equal(rows[0].contact_context, input.contact_context)
+    assert.equal(rows.length, 0)
     assert.equal(call('list_applications', 'outsider', scope).length, 0)
     assert.deepEqual(call('create_linkedin_application', 'staff-a', input), [0, 0, 0, 0])
-    assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.created'").get().n, 1)
+    assert.equal(db.prepare("SELECT count(*) AS n FROM hiring_audit_events WHERE action='application.created'").get().n, 0)
+    }
   }
 })
 
