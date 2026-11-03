@@ -128,12 +128,8 @@ invalidate continuation; restart the search. Pages are live reads, not snapshots
 Every page rechecks authority even if a caller constructs a token itself.
 
 Migration `0041_grant_scoped_search` adds one bounded counter row per principal.
-Migration `0068_search_budget_gate` adds a view with an `INSTEAD OF INSERT`
-trigger that advances that counter atomically. SQLite reports zero direct changes
-for the outer view insert, including when the search returns rows. The trigger
-still writes the physical counter row, so the 30-request limit is unchanged.
 All four search actions atomically increment the same authenticated-user budget
-and read within a D1 batch. Each batch contains one view insert with `RETURNING`;
+and read within a D1 batch. Each batch contains one upsert with `RETURNING`;
 its response row contains `status`, `retry_after` and `rows_json`. The client
 decodes `rows_json` into the documented record projection. No result payload or
 query text is persisted in the budget table. This fits the platform requirement
@@ -143,6 +139,10 @@ and a status row with `status=429` and `retry_after`. The next minute resets the
 counter. Denied/invalid searches also consume budget. Counter storage contains
 only identity, window and count; it never contains query text. The `x-rate-limit`
 manifest extension documents this policy; SQL enforces it independently.
+Migration `0068_search_budget_gate` remains in the applied schema but is not used
+by the registered search tools. Its view trigger advanced the budget correctly,
+yet hosted D1 still reported that write as `meta.changes: 1`; SQLite's local
+`changes()` result was not a reliable proxy for D1 response metadata.
 
 **Transport boundary:** the current PAS action endpoint wraps successful SQL
 batches in HTTP 200 and does not implement authenticated per-tool HTTP status
