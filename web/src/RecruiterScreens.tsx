@@ -1,3 +1,4 @@
+import { GoogleCalendarSettings } from './GoogleCalendar'
 import { TermsFields, termsFromForm } from './vacancy-terms'
 import { CurrentPipeline } from './CurrentPipeline'
 import { FunnelAnalytics } from './FunnelAnalytics'
@@ -110,7 +111,7 @@ export function SettingsScreen() {
   const run: Run = async (name, params) => { setBusy(true); setError(''); setSuccess(''); try { await write(name, params); await reloadSpaces(); setSuccess('Action saved successfully.') } catch (e) { setError(mutationError(e)) } finally { setBusy(false) } }
   const organizationPath = organizationSettingsUrl(space.organization_id)
   if (location.pathname === organizationPath && !space.can_create_brand) return <NotFound />
-  return <Screen title="Settings"><SettingsNavigation />{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} /></Screen>
+  return <Screen title="Settings"><SettingsNavigation />{error && <p role="alert">{error}</p>}{success && <p role="status">{success}</p>}<Admin onChanged={reloadSpaces} scope={scopeOf(space)} role={space.role} organizationName={space.organization_name} canCreateBrand={Boolean(space.can_create_brand)} busy={busy} run={run} managementScope={location.pathname === organizationPath ? 'organization' : 'brand'} />{location.pathname !== organizationPath && <GoogleCalendarSettings key={JSON.stringify(scopeOf(space))} scope={scopeOf(space)} />}</Screen>
 }
 
 function SettingsNavigation() {

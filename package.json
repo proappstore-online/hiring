@@ -8,6 +8,7 @@
     "dev": "pnpm --filter @hiring/web dev",
     "prebuild": "npx -y @proappstore/cli@latest check",
     "build": "pnpm --filter @hiring/web build",
+    "build:worker": "pnpm --filter @hiring/worker build",
     "preview": "pnpm --filter @hiring/web preview",
     "dev:marketing": "pnpm --filter @hiring/marketing dev",
     "build:marketing": "pnpm --filter @hiring/marketing build",

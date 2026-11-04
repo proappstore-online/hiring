@@ -1,5 +1,9 @@
 # Calendar and job-board integration assessment (#41)
 
+2026-11-04 addition: Serge requested a read-only Google Meet attendance job.
+[Its implementation and activation contract](meeting-attendance.md) is separate
+from the calendar invitation and candidate-transfer decisions assessed below.
+
 Version 1 · assessed 2026-10-25 · accountable owner: Serge.
 Decision: defer implementation. This assessment authorizes no external candidate
 transfer, provider installation, OAuth grant, purchase or production enablement.

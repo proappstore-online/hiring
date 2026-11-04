@@ -7219,6 +7219,386 @@
         }
       },
       "sql": "SELECT j.requisition_id,j.linkedin_job_id,(CASE WHEN abs(j.expiry_date)<10000000000 THEN j.expiry_date*1000 ELSE j.expiry_date END) AS expiry_date,j.version AS expected_version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100"
+    },
+    {
+      "name": "configure_meeting_attendance",
+      "description": "Create or revise attendance tracking for one candidate and meeting occurrence. kind interview follows the linked Hiring interview time and requires its location to contain this Meet URL; working_interview and standup use explicit epoch-millisecond start/end. Supply a verified Google users/ID or null (unresolved), never infer it from a display name. expected_version=0 creates; subsequent saves require the current version. enabled=0 stops checks. No messages or hiring transitions.",
+      "operation": "batch",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "interview_id": {
+          "type": "string",
+          "optional": true
+        },
+        "kind": {
+          "type": "string"
+        },
+        "meeting_code": {
+          "type": "string"
+        },
+        "starts_at": {
+          "type": "integer"
+        },
+        "ends_at": {
+          "type": "integer"
+        },
+        "google_user_id": {
+          "type": "string",
+          "optional": true
+        },
+        "enabled": {
+          "type": "integer"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "calendar_id": {
+          "type": "string",
+          "optional": true
+        },
+        "calendar_event_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_attendance_targets(id,organization_id,brand_id,application_id,interview_id,kind,meeting_code,starts_at,ends_at,google_user_id,calendar_id,calendar_event_id,enabled,version,created_by,created_at,updated_at) SELECT :target_id,:organization_id,:brand_id,:application_id,:interview_id,:kind,:meeting_code,:starts_at,:ends_at,COALESCE(:google_user_id,(SELECT 'users/'||substr(c.worker_user_id,8) FROM hiring_candidates c JOIN hiring_applications a ON a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.worker_user_id GLOB 'google:[0-9]*' AND substr(c.worker_user_id,8) NOT GLOB '*[^0-9]*')),:calendar_id,:calendar_event_id,:enabled,1,:__user_id,:__now,:__now WHERE :expected_version=0 AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter')) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d JOIN hiring_applications a ON a.candidate_id=d.candidate_id AND a.organization_id=d.organization_id AND a.brand_id=d.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) ON CONFLICT(id) DO NOTHING",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attendance.configured',:__user_id,:operation_id,:__now,'attendance_target',:target_id,'Meeting attendance tracking configured' WHERE changes()=1",
+        "UPDATE hiring_attendance_targets SET meeting_code=:meeting_code,starts_at=:starts_at,ends_at=:ends_at,google_user_id=COALESCE(:google_user_id,(SELECT 'users/'||substr(c.worker_user_id,8) FROM hiring_candidates c JOIN hiring_applications a ON a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND c.worker_user_id GLOB 'google:[0-9]*' AND substr(c.worker_user_id,8) NOT GLOB '*[^0-9]*')),calendar_id=:calendar_id,calendar_event_id=:calendar_event_id,enabled=:enabled,version=version+1,created_by=:__user_id,updated_at=:__now WHERE id=:target_id AND organization_id=:organization_id AND brand_id=:brand_id AND application_id=:application_id AND kind=:kind AND interview_id IS :interview_id AND version=:expected_version AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter')) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d JOIN hiring_applications a ON a.candidate_id=d.candidate_id AND a.organization_id=d.organization_id AND a.brand_id=d.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id) AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,:application_id,'attendance.configured',:__user_id,:operation_id,:__now,'attendance_target',:target_id,'Meeting attendance tracking configured' WHERE changes()=1"
+      ]
+    },
+    {
+      "name": "list_meeting_attendance",
+      "description": "Read scoped meeting attendance and the latest check for the current configuration/schedule. not_observed is evidence for review, not a confirmed no-show. source_ready=0 needs interview schedule or Meet location repair. enabled=0 pauses checks. Checks cover the seven days after the meeting.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string",
+          "optional": true
+        }
+      },
+      "sql": "SELECT t.*,(SELECT json_object('status',c.status,'duration_seconds',c.duration_seconds,'first_join_at',c.first_join_at,'last_leave_at',c.last_leave_at,'conference_count',c.conference_count,'error_code',c.error_code,'checked_at',c.checked_at) FROM hiring_attendance_checks c WHERE c.target_id=t.id AND c.target_version=t.version AND c.source_version=t.source_version ORDER BY c.checked_at DESC,c.event_id DESC LIMIT 1) AS latest_check FROM hiring_attendance_connected t WHERE (:target_id IS NULL OR t.id=:target_id) AND t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.application_id=:application_id AND EXISTS (SELECT 1 FROM hiring_applications a JOIN hiring_effective_access p ON p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter')) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d JOIN hiring_applications a ON a.candidate_id=d.candidate_id AND a.organization_id=d.organization_id AND a.brand_id=d.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id) ORDER BY t.starts_at DESC,t.id LIMIT 100"
+    },
+    {
+      "name": "worker_list_due_attendance",
+      "description": "Worker-only bounded attendance queue, 15-minute reporting grace and seven-day reconciliation window. Oldest-checked targets first. Requires the configuring recruiter still has access.",
+      "operation": "query",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "event_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT t.*,(t.ends_at<=:__now-900000) AS attendance_due FROM hiring_attendance_connected t WHERE EXISTS(SELECT 1 FROM hiring_google_calendar_connections c WHERE c.organization_id=t.organization_id AND c.brand_id=t.brand_id AND c.status='connected' AND c.calendar_id IS NOT NULL AND (t.calendar_id IS NULL OR t.calendar_id=c.calendar_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=c.organization_id AND p.brand_id=c.brand_id AND p.user_id=c.connected_by AND p.role='owner' AND p.requisition_id IS NULL)) AND :__user_id=('system'||char(58)||'worker') AND t.enabled=1 AND t.source_ready=1 AND t.ends_at>=:__now-604800000 AND ((t.calendar_event_id IS NOT NULL AND t.starts_at<=:__now+2592000000) OR t.ends_at<=:__now-900000) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d JOIN hiring_applications a ON a.candidate_id=d.candidate_id AND a.organization_id=d.organization_id AND a.brand_id=d.brand_id WHERE a.id=t.application_id AND a.organization_id=t.organization_id AND a.brand_id=t.brand_id) AND EXISTS(SELECT 1 FROM hiring_attendance_targets original JOIN hiring_applications a ON a.id=original.application_id JOIN hiring_effective_access p ON p.organization_id=original.organization_id AND p.brand_id=original.brand_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) WHERE original.id=t.id AND p.user_id=original.created_by AND p.role IN ('owner','recruiter')) AND NOT EXISTS(SELECT 1 FROM hiring_attendance_checks c WHERE c.target_id=t.id AND c.target_version=t.version AND c.source_version=t.source_version AND (c.event_id=:event_id OR CAST(c.checked_at/3600000 AS INTEGER)=CAST(:__now/3600000 AS INTEGER))) ORDER BY COALESCE((SELECT MAX(c.checked_at) FROM hiring_attendance_checks c WHERE c.target_id=t.id AND c.target_version=t.version AND c.source_version=t.source_version),0),t.ends_at,t.id LIMIT 10"
+    },
+    {
+      "name": "worker_record_attendance",
+      "description": "Worker-only idempotent observation. Rejects stale configuration/schedules, revoked authority, disabled targets and erased candidates. Stores counts and durations, no unrelated participant profiles.",
+      "operation": "execute",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "target_id": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "source_version": {
+          "type": "integer"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "duration_seconds": {
+          "type": "integer"
+        },
+        "first_join_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "last_leave_at": {
+          "type": "integer",
+          "optional": true
+        },
+        "conference_count": {
+          "type": "integer"
+        },
+        "error_code": {
+          "type": "string",
+          "optional": true
+        },
+        "connection_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_attendance_checks(target_id,target_version,source_version,event_id,status,duration_seconds,first_join_at,last_leave_at,conference_count,error_code,checked_at) SELECT t.id,t.version,t.source_version,:event_id,:status,:duration_seconds,:first_join_at,:last_leave_at,:conference_count,:error_code,:__now FROM hiring_attendance_connected t WHERE EXISTS(SELECT 1 FROM hiring_google_calendar_connections c WHERE c.organization_id=t.organization_id AND c.brand_id=t.brand_id AND c.connection_id=:connection_id AND c.status='connected' AND c.calendar_id IS NOT NULL AND (t.calendar_id IS NULL OR t.calendar_id=c.calendar_id) AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=c.organization_id AND p.brand_id=c.brand_id AND p.user_id=c.connected_by AND p.role='owner' AND p.requisition_id IS NULL)) AND t.id=:target_id AND t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.version=:expected_version AND t.source_version=:source_version AND :__user_id=('system'||char(58)||'worker') AND t.enabled=1 AND t.source_ready=1 AND t.ends_at>=:__now-604800000 AND ((t.calendar_event_id IS NOT NULL AND t.starts_at<=:__now+2592000000) OR t.ends_at<=:__now-900000) AND NOT EXISTS (SELECT 1 FROM hiring_deletion_tombstones d JOIN hiring_applications a ON a.candidate_id=d.candidate_id AND a.organization_id=d.organization_id AND a.brand_id=d.brand_id WHERE a.id=t.application_id AND a.organization_id=t.organization_id AND a.brand_id=t.brand_id) AND EXISTS(SELECT 1 FROM hiring_attendance_targets original JOIN hiring_applications a ON a.id=original.application_id JOIN hiring_effective_access p ON p.organization_id=original.organization_id AND p.brand_id=original.brand_id AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id) WHERE original.id=t.id AND p.user_id=original.created_by AND p.role IN ('owner','recruiter')) AND (:status='error' OR (:status='scheduled' AND t.ends_at>:__now-900000) OR (:status<>'scheduled' AND t.ends_at<=:__now-900000)) AND :duration_seconds<=CAST((t.ends_at-t.starts_at)/1000 AS INTEGER) AND (:first_join_at IS NULL OR (:first_join_at>=t.starts_at AND :last_leave_at<=t.ends_at)) ON CONFLICT(target_id,target_version,source_version,event_id) DO NOTHING"
+    },
+    {
+      "name": "get_google_calendar_settings",
+      "description": "Brand-wide staff may read connection metadata. Only owners can connect, select calendars or disconnect. No credentials are returned.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT :__user_id AS user_id,CASE WHEN EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL) THEN 1 ELSE 0 END AS can_manage,CASE WHEN EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.organization_id=c.organization_id AND g.brand_id=c.brand_id AND g.user_id=c.connected_by AND g.role='owner' AND g.requisition_id IS NULL) THEN 1 ELSE 0 END AS owner_active,c.connection_id,c.account_email,c.calendar_id,c.calendar_name,COALESCE(c.status,'disconnected') AS status,COALESCE(c.version,0) AS version FROM (SELECT 1) seed LEFT JOIN hiring_google_calendar_connections c ON c.organization_id=:organization_id AND c.brand_id=:brand_id WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) LIMIT 1",
+      "operation": "query",
+      "requires_auth": true
+    },
+    {
+      "name": "begin_google_calendar_oauth",
+      "description": "Owner-only ten-minute OAuth state, bound to the authenticated account and current connection version.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "state_hash": {
+          "type": "string"
+        }
+      },
+      "operation": "execute",
+      "requires_auth": true,
+      "sql": "INSERT INTO hiring_google_oauth_states(state_hash,organization_id,brand_id,user_id,expected_version,expires_at,created_at) SELECT :state_hash,:organization_id,:brand_id,:__user_id,COALESCE((SELECT version FROM hiring_google_calendar_connections WHERE organization_id=:organization_id AND brand_id=:brand_id),0),:__now+600000,:__now WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL) AND (SELECT COUNT(*) FROM hiring_google_oauth_states WHERE user_id=:__user_id AND created_at>:__now-600000)<10"
+    },
+    {
+      "name": "consume_google_calendar_oauth",
+      "description": "One-time OAuth callback claim; exact initiating user, expiry and live owner authority are required.",
+      "params": {
+        "state_hash": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        }
+      },
+      "operation": "execute",
+      "requires_auth": true,
+      "sql": "UPDATE hiring_google_oauth_states SET claim_id=:claim_id,consumed_at=:__now WHERE state_hash=:state_hash AND user_id=:__user_id AND consumed_at IS NULL AND expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=hiring_google_oauth_states.organization_id AND p.brand_id=hiring_google_oauth_states.brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL)"
+    },
+    {
+      "name": "finish_google_calendar_oauth",
+      "description": "Save OAuth connection metadata after a claimed callback. Encrypted credentials stay in private worker storage; stale reconnects cannot replace newer connections.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "state_hash": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "connection_id": {
+          "type": "string"
+        },
+        "account_email": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "INSERT INTO hiring_google_calendar_connections(organization_id,brand_id,connection_id,account_email,status,version,connected_by,connected_at,updated_at) SELECT :organization_id,:brand_id,:connection_id,:account_email,'connected',1,:__user_id,:__now,:__now WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL) AND COALESCE((SELECT version FROM hiring_google_calendar_connections WHERE organization_id=:organization_id AND brand_id=:brand_id),0)=:expected_version AND EXISTS(SELECT 1 FROM hiring_google_oauth_states s WHERE s.state_hash=:state_hash AND s.claim_id=:claim_id AND s.organization_id=:organization_id AND s.brand_id=:brand_id AND s.user_id=:__user_id AND s.expected_version=:expected_version AND s.expires_at>:__now) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id) ON CONFLICT(organization_id,brand_id) DO UPDATE SET connection_id=excluded.connection_id,account_email=excluded.account_email,status='connected',calendar_id=NULL,calendar_name=NULL,version=hiring_google_calendar_connections.version+1,connected_by=excluded.connected_by,connected_at=excluded.connected_at,updated_at=excluded.updated_at WHERE hiring_google_calendar_connections.version=:expected_version",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,NULL,'calendar.connected',:__user_id,:operation_id,:__now,'calendar_connection',:connection_id,'Google Calendar connection updated' WHERE changes()=1"
+      ],
+      "operation": "batch",
+      "requires_auth": true
+    },
+    {
+      "name": "select_google_calendar",
+      "description": "Owner-only versioned calendar selection. Provider access is checked by the app worker; changing selection pauses targets from the former calendar.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "connection_id": {
+          "type": "string"
+        },
+        "calendar_id": {
+          "type": "string"
+        },
+        "calendar_name": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_google_calendar_connections SET calendar_id=:calendar_id,calendar_name=:calendar_name,version=version+1,updated_at=:__now WHERE organization_id=:organization_id AND brand_id=:brand_id AND connection_id=:connection_id AND status='connected' AND version=:expected_version AND length(:calendar_id) BETWEEN 1 AND 1024 AND length(:calendar_name)<=1000 AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,NULL,'calendar.selected',:__user_id,:operation_id,:__now,'calendar_connection',:connection_id,'Google Calendar connection updated' WHERE changes()=1"
+      ],
+      "operation": "batch",
+      "requires_auth": true
+    },
+    {
+      "name": "disconnect_google_calendar",
+      "description": "Owner-only disconnect; immediately prevents scheduled credential use and invalidates pending OAuth attempts. The app worker removes the encrypted credential object.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "statements": [
+        "UPDATE hiring_google_calendar_connections SET status='disconnected',calendar_id=NULL,calendar_name=NULL,version=version+1,updated_at=:__now WHERE organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND status='connected' AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner') AND p.requisition_id IS NULL) AND NOT EXISTS(SELECT 1 FROM hiring_audit_events WHERE operation_id=:operation_id OR id=:operation_id)",
+        "INSERT INTO hiring_audit_events(id,organization_id,brand_id,application_id,action,actor_user_id,operation_id,created_at,object_type,object_id,redacted_summary) SELECT :operation_id,:organization_id,:brand_id,NULL,'calendar.disconnected',:__user_id,:operation_id,:__now,'calendar_connection','disconnected','Google Calendar connection updated' WHERE changes()=1"
+      ],
+      "operation": "batch",
+      "requires_auth": true
+    },
+    {
+      "name": "worker_get_google_calendar_connection",
+      "description": "Worker-only active connection metadata, with live configuring-owner authority.",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT c.* FROM hiring_google_calendar_connections c WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.status='connected' AND c.calendar_id IS NOT NULL AND :__user_id=('system'||char(58)||'worker') AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=c.organization_id AND p.brand_id=c.brand_id AND p.user_id=c.connected_by AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1",
+      "operation": "query",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ]
+    },
+    {
+      "name": "worker_refresh_calendar_attendance",
+      "description": "Refresh linked calendar occurrence timing/code or disable a cancelled event. CAS prevents overwriting recruiter edits or a disconnected calendar.",
+      "operation": "execute",
+      "requires_auth": true,
+      "callers": [
+        "worker"
+      ],
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "connection_id": {
+          "type": "string"
+        },
+        "starts_at": {
+          "type": "integer"
+        },
+        "ends_at": {
+          "type": "integer"
+        },
+        "meeting_code": {
+          "type": "string"
+        },
+        "event_status": {
+          "type": "string"
+        }
+      },
+      "sql": "UPDATE hiring_attendance_targets SET starts_at=CASE WHEN :event_status='cancelled' THEN starts_at ELSE :starts_at END,ends_at=CASE WHEN :event_status='cancelled' THEN ends_at ELSE :ends_at END,meeting_code=CASE WHEN :event_status='cancelled' THEN meeting_code ELSE :meeting_code END,enabled=CASE WHEN :event_status='cancelled' THEN 0 ELSE enabled END,version=version+1,updated_at=:__now WHERE id=:target_id AND organization_id=:organization_id AND brand_id=:brand_id AND version=:expected_version AND calendar_event_id IS NOT NULL AND enabled=1 AND :__user_id=('system'||char(58)||'worker') AND :event_status IN ('confirmed','cancelled') AND (:event_status='cancelled' OR starts_at<>:starts_at OR ends_at<>:ends_at OR meeting_code<>:meeting_code) AND EXISTS(SELECT 1 FROM hiring_google_calendar_connections c WHERE c.organization_id=:organization_id AND c.brand_id=:brand_id AND c.connection_id=:connection_id AND c.calendar_id=hiring_attendance_targets.calendar_id AND c.status='connected' AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=c.organization_id AND p.brand_id=c.brand_id AND p.user_id=c.connected_by AND p.role='owner' AND p.requisition_id IS NULL))"
+    },
+    {
+      "name": "get_google_calendar_oauth_claim",
+      "description": "Read a consumed OAuth claim only for its exact initiating user and fresh unique claim ID, with current owner access.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "state_hash": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT organization_id,brand_id,user_id,expected_version FROM hiring_google_oauth_states WHERE state_hash=:state_hash AND claim_id=:claim_id AND user_id=:__user_id AND expires_at>:__now AND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=hiring_google_oauth_states.organization_id AND p.brand_id=hiring_google_oauth_states.brand_id AND p.user_id=:__user_id AND p.role='owner' AND p.requisition_id IS NULL) LIMIT 1"
     }
-  ]
+  ],
+  "worker": {
+    "secrets": [
+      "HIRING_GOOGLE_CLIENT_ID",
+      "HIRING_GOOGLE_CLIENT_SECRET",
+      "HIRING_GOOGLE_TOKEN_KEY"
+    ],
+    "schedules": [
+      {
+        "name": "meeting_attendance",
+        "cron": "0 * * * *"
+      }
+    ]
+  }
 }

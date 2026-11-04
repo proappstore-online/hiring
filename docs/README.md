@@ -1,5 +1,8 @@
 # Hiring planning set
 
+[Meeting attendance](meeting-attendance.md) documents the app-owned hourly Google
+Meet checker, scoped configuration and production activation requirements.
+
 These documents are the implementation baseline. Changes to a decision require a documented revision and updates to affected issues.
 
 | Document | Purpose |

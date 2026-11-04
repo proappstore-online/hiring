@@ -1,3 +1,4 @@
+import { GoogleCalendarCallback } from './GoogleCalendar'
 import { PrimaryNav, primarySections } from './PrimaryNav'
 import { mutationError } from './mutation-state'
 import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -187,6 +188,7 @@ export function AppRoutes() {
   return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' || location.pathname === '/recruiter/applications' ? location.pathname : location.pathname + location.search}><Routes>
     <Route element={<PublicShell />}><Route index element={<Navigate replace to="/vacancies" />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="vacancies/:vacancyId/apply" element={<PublicJobs mode="apply" />} /><Route path="jobs" element={<LegacyJobsIndex />} /><Route path="jobs/:jobId" element={<LegacyPublicRedirect />} /><Route path="apply/:jobId" element={<LegacyPublicRedirect apply />} /><Route path="my-applications" element={<CandidateAccount />} /><Route path="my-applications/:applicationId" element={<CandidateAccount />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}>
+      <Route path="recruiter/google-calendar/callback" element={<GoogleCalendarCallback />} />
       <Route path="recruiter/overview" element={<OverviewScreen />} />
       <Route path="recruiter/vacancies" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/vacancies/:requisitionId" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />

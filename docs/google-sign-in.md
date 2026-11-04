@@ -1,6 +1,6 @@
 # Google sign-in operator setup
 
-Hiring uses PAS-native Google OAuth through `app.auth.signIn('google')`. The installed `@proappstore/sdk` supports `google` as an auth provider, and the PAS host marks `hiring.proappstore.online` for its same-origin, HttpOnly cookie flow. Hiring does not exchange OAuth codes, store Google tokens or handle a Google client secret.
+Hiring uses PAS-native Google OAuth through `app.auth.signIn('google')`. The installed `@proappstore/sdk` supports `google` as an auth provider, and the PAS host marks `hiring.proappstore.online` for its same-origin, HttpOnly cookie flow. For sign-in, Hiring does not exchange OAuth codes, store Google tokens or handle a Google client secret. Calendar/Meet linking uses the separate connection described below.
 
 ## Current production configuration
 
@@ -22,3 +22,5 @@ Google's [web-server OAuth guide](https://developers.google.com/identity/protoco
 After a credential change, check that `/.pas/auth/start?provider=google&return_to=%2F` on the Hiring host redirects through PAS to Google, then complete a sign-in with an authorized account and confirm the Hiring page loads. GitHub remains available as a second native provider. A Google account and a GitHub account have different PAS user IDs even if their emails match; Hiring membership and brand grants must use the stable PAS user ID and never infer access from email equality.
 
 Candidate intake remains closed. Staff sign-in does not grant access to another organization or brand by itself. The internal workspace grants the creator owner access and lets that owner add recruiters by exact PAS user ID; see [internal workspace](internal-workspace.md).
+
+Calendar/Meet linking is a separate, owner-authorized OAuth flow with its own server-side client and encrypted refresh tokens. See [meeting attendance](meeting-attendance.md); the sign-in configuration above is unchanged.
