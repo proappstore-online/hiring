@@ -8,7 +8,6 @@ const sections = [
   { path: '/recruiter/vacancies', label: 'Vacancies', roles: ['owner', 'recruiter'] },
   { path: '/recruiter/applications', label: 'Applications', roles: ['owner', 'recruiter', 'reviewer'] },
   { path: '/recruiter/communications', label: 'Communications', roles: ['owner', 'recruiter'] },
-  { path: '/recruiter/attendance', label: 'Attendance', roles: ['owner', 'recruiter'] },
   { path: '/recruiter/playbook', label: 'Playbook', roles: ['owner', 'recruiter'] },
   { path: '/recruiter/compliance', label: 'Compliance', roles: ['owner', 'recruiter', 'auditor'] },
   { path: '/recruiter/settings', label: 'Settings', roles: ['owner', 'recruiter'] },

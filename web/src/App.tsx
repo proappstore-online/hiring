@@ -1,5 +1,3 @@
-import { GoogleCalendarCallback } from './GoogleCalendar'
-import { AttendanceScreen } from './RecruiterScreens'
 import { PrimaryNav, primarySections } from './PrimaryNav'
 import { mutationError } from './mutation-state'
 import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -184,14 +182,15 @@ function CommunicationsRoute() {
   query.delete('application_id')
   return <Navigate replace to={`/recruiter/communications/${encodeURIComponent(applicationId)}?${query}`} />
 }
+function AttendanceMoved() { return <section className={panel}><h1 className="text-2xl font-semibold">Attendance moved to Interns</h1><p className="my-3">Daily meeting attendance belongs to the internship program. Google Calendar setup, member identity links, meeting records and hourly checks are now in Interns.</p><a className="inline-flex min-h-11 items-center underline" href="https://interns.proappstore.online/#/org/1ee1823a-d478-4aa6-b240-f64bb67cc0ef/workspace?tab=attendance">Open FreeAppStore attendance in Interns</a></section> }
 export function AppRoutes() {
   const location = useLocation()
   return <><a href="#route-content" className="sr-only focus:not-sr-only">Skip to content</a><RouteFocus /><RouteBoundary key={location.pathname === '/vacancies' || location.pathname === '/recruiter/applications' ? location.pathname : location.pathname + location.search}><Routes>
     <Route element={<PublicShell />}><Route index element={<Navigate replace to="/vacancies" />} /><Route path="vacancies" element={<VacanciesIndexPage />} /><Route path="vacancies/:vacancyId" element={<VacancyDetailPage />} /><Route path="vacancies/:vacancyId/apply" element={<PublicJobs mode="apply" />} /><Route path="jobs" element={<LegacyJobsIndex />} /><Route path="jobs/:jobId" element={<LegacyPublicRedirect />} /><Route path="apply/:jobId" element={<LegacyPublicRedirect apply />} /><Route path="my-applications" element={<CandidateAccount />} /><Route path="my-applications/:applicationId" element={<CandidateAccount />} /><Route path="sign-in" element={<SignIn />} /><Route path="*" element={<NotFound />} /></Route>
     <Route element={<ProtectedShell />}>
-      <Route path="recruiter/google-calendar/callback" element={<GoogleCalendarCallback />} />
+      <Route path="recruiter/google-calendar/callback" element={<AttendanceMoved />} />
       <Route path="recruiter/overview" element={<OverviewScreen />} />
-      <Route path="recruiter/attendance" element={<Allowed roles={['owner','recruiter']}><AttendanceScreen /></Allowed>} />
+      <Route path="recruiter/attendance" element={<AttendanceMoved />} />
       <Route path="recruiter/vacancies" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/vacancies/:requisitionId" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/applications" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationsScreen /></Allowed>} />

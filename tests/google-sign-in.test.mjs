@@ -20,13 +20,14 @@ test('native sign-in stays on PAS and Calendar credentials stay out of browser c
   const app = read('web/src/App.tsx')
   const manifest = read('mcp.json')
   const migration = read('migrations.json')
-  for (const value of [app, migration, read('web/src/GoogleCalendar.tsx')]) {
+  for (const value of [app, migration]) {
     assert.doesNotMatch(value, /GOOGLE_CLIENT_SECRET|client_secret|oauth2\.googleapis\.com/)
     assert.doesNotMatch(value, /pas_session|localStorage\.setItem/)
   }
   const parsed = JSON.parse(manifest)
   assert.deepEqual(parsed.worker.secrets, [])
-  assert.deepEqual(parsed.connectors, [{name:'calendar',kind:'google_calendar',modes:['oauth']}])
+  assert.deepEqual(parsed.connectors, [])
+  assert.deepEqual(parsed.worker.schedules, [])
   for (const tool of parsed.tools) assert.ok(!Object.keys(tool.params ?? {}).some(key => /refresh_token|client_secret/.test(key)))
   const operatorNote = read('docs/google-sign-in.md')
   assert.match(operatorNote, /https:\/\/api\.proappstore\.online\/v1\/auth\/google\/callback/)

@@ -17,7 +17,7 @@ For a trusted Hiring agent in ProAgentStore, grant **Read & write access to this
 actions; individual tool selection remains available under Advanced permissions. The Hiring
 server continues to enforce the connected user's organization and brand access.
 - `.github/workflows/`: CI, compliance and main-branch deploy.
-- `worker/`: hourly Google Meet attendance checks; [setup and operation](docs/meeting-attendance.md).
+- Daily meeting attendance lives in [Interns](https://interns.proappstore.online), not Hiring. See [the move](docs/meeting-attendance.md).
 
 See [internal workspace setup](docs/internal-workspace.md). Run `pnpm install && pnpm dev`, `pnpm test`, and `pnpm build`. Main is the delivery branch; no PRs. A push to main triggers deployment. Follow [CLAUDE.md](CLAUDE.md) and the [platform guide](https://proappstore.online/skills.md). Do not treat the starter's placeholder owner, copy, schema or tools as product decisions.
 
