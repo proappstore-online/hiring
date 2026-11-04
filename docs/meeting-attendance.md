@@ -52,8 +52,11 @@ does not change that policy or transfer ownership.
 Browser setup on 2026-11-04 confirmed **Enabled** for Calendar API and Google Meet
 REST API in the `proappstore-online` Google Cloud project. The existing
 `proappstore-api` OAuth client has the sign-in callback. The new connector callback
-has been prepared in the browser but remains unsaved pending action-time approval.
+was saved after explicit user approval; Google confirmed “OAuth client saved”.
 No client secret was created, copied or changed; no organizer consent was accepted.
+Official ownership recovery request `#1` was submitted with user approval and is
+awaiting platform-admin review (`escalated`). Ownership has not changed; worker
+eligibility remains unresolved. The requester cannot approve their own recovery.
 
 The Hiring refactor is saved to main with `[skip ci]` while worker upload remains
 explicitly denied. Local build, worker build, SQL/attendance tests and browser
@@ -64,7 +67,9 @@ the deployment workflow. Do not re-run the older app-owned-OAuth deployment.
 Deploy in this order:
 
 1. PAS connector source is committed as `81186ef`; SDK `1.16.98` is published
-   and pinned in Hiring. Deploy the backend migration through platform main.
+   and pinned in Hiring. Backend migration and deployment succeeded in
+   [run 41754578858](https://github.com/proappstore-online/platform/actions/runs/41754578858).
+   The live callback rejects invalid state with HTTP 400 and `no-store`.
    Existing PAS secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
    `APP_SECRET_KEK` and `SESSION_SIGNING_KEY` are reused. No Hiring secrets are needed.
 2. Enable Google Calendar API and Google Meet REST API in the PAS Google Cloud
