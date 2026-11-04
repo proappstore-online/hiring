@@ -14,6 +14,41 @@ The connection is read-only: no invitations, calendar edits or hiring decisions.
 
 ## User flow
 
+The recruiter navigation's **More → Attendance** opens `/recruiter/attendance`
+with the selected organization/brand scope. The report switches between this
+week and last week using Monday boundaries in Australia/Melbourne, groups tracked
+participants by occurrence, and links to each candidate's Interview section.
+It shows only the two selected FreeAppStore recurring series below, identified by
+calendar and series ID rather than title matching. Records are paged in groups
+of 100 participant records; one meeting may span pages. Only owners and recruiters
+can open the route, and SQL rechecks each participant's current requisition grants
+and erasure boundary.
+
+**Recent recorded checks** shows up to 20 observation batches for the selected
+meeting week, including errors and counts of superseded configurations. It is not
+scheduler run history: idle runs and failures before evidence storage cannot
+appear. The screen explicitly leaves scheduler health unverified and distinguishes
+unavailable data from an empty report. Future meetings and the reporting grace
+period cannot appear as absences. Refresh reads evidence and connection status;
+it does not trigger a job. No targets, identities, grants or attendance evidence
+are created by opening the report.
+
+### Initial rollout scope (confirmed 2026-11-05)
+
+Track only **FAS Daily Meeting** occurrences on **FreeAppStore Dev Team Calendar**
+(`35924e97c4e2ba297a4f4f925584e92ee21229a40a1592870be3414dead9c552@group.calendar.google.com`).
+The calendar currently contains morning and afternoon recurring series with this
+title; both are in scope. Use the exact calendar and selected event occurrences,
+not a title match across other calendars. Other team meetings, interviews and
+workshops are outside this rollout.
+
+The requested initial report covers last week (2026-10-26 through 2026-11-01)
+and this week (2026-11-02 through 2026-11-08), in Australia/Melbourne time.
+Future occurrences must remain scheduled, and attendance requires actual Meet
+participant sessions. Older occurrences need a bounded historical backfill beyond
+the normal seven-day reconciliation window. This records the requested scope;
+it does not activate the worker, create grants or enroll attendance targets.
+
 1. A brand owner opens **Settings → Brand management → Google Calendar** and
    chooses **Connect Google Calendar**.
 2. The organizer personally signs in and approves Calendar, Meet and account-email

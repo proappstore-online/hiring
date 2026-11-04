@@ -1,4 +1,5 @@
 import { GoogleCalendarSettings } from './GoogleCalendar'
+import { AttendanceDashboard } from './AttendanceDashboard'
 import { TermsFields, termsFromForm } from './vacancy-terms'
 import { CurrentPipeline } from './CurrentPipeline'
 import { FunnelAnalytics } from './FunnelAnalytics'
@@ -37,6 +38,7 @@ function useRows<T>(name: string | null, params: Record<string, string>) {
 }
 function RowsState({ loading, error, retry, children }: { loading: boolean; error: boolean; retry: () => void; children: ReactNode }) { return loading ? <LoadingState /> : error ? <ErrorState retry={retry} /> : <>{children}</> }
 export function OverviewScreen() { const { space } = useWorkspace(); return <Screen title="Overview"><Section title="Workspace"><p className="mt-2">{space.organization_name} / {space.brand_name}</p><p className="mt-2">Your role: {space.role}</p></Section><CurrentPipeline key={"pipeline:" + JSON.stringify(space)} scope={scopeOf(space)} role={space.role} /><FunnelAnalytics key={JSON.stringify(space)} scope={scopeOf(space)} /></Screen> }
+export function AttendanceScreen() { const { space } = useWorkspace(); return <AttendanceDashboard key={JSON.stringify(space)} scope={scopeOf(space)} canManage={space.role === 'owner'} /> }
 export function VacanciesScreen() {
   const { space } = useWorkspace(); const { requisitionId = '' } = useParams(); const scope = scopeOf(space)
   const detail = useRows<ManagedVacancy>(requisitionId ? 'get_vacancy_management' : null, { ...scope, requisition_id: requisitionId })

@@ -323,9 +323,22 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
    const routes=[['/dashboard','/recruiter/overview'],['/admin','/recruiter/overview'],['/applications','/recruiter/applications'],['/applications/full','/recruiter/applications/full'],['/playbook','/recruiter/playbook'],['/admin/communications','/recruiter/communications'],['/admin/operations','/recruiter/settings/operations'],['/admin/compliance','/recruiter/compliance'],['/admin/settings','/recruiter/organizations/org/brands/brand/settings']]
    for(const [oldPath,newPath] of routes){await go(oldPath+'?organization_id=org&brand_id=brand');await page.evaluate(()=>{window.role='owner';window.auth={user:{id:'owner'},loading:false};window.render()});await expect(page).toHaveURL(base+newPath+(newPath.includes('/organizations/')?'':'?organization_id=org&brand_id=brand'))}
   })
+  await t.test('attendance route permits staff only and binds report reads to the workspace',async()=>{
+   for(const role of ['owner','recruiter','reviewer','auditor']){
+    await go('/recruiter/attendance?organization_id=org&brand_id=brand');await page.evaluate(role=>{window.role=role;window.auth={user:{id:'staff'},loading:false};window.render()},role)
+    if(['owner','recruiter'].includes(role)){
+     await expect(page.getByRole('heading',{name:'Attendance',exact:true})).toBeVisible()
+     await expect(page.getByText('No tracked participants found',{exact:false})).toBeVisible()
+     assert.ok(await page.evaluate(()=>window.calls.some(c=>c.name==='list_attendance_overview'&&c.p.organization_id==='org'&&c.p.brand_id==='brand')))
+    }else{
+     await expect(page.getByRole('heading',{name:'404 — Not found'})).toBeVisible()
+     assert.equal(await page.evaluate(()=>window.calls.some(c=>c.name==='list_attendance_overview')),false)
+    }
+   }
+  })
   await t.test('primary navigation follows role, scope, active route and mobile menu',async()=>{
    await page.setViewportSize({width:1280,height:800})
-   for(const [role,names] of Object.entries({owner:['Overview','Vacancies','Applications','Communications','Playbook','Compliance','Settings'],recruiter:['Overview','Vacancies','Applications','Communications','Playbook','Compliance','Settings'],reviewer:['Overview','Applications'],auditor:['Overview','Compliance']})){
+   for(const [role,names] of Object.entries({owner:['Overview','Vacancies','Applications','Communications','Attendance','Playbook','Compliance','Settings'],recruiter:['Overview','Vacancies','Applications','Communications','Attendance','Playbook','Compliance','Settings'],reviewer:['Overview','Applications'],auditor:['Overview','Compliance']})){
     await go('/recruiter/overview?organization_id=org&brand_id=brand');await page.evaluate(role=>{window.role=role;window.auth={user:{id:'staff'},loading:false};window.render()},role)
     const nav=page.getByRole('navigation',{name:'Primary navigation'});await expect(nav).toBeVisible()
     await expect(nav.locator('.md\\:flex a')).toHaveText([...names,'Public vacancies'])

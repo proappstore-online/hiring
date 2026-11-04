@@ -41,6 +41,7 @@ existing permission checks and safe return URLs in routes.ts.
 | search | Search authorized records | One query and result list |
 | talent-pool | Review retained candidates | Filters and records |
 | communications | Prepare authorized message | Selected communication task; template administration separate |
+| attendance | Review selected meeting attendance | Week selector, connection/check status, grouped participant records, recent recorded checks |
 | playbook | Edit selected policy | Selected editor |
 | settings | Redirect to permitted scope | No recruiting controls |
 | organizations/:org/brands/:brand/settings | Save selected brand task | Collapsed brand settings and staff administration |

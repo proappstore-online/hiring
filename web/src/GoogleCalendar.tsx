@@ -5,7 +5,8 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { secondaryButton } from './design-system'
 import { button, date, field, panel } from './ui'
 
-type Status = { status: string; account_email: string | null; calendar_id: string | null; calendar_name: string | null; version: number; configured: boolean; owner_active: boolean; can_manage: boolean; account_connected?: boolean; available_account_email?: string | null; connection_valid?: boolean }
+export type CalendarStatus = { status: string; account_email: string | null; calendar_id: string | null; calendar_name: string | null; version: number; configured: boolean; owner_active: boolean; can_manage: boolean; account_connected?: boolean; available_account_email?: string | null; connection_valid?: boolean }
+type Status = CalendarStatus
 type Calendar = { id: string; name: string; primary: boolean }
 type Meeting = { id: string; title: string; starts_at: number; ends_at: number; meeting_code: string }
 type Attendance = { source_ready: number; configured_starts_at: number; configured_ends_at: number; id: string; version: number; kind: string; interview_id: string | null; meeting_code: string; starts_at: number; ends_at: number; google_user_id: string | null; calendar_id: string | null; calendar_event_id: string | null; enabled: number; latest_check: string | null }
@@ -24,7 +25,7 @@ const messages: Record<string, string> = {
   calendar_event_required: 'Link this meeting from Google Calendar before checking attendance.',
   meeting_changed: 'The meeting changed while attendance was checked. The next hourly check will refresh it.',
 }
-async function request<T>(path: string, scope?: Scope, body?: Record<string, unknown>): Promise<T> {
+export async function calendarRequest<T>(path: string, scope?: Scope, body?: Record<string, unknown>): Promise<T> {
   const suffix = body ? path : path + (scope ? '?' + new URLSearchParams(scope) : '')
   const response = await app.worker.fetch(suffix, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...scope, ...body }) } : {})
   let result: { error?: string }
@@ -32,6 +33,7 @@ async function request<T>(path: string, scope?: Scope, body?: Record<string, unk
   if (!response.ok) throw Error(messages[result.error ?? ''] ?? 'Could not complete the calendar request. Refresh and try again.')
   return result as T
 }
+const request = calendarRequest
 
 export function GoogleCalendarSettings({ scope }: { scope: Scope }) {
   const [open, setOpen] = useState(false)

@@ -1,4 +1,5 @@
 import { GoogleCalendarCallback } from './GoogleCalendar'
+import { AttendanceScreen } from './RecruiterScreens'
 import { PrimaryNav, primarySections } from './PrimaryNav'
 import { mutationError } from './mutation-state'
 import { BrowserRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -190,6 +191,7 @@ export function AppRoutes() {
     <Route element={<ProtectedShell />}>
       <Route path="recruiter/google-calendar/callback" element={<GoogleCalendarCallback />} />
       <Route path="recruiter/overview" element={<OverviewScreen />} />
+      <Route path="recruiter/attendance" element={<Allowed roles={['owner','recruiter']}><AttendanceScreen /></Allowed>} />
       <Route path="recruiter/vacancies" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/vacancies/:requisitionId" element={<Allowed roles={['owner','recruiter']}><VacanciesScreen /></Allowed>} />
       <Route path="recruiter/applications" element={<Allowed roles={['owner','recruiter','reviewer']}><ApplicationsScreen /></Allowed>} />
