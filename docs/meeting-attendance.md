@@ -80,18 +80,37 @@ On 2026-11-04, deployment of Hiring `0bf3cb1` built successfully and applied
 migrations `0071`/`0072`, then stopped before worker/frontend upload because the
 worker was disabled. Enabling it returned HTTP 403: `app workers are limited to
 first-party apps during the prototype`. The platform checks the registered app
-owner against its administrator list. An authorized platform operator must
-resolve eligibility through the supported control plane; this implementation
-does not change that policy or transfer ownership.
+owner against its administrator list. The platform release tracked in
+[PAS #267](https://github.com/proappstore-online/platform/issues/267) removes this
+prototype restriction through the supported owner deployment flow. No ownership
+transfer or change to the platform administrator identities is required.
+
+### Immediate release decision (2026-11-05 Australia/Melbourne)
+
+The owner explicitly waived the remaining 14-day observation wait and directed
+immediate release: “not needed anymore, stable enough!” The previously quoted
+7 November UTC date came from the Oct 24–Nov 6 observation window recorded in
+DuperDash #7 and PAS #306; it was a release policy, not a technical dependency.
+That date is no longer a prerequisite for releasing Hiring. This decision does
+not assert that the full observation window passed.
+
+Release the tested platform support, then deploy Hiring main through its normal
+workflow. Retain ownership authorization, tenant isolation, runtime limits,
+conservative quotas and the administrator kill switch. Legacy DuperDash retirement
+(PAS #263) and measured quota calibration (PAS #306) remain follow-ups rather than
+Hiring release blockers. Do not delete legacy resources as part of this release.
+Deployment success, Calendar/Meet consent and an actual attendance smoke check
+must each be verified separately; the policy decision alone does not establish them.
 
 Browser setup on 2026-11-04 confirmed **Enabled** for Calendar API and Google Meet
 REST API in the `proappstore-online` Google Cloud project. The existing
 `proappstore-api` OAuth client has the sign-in callback. The new connector callback
 was saved after explicit user approval; Google confirmed “OAuth client saved”.
 No client secret was created, copied or changed; no organizer consent was accepted.
-Official ownership recovery request `#1` was submitted with user approval and is
-awaiting platform-admin review (`escalated`). Ownership has not changed; worker
-eligibility remains unresolved. The requester cannot approve their own recovery.
+Official ownership recovery request `#1` remains `escalated`, but the current
+PAS connection for `serge.the.dev@gmail.com` already reports `you: owner` for
+Hiring. Recovery is therefore not a prerequisite for this release. Worker
+eligibility must be resolved by the supported platform release above.
 
 The Hiring refactor is saved to main with `[skip ci]` while worker upload remains
 explicitly denied. Local build, worker build, SQL/attendance tests and browser
@@ -111,7 +130,8 @@ Deploy in this order:
    project. Add this exact redirect to the existing OAuth Web application client:
    `https://api.proappstore.online/v1/connectors/google-calendar/callback`.
    Keep the existing sign-in callback. Configure consent/test users as required.
-3. Resolve Hiring worker eligibility, then check `pas worker status --app hiring`.
+3. Deploy PAS #267's supported owner worker eligibility, then check
+   `pas worker status --app hiring`.
    Deploy Hiring main with the SDK version that includes `connectors.googleCalendar`.
    The workflow uploads the worker and registers the hourly schedule and actions.
 4. The organizer personally completes Google consent, then saves a calendar for
