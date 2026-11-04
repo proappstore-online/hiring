@@ -12,35 +12,50 @@ reads events/RSVPs; actual attendance additionally requires Meet conference and
 participant-session access. PAS is independent of PAGS and holds its own tokens.
 The connection is read-only: no invitations, calendar edits or hiring decisions.
 
-## Production release verified — 2026-11-05 Australia/Melbourne
+## Current production setup
 
-PAS owner-worker support is deployed at `d9925f6`: migration, backend health smoke,
-CI, related worker deployments and published documentation all succeeded in
-[platform run 41885998435](https://github.com/proappstore-online/platform/actions/runs/41885998435).
-Hiring `bea7bd2` deployed successfully in
-[run 41886840017](https://github.com/proappstore-online/hiring/actions/runs/41886840017),
-including its worker, action registration and frontend. Hiring CI and compliance
-also passed. The production bundle contains the attendance route and Calendar UI.
+The worker is enabled on `loader`; `meeting_attendance` runs hourly. Google Calendar
+is connected in the **BetaBuilders workspace** to **FreeAppStore Dev Team Calendar**
+using `serge.the.dev@gmail.com`. The separate FreeAppStore brand is not connected.
+Do not move the grant between workspaces silently.
 
-The worker is enabled on `loader` and `meeting_attendance` is active hourly.
-Manual smoke run `8e60574b-554e-4092-9f47-238e55b3a5e7` succeeded with HTTP 200 at
-2026-11-04 18:27:49 UTC. This verifies execution, not Google attendance ingestion.
-The FreeAppStore brand currently reports `disconnected`, with no saved Calendar
-grant. Scoped reports for this week and last week returned no participant records.
-The organizer must personally complete Calendar/Meet consent, select the
-FreeAppStore calendar, and then link the intended meeting occurrences to candidates.
-The date-based release hold is removed; Google consent and attendance enrollment
-remain application setup. Chrome automation became unavailable during the final
-check, so a live visual smoke check remains unverified.
+The Cloudflare fetch compatibility fix deployed in platform `0a924cf` and Hiring
+`0b5fcbf`. The manual run `c7a239fb-2574-4550-b7b5-a6bb3e64f67a` succeeded on
+2026-11-04 at 20:52:54 UTC. It had no enrolled candidate targets: execution success
+is not evidence that attendance was ingested.
+
+The meeting-first report reads Google on demand. It does not require candidate
+enrollment and does not persist a second copy of provider participant identities.
+The separate tracked-candidate section continues to show stored hourly checks.
 
 ## User flow
 
 The recruiter navigation's **More → Attendance** opens `/recruiter/attendance`
 with the selected organization/brand scope. The report switches between this
-week and last week using Monday boundaries in Australia/Melbourne, groups tracked
-participants by occurrence, and links to each candidate's Interview section.
+week and last week using Monday boundaries in Australia/Melbourne. The primary
+view lists exact Calendar occurrences; opening one reads all of its Google Meet
+participants, including anonymous, phone and unlinked people. Each row shows
+provider name, stable Google ID when available, first/last sightings and Hiring
+matches. Show join/leave sessions reads sessions and merges overlaps to calculate
+time actually present inside the scheduled meeting. First/last span alone is
+never presented as duration. Empty conference results and provider errors are
+explicitly different states, neither implying absence.
+
+Matching uses `hiring_candidates.worker_user_id = google:<Meet user ID>` or an
+existing enabled explicit attendance identity. Display names and invitation
+emails are never used to guess. Multiple matches remain visible for review;
+matching enforces current brand-wide owner/recruiter access and erasure tombstones.
+To link manually, verify the Google ID, open the candidate’s Interview section,
+choose the occurrence and enter that ID under Specify Google identity.
+
+The live routes recheck staff access, the connecting owner and the exact PAS grant
+before and after reads, return `Cache-Control: no-store`, and reject other series.
+Calendar enumeration is bounded to ten pages per series; Meet reads share a
+100-call budget per request. Limits and incomplete pages fail explicitly.
+The PAS connector permits bounded backfill up to 28 days; Google deletes Meet
+conference records after 30 days. The UI offers this week and last week.
 It shows only the two selected FreeAppStore recurring series below, identified by
-calendar and series ID rather than title matching. Records are paged in groups
+calendar and series ID rather than title matching. The separate stored candidate checks are paged in groups
 of 100 participant records; one meeting may span pages. Only owners and recruiters
 can open the route, and SQL rechecks each participant's current requisition grants
 and erasure boundary.

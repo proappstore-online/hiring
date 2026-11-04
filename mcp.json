@@ -7569,6 +7569,24 @@
         }
       },
       "sql": "WITH scoped AS (SELECT t.*,c.name AS candidate_name FROM hiring_attendance_connected t\nJOIN hiring_applications a ON a.id=t.application_id AND a.organization_id=t.organization_id AND a.brand_id=t.brand_id\nJOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id\nWHERE t.organization_id=:organization_id AND t.brand_id=:brand_id AND t.calendar_id=:calendar_id\nAND :starts_at>=0 AND :ends_at>:starts_at AND :ends_at-:starts_at<=1209600000\nAND t.starts_at>=:starts_at AND t.starts_at<:ends_at\nAND (t.calendar_event_id=:series_id OR substr(t.calendar_event_id,1,length(:series_id)+1)=:series_id||'_'\n OR t.calendar_event_id=:second_series_id OR substr(t.calendar_event_id,1,length(:second_series_id)+1)=:second_series_id||'_')\nAND length(:series_id)>0 AND length(:second_series_id)>0\nAND EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=a.organization_id AND p.brand_id=a.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=a.requisition_id))\nAND NOT EXISTS(SELECT 1 FROM hiring_deletion_tombstones d WHERE d.organization_id=a.organization_id AND d.brand_id=a.brand_id AND d.candidate_id=a.candidate_id)) SELECT c.event_id,MIN(c.checked_at) AS started_at,MAX(c.checked_at) AS checked_at,COUNT(*) AS observations,\nSUM(c.status='attended') AS attended,SUM(c.status='error') AS errors,SUM(c.status='scheduled') AS scheduled,\nSUM(c.target_version<>t.version OR c.source_version<>t.source_version) AS superseded\nFROM scoped t JOIN hiring_attendance_checks c ON c.target_id=t.id\nGROUP BY c.event_id ORDER BY checked_at DESC,c.event_id DESC LIMIT 20"
+    },
+    {
+      "name": "match_calendar_participants",
+      "description": "Match Meet stable Google identities to this brand’s Hiring records. Exact Google account or explicit attendance identity only; never display names or invitation emails. Brand-wide staff only, erasure enforced.",
+      "operation": "query",
+      "requires_auth": true,
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "google_user_ids": {
+          "type": "string"
+        }
+      },
+      "sql": "WITH identities AS (SELECT DISTINCT value AS google_user_id FROM json_each(CASE WHEN json_valid(:google_user_ids) THEN :google_user_ids ELSE '[]' END) WHERE type='text' AND value GLOB 'users/[0-9]*' AND length(:google_user_ids)<=50000), matches AS (\nSELECT i.google_user_id,a.id AS application_id,c.name AS candidate_name,'google_account' AS match_source FROM identities i JOIN hiring_candidates c ON c.worker_user_id='google:'||substr(i.google_user_id,7) JOIN hiring_applications a ON a.candidate_id=c.id AND a.organization_id=c.organization_id AND a.brand_id=c.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id\nUNION SELECT i.google_user_id,a.id,c.name,'explicit_link' FROM identities i JOIN hiring_attendance_connected t ON t.google_user_id=i.google_user_id AND t.enabled=1 JOIN hiring_applications a ON a.id=t.application_id AND a.organization_id=t.organization_id AND a.brand_id=t.brand_id JOIN hiring_candidates c ON c.id=a.candidate_id AND c.organization_id=a.organization_id AND c.brand_id=a.brand_id WHERE a.organization_id=:organization_id AND a.brand_id=:brand_id\n) SELECT DISTINCT m.* FROM matches m JOIN hiring_applications a ON a.id=m.application_id WHERE EXISTS(SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=:organization_id AND p.brand_id=:brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND p.requisition_id IS NULL) AND NOT EXISTS(SELECT 1 FROM hiring_deletion_tombstones d WHERE d.organization_id=a.organization_id AND d.brand_id=a.brand_id AND d.candidate_id=a.candidate_id) ORDER BY m.google_user_id,m.application_id,m.match_source LIMIT 1001"
     }
   ],
   "worker": {

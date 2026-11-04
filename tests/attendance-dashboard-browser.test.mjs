@@ -13,7 +13,10 @@ const ts = require('typescript'), web = new URL('../web/', import.meta.url).path
 const sdk = `export const initPro=()=>({auth:{user:{id:'owner'}},worker:{fetch:(...args)=>window.workerFetch(...args)},actions:{call:(...args)=>window.action(...args)}});`
 const fixture = `import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter} from 'react-router-dom';import {AttendanceDashboard} from '/src/AttendanceDashboard.tsx';import {PrimaryNav} from '/src/PrimaryNav.tsx';import {attendanceSelection} from '/src/attendance-report.ts';import '/src/index.css';
 window.calls=[];window.fail=false;window.blocked=true;window.empty=false;window.historyFail=false;
-window.workerFetch=async()=>{if(window.blocked)return Response.json({error:'worker_disabled'},{status:403});return Response.json({configured:true,status:'connected',owner_active:true,connection_valid:true,account_email:'organizer@example.test',calendar_id:attendanceSelection.calendar_id})};
+window.workerFetch=async(path,init)=>{if(window.blocked)return Response.json({error:'worker_disabled'},{status:403});
+if(path==='/attendance/meetings')return Response.json({meetings:[{id:'meeting-1',title:'FAS Daily Meeting',series_id:attendanceSelection.series_id,starts_at:1793556000000,ends_at:1793557800000,meeting_code:'abc-defg-hij',status:'ready'}],checked_at:1793641500000});
+if(path==='/attendance/people'){const body=JSON.parse(init.body);if(window.peopleFail)return Response.json({error:'google_forbidden'},{status:502});if(body.participant_id)return Response.json({sessions:[{name:'session-1',startTime:'2026-11-01T22:00:00Z',endTime:'2026-11-01T22:20:00Z'}],duration_seconds:1200,checked_at:1793641500000});return Response.json({people:[{id:'person-1',name:'Unlinked Google participant',google_user_id:'users/123456',identity_kind:'signed_in',first_join_at:1793556000000,last_leave_at:1793557200000,matches:[]},{id:'person-2',name:'Guest participant',google_user_id:null,identity_kind:'anonymous',first_join_at:null,last_leave_at:null,matches:[]}],conference_count:1,checked_at:1793641500000})};
+return Response.json({configured:true,status:'connected',owner_active:true,connection_valid:true,account_email:'organizer@example.test',calendar_id:attendanceSelection.calendar_id})};
 window.action=async(name,params)=>{window.calls.push({name,params});if(name==='list_attendance_check_history'){if(window.historyFail)throw Error('Unavailable');return {rows:window.empty?[]:[{event_id:'run-1',started_at:1793641500000,checked_at:1793641500000,observations:3,attended:1,errors:1,scheduled:0,superseded:0}]}};if(window.fail)throw Error('Unavailable');if(window.empty)return{rows:[]};const last=params.starts_at<Date.parse('2026-11-02T00:00:00+11:00');
 const start=Date.parse(last?'2026-10-26T09:00:00+11:00':'2026-11-02T09:00:00+11:00');
 const row={id:'a',application_id:'app-a',candidate_name:last?'Last week participant':'Ada Example',calendar_event_id:'morning',meeting_code:'abc-defg-hij',starts_at:start,ends_at:start+1800000,enabled:1,source_ready:1,identity_linked:1,status:'attended',duration_seconds:1250,first_join_at:start+60000,last_leave_at:start+1310000,error_code:null,checked_at:start+2700000,total_count:4};
@@ -66,6 +69,25 @@ test('attendance dashboard shows evidence, failures, empty states and week selec
     await expect(page.getByText('No tracked participants found', { exact: false })).toBeVisible()
     await expect(page.getByText('FreeAppStore calendar connection verified.')).toBeVisible()
     await expect(page.getByText('No attendance checks recorded for this period.')).toBeVisible()
+    await page.getByText('View Google records', { exact: true }).click()
+    await expect(page.getByText('Unlinked Google participant', { exact: true })).toBeVisible()
+    await expect(page.getByText('Guest participant', { exact: true })).toBeVisible()
+    await expect(page.getByText('Google ID: users/123456')).toBeVisible()
+    await expect(page.getByText('Not linked to a Hiring record in this workspace.').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Show join/leave sessions' }).first().click()
+    await expect(page.getByText('20m 0s present during scheduled meeting')).toBeVisible()
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({width, height:1000})
+      await page.screenshot({path:'/tmp/hiring-attendance-visuals/meeting-people-'+width+'.png',fullPage:true})
+    }
+    await page.getByText('How people are associated', { exact: true }).click()
+    await expect(page.getByText('Signed-in participants have a stable Google user ID.', { exact: false })).toBeVisible()
+    await page.evaluate(() => { window.peopleFail = true })
+    await page.getByRole('button', { name: 'Refresh attendance' }).click()
+    await page.getByText('View Google records', { exact: true }).click()
+    await expect(page.getByText('Google did not grant access.', { exact: false })).toBeVisible()
+    await expect(page.getByText('Unlinked Google participant', { exact: true })).toHaveCount(0)
     await page.evaluate(() => { window.fail = true; window.historyFail = true })
     await page.getByRole('button', { name: 'Refresh attendance' }).click()
     await expect(page.getByText('Attendance records could not be loaded.', { exact: false })).toBeVisible()

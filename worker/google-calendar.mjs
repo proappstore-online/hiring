@@ -34,7 +34,7 @@ async function revokeConnection(pas, connection) {
   }
   await calendarCall(pas, { operation: 'revoke_grant', grant_id: connection.connection_id })
 }
-async function activeConnection(pas, scope) {
+export async function activeConnection(pas, scope) {
   const connection = await settings(pas, scope)
   if (connection.status !== 'connected' || !connection.connection_id || !connection.owner_active) fail('reconnect_required', 409)
   await verifyConnection(pas, connection)

@@ -11,6 +11,15 @@ type Calendar = { id: string; name: string; primary: boolean }
 type Meeting = { id: string; title: string; starts_at: number; ends_at: number; meeting_code: string }
 type Attendance = { source_ready: number; configured_starts_at: number; configured_ends_at: number; id: string; version: number; kind: string; interview_id: string | null; meeting_code: string; starts_at: number; ends_at: number; google_user_id: string | null; calendar_id: string | null; calendar_event_id: string | null; enabled: number; latest_check: string | null }
 const messages: Record<string, string> = {
+  wrong_calendar: 'Select FreeAppStore Dev Team Calendar in this workspace’s calendar settings.',
+  invalid_meeting_window: 'This meeting is outside the available reporting window, or has not ended yet.',
+  meeting_out_of_scope: 'Only the two selected FAS Daily Meeting series are available in this report.',
+  meeting_unavailable: 'This meeting was cancelled or no longer has a usable Google Meet link.',
+  incomplete_sessions: 'Google has not returned complete join and leave records. Try again later.',
+  identity_lookup_failed: 'Hiring identity links could not be loaded. Try again.',
+  request_budget: 'This meeting exceeds the report request limit. No partial attendance result is shown.',
+  google_invalid_response: 'Google returned incomplete or invalid meeting data. Try again later.',
+
   google_not_configured: 'Google Calendar is not available yet. Ask the app administrator to finish setup.',
   forbidden: 'You do not have access to this calendar connection.',
   reconnect_required: 'Reconnect Google Calendar to restore access.',

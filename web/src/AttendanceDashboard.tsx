@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MeetingPeople } from './MeetingPeople'
 import { Link } from 'react-router-dom'
 import { read, type Scope } from './api'
 import { calendarRequest, type CalendarStatus } from './GoogleCalendar'
@@ -87,8 +88,9 @@ export function AttendanceDashboard({ scope, canManage }: { scope: Scope; canMan
         <Link className="inline-flex min-h-11 items-center underline" to={applicationsUrl}>Manage tracked participants</Link>
       </div>
     </Section>
-    <Section title="Meeting attendance">
-      <p className="mb-3 text-sm">Only explicitly tracked participants appear here. Untracked meetings and people are not counted. Missing evidence is not a confirmed absence.</p>
+    <MeetingPeople key={periodKey} scope={scope} startsAt={window.starts_at} endsAt={window.ends_at} revision={revision} />
+    <Section title="Tracked candidate attendance">
+      <p className="mb-3 text-sm">This section contains hourly checks for explicitly tracked candidates. Untracked meetings and people are not counted. Missing evidence is not a confirmed absence.</p>
       {!loaded ? <LoadingState>Loading attendance…</LoadingState> : result.failed ? <ErrorState retry={refresh}>Attendance records could not be loaded. The attendance feature may not be deployed yet, or access may have changed.</ErrorState> : !rows.length ? <EmptyState>{offset > 0 ? 'No more participant records on this page. Return to the previous page.' : 'No tracked participants found for these meeting series in this week. Open a candidate’s Interview section to link a meeting occurrence.'}</EmptyState> : <>
         <p className="mb-3 text-sm text-[var(--muted)]">Showing {offset + 1}–{offset + rows.length} of {total} participant records. A person can appear in more than one meeting.</p>
         {[...groups.entries()].map(([groupKey, people]) => {

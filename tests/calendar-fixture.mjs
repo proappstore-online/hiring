@@ -18,7 +18,7 @@ export function calendarFixture() {
       const results=(t.statements??[t.sql]).map(sql=>{
         const bindings=[]
         const stmt=f.db.prepare(sql.replace(/:([a-z_][a-z0-9_]*)/gi,(_,key)=>{assert.notEqual(params[key],undefined,key);bindings.push(params[key]);return '?'}))
-        return /^\s*SELECT\b/i.test(sql)?{rows:stmt.all(...bindings).map(r=>({...r}))}:{meta:{changes:stmt.run(...bindings).changes}}
+        return /^\s*(SELECT|WITH)\b/i.test(sql)?{rows:stmt.all(...bindings).map(r=>({...r}))}:{meta:{changes:stmt.run(...bindings).changes}}
       })
       f.db.exec('COMMIT');return t.operation==='batch'?{results}:results[0]
     }catch(e){f.db.exec('ROLLBACK');throw e}
