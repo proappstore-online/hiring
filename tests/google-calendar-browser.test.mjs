@@ -22,6 +22,7 @@ else if(path==='/google/select'){window.connected=true;window.selected=body.cale
 if(path==='/google/disconnect'){window.connected=false;window.selected='';window.version++;result={ok:true}};
 if(path.startsWith('/google/events'))result={events:[{id:'event-1',title:'Working interview',starts_at:1793750400000,ends_at:1793752200000,meeting_code:'abc-defg-hij'}]};
 if(path==='/google/track'){window.records=[{id:'target',version:1,kind:'working_interview',interview_id:null,meeting_code:'abc-defg-hij',starts_at:1793750400000,ends_at:1793752200000,configured_starts_at:1793750400000,configured_ends_at:1793752200000,source_ready:1,google_user_id:body.google_user_id,calendar_id:'recruiting',calendar_event_id:'event-1',enabled:1,latest_check:null}];result={ok:true}};
+if(path==='/google/complete'&&location.pathname.includes('unavailable'))return Response.json({error:'google_unavailable'},{status:502});
 if(path==='/google/complete')result={return_to:'/recruiter/organizations/org/brands/brand/settings'};
 return Response.json(result)};
 window.action=async(name,params)=>{window.calls.push({name,params});if(name==='list_meeting_attendance')return{rows:window.records};if(name==='configure_meeting_attendance'){window.records[0].enabled=0;return{results:[{meta:{changes:1}}]}}return{rows:[]}};
@@ -44,7 +45,7 @@ test('Google Calendar controls connect, select, track, pause and disconnect with
     await page.evaluate(()=>{window.accountConnected=true})
     await page.getByText('Google Calendar',{exact:true}).click()
     await expect(page.getByText('Available Google account: organizer@example.com.',{exact:false})).toBeVisible()
-    await expect(page.getByText('No Google Calendar connected.')).toBeVisible()
+    await expect(page.getByText('Google account connected. Choose a calendar below to finish setup.')).toBeVisible()
     await page.getByLabel('Calendar',{exact:true}).selectOption('recruiting')
     await page.getByRole('button',{name:'Save calendar',exact:true}).click()
     await expect(page.getByRole('button',{name:'Save calendar',exact:true})).toBeDisabled()
@@ -76,5 +77,9 @@ test('Google Calendar controls connect, select, track, pause and disconnect with
     await expect(page).toHaveURL(/\/recruiter\/organizations\/org\/brands\/brand\/settings$/)
     assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.path==='/google/complete').length),1)
     assert.doesNotMatch(page.url(),/code=|state=/)
+    await page.goto(base+'callback-unavailable?code=one-use&state=synthetic-state')
+    await expect(page.getByRole('alert')).toContainText('start Connect Google Calendar again')
+    assert.doesNotMatch(page.url(),/code=|state=/)
+    assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.path==='/google/complete').length),1)
   }finally{await browser?.close();await server.close();rmSync(cache,{recursive:true,force:true})}
 })

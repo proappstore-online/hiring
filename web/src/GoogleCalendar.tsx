@@ -21,6 +21,7 @@ const messages: Record<string, string> = {
   connection_changed: 'The connection changed. Refresh and try again.',
   select_calendar_first: 'Choose a calendar in brand settings first.',
   google_rate_limited: 'Google is busy. Try again shortly.',
+  google_unavailable: 'The calendar service could not reach Google. If you just approved access, start Connect Google Calendar again; that attempt could not be saved.',
   calendar_too_large: 'This calendar has too many meetings to show. Choose a dedicated recruiting calendar.',
   calendar_event_required: 'Link this meeting from Google Calendar before checking attendance.',
   meeting_changed: 'The meeting changed while attendance was checked. The next hourly check will refresh it.',
@@ -66,7 +67,7 @@ function CalendarSettingsForm({ scope }: { scope: Scope }) {
     {!status && !error && <p role="status">Loading calendar connection…</p>}
     {status && !status.configured && <p role="status">Google Calendar is not available yet. Ask the app administrator to finish setup.</p>}
     {status?.configured && <>
-      <p className="break-words">{status.status === 'connected' ? `Connected as ${status.account_email}` : 'No Google Calendar connected.'}</p>
+      <p className="break-words">{status.status === 'connected' ? `Connected as ${status.account_email}` : status.account_connected ? 'Google account connected. Choose a calendar below to finish setup.' : 'No Google Calendar connected.'}</p>
       {status.account_connected && <p className="break-words">Available Google account: {status.available_account_email}. Choose a calendar below to grant this brand access.</p>}
       {status.status === 'connected' && !status.owner_active && <p role="alert">The connection owner no longer has access to this brand. Reconnect to continue.</p>}
       {status.status === 'connected' && status.owner_active && status.connection_valid === false && <p role="alert">This calendar grant is no longer available. Reconnect Google if needed, then save a calendar to restore this brand’s access.</p>}
