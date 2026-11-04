@@ -5,7 +5,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { secondaryButton } from './design-system'
 import { button, date, field, panel } from './ui'
 
-type Status = { status: string; account_email: string | null; calendar_id: string | null; calendar_name: string | null; version: number; configured: boolean; owner_active: boolean; can_manage: boolean }
+type Status = { status: string; account_email: string | null; calendar_id: string | null; calendar_name: string | null; version: number; configured: boolean; owner_active: boolean; can_manage: boolean; account_connected?: boolean; available_account_email?: string | null; connection_valid?: boolean }
 type Calendar = { id: string; name: string; primary: boolean }
 type Meeting = { id: string; title: string; starts_at: number; ends_at: number; meeting_code: string }
 type Attendance = { source_ready: number; configured_starts_at: number; configured_ends_at: number; id: string; version: number; kind: string; interview_id: string | null; meeting_code: string; starts_at: number; ends_at: number; google_user_id: string | null; calendar_id: string | null; calendar_event_id: string | null; enabled: number; latest_check: string | null }
@@ -21,6 +21,8 @@ const messages: Record<string, string> = {
   select_calendar_first: 'Choose a calendar in brand settings first.',
   google_rate_limited: 'Google is busy. Try again shortly.',
   calendar_too_large: 'This calendar has too many meetings to show. Choose a dedicated recruiting calendar.',
+  calendar_event_required: 'Link this meeting from Google Calendar before checking attendance.',
+  meeting_changed: 'The meeting changed while attendance was checked. The next hourly check will refresh it.',
 }
 async function request<T>(path: string, scope?: Scope, body?: Record<string, unknown>): Promise<T> {
   const suffix = body ? path : path + (scope ? '?' + new URLSearchParams(scope) : '')
@@ -45,7 +47,7 @@ function CalendarSettingsForm({ scope }: { scope: Scope }) {
     void request<Status>('/google/status', scope).then(async state => {
       if (!active) return
       setStatus(state); setSelected(state.calendar_id ?? '')
-      if (state.configured && state.status === 'connected' && state.owner_active) {
+      if (state.configured && state.can_manage && (state.account_connected ?? (state.status === 'connected' && state.owner_active))) {
         const result = await request<{ calendars: Calendar[] }>('/google/calendars', scope)
         if (active) setCalendars(result.calendars)
       }
@@ -57,28 +59,31 @@ function CalendarSettingsForm({ scope }: { scope: Scope }) {
     try { await action() } catch (e) { setError(e instanceof Error ? e.message : 'Calendar request failed.') } finally { setBusy(false) }
   }
   return <div className="mt-4 space-y-3">
-    <p>Link the organizer’s Google account to find meetings and check actual Meet attendance hourly. Access is read-only.</p>
+    <p>Connect the organizer’s Google account, then grant this brand a recruiting calendar. Attendance checks use actual Meet sessions hourly. Access is read-only.</p>
     {error && <p role="alert">{error}</p>}
     {!status && !error && <p role="status">Loading calendar connection…</p>}
     {status && !status.configured && <p role="status">Google Calendar is not available yet. Ask the app administrator to finish setup.</p>}
     {status?.configured && <>
       <p className="break-words">{status.status === 'connected' ? `Connected as ${status.account_email}` : 'No Google Calendar connected.'}</p>
+      {status.account_connected && <p className="break-words">Available Google account: {status.available_account_email}. Choose a calendar below to grant this brand access.</p>}
       {status.status === 'connected' && !status.owner_active && <p role="alert">The connection owner no longer has access to this brand. Reconnect to continue.</p>}
+      {status.status === 'connected' && status.owner_active && status.connection_valid === false && <p role="alert">This calendar grant is no longer available. Reconnect Google if needed, then save a calendar to restore this brand’s access.</p>}
       {status.can_manage && <button className={status.status === 'connected' ? secondaryButton : button} disabled={busy} onClick={() => void run(async () => {
         const result = await request<{ authorization_url: string }>('/google/start', scope, {})
         const url = new URL(result.authorization_url)
         if (url.origin !== 'https://accounts.google.com') throw Error('Invalid Google authorization response.')
         window.location.assign(url.href)
       })}>{status.status === 'connected' ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}</button>}
-      {status.status === 'connected' && status.owner_active && <form className="space-y-3" onSubmit={e => { e.preventDefault(); void run(async () => { await request('/google/select', scope, { calendar_id: selected, expected_version: status.version }); setRevision(v => v + 1) }) }}>
+      {status.account_connected && status.can_manage && <p className="text-sm">Reconnecting Google replaces this account’s access. Save a calendar again for each brand that uses it.</p>}
+      {(status.account_connected ?? (status.status === 'connected' && status.owner_active)) && <form className="space-y-3" onSubmit={e => { e.preventDefault(); void run(async () => { await request('/google/select', scope, { calendar_id: selected, expected_version: status.version }); setRevision(v => v + 1) }) }}>
         <label className="block">Calendar<select aria-label="Calendar" className={field} value={selected} onChange={e => setSelected(e.target.value)} disabled={busy || !status.can_manage} required><option value="">Choose a calendar</option>{calendars.map(c => <option key={c.id} value={c.id}>{c.name}{c.primary ? ' (primary)' : ''}</option>)}</select></label>
         <p className="text-sm">Use a recruiting calendar. Track a specific meeting from the candidate’s Interview section.</p>
-        {status.can_manage && <button className={button} disabled={busy || !selected || selected === status.calendar_id}>Save calendar</button>}
+        {status.can_manage && <button className={button} disabled={busy || !selected || (selected === status.calendar_id && status.connection_valid !== false && (!status.available_account_email || status.available_account_email === status.account_email))}>Save calendar</button>}
       </form>}
       {status.status === 'connected' && status.can_manage && <button type="button" className={secondaryButton + ' mr-3'} disabled={busy} onClick={() => setConfirm(true)}>Disconnect Google Calendar</button>}
     </>}
     <button type="button" className={secondaryButton} disabled={busy} onClick={() => setRevision(v => v + 1)}>Refresh connection</button>
-    {confirm && status && <ConfirmDialog title="Disconnect Google Calendar?" body="Attendance checks for this brand will stop and Hiring will remove the saved Google credential. Existing attendance records remain." confirmLabel="Disconnect" onCancel={() => setConfirm(false)} onConfirm={() => { setConfirm(false); void run(async () => { await request('/google/disconnect', scope, { expected_version: status.version }); setRevision(v => v + 1) }) }} />}
+    {confirm && status && <ConfirmDialog title="Disconnect Google Calendar?" body="Attendance checks for this brand will stop and its calendar grant will be revoked. Other brands and your connected Google account are unaffected. Existing attendance records remain." confirmLabel="Disconnect" onCancel={() => setConfirm(false)} onConfirm={() => { setConfirm(false); void run(async () => { await request('/google/disconnect', scope, { expected_version: status.version }); setRevision(v => v + 1) }) }} />}
   </div>
 }
 

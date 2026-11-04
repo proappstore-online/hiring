@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": { "build": "esbuild app.mjs --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/app.js" },
-  "dependencies": { "@proappstore/sdk": "1.16.78" },
+  "dependencies": { "@proappstore/sdk": "1.16.98" },
   "devDependencies": { "esbuild": "0.27.4" }
 }

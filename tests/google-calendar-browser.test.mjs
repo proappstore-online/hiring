@@ -13,12 +13,12 @@ const ts=require('typescript'),web=new URL('../web/',import.meta.url).pathname
 const transpile=s=>ts.transpile(s,{jsx:ts.JsxEmit.React,module:ts.ModuleKind.ESNext})
 const sdk=`export const initPro=()=>({auth:{user:{id:'owner'}},worker:{fetch:(...args)=>window.workerFetch(...args)},actions:{call:(...args)=>window.action(...args)}});`
 const fixture=`import React from 'react';import {createRoot} from 'react-dom/client';import {BrowserRouter} from 'react-router-dom';import {GoogleCalendarSettings,MeetingAttendance,GoogleCalendarCallback} from '/src/GoogleCalendar.tsx';import '/src/index.css';
-window.calls=[];window.connected=false;window.selected='';window.version=0;window.records=[];
+window.calls=[];window.accountConnected=false;window.connected=false;window.selected='';window.version=0;window.records=[];
 window.workerFetch=async(path,init={})=>{const body=init.body?JSON.parse(init.body):null;window.calls.push({path,body});let result={};
-if(path.startsWith('/google/status'))result={status:window.connected?'connected':'disconnected',account_email:window.connected?'organizer@example.com':null,calendar_id:window.selected,version:window.version,configured:true,owner_active:true,can_manage:true};
+if(path.startsWith('/google/status'))result={status:window.connected?'connected':'disconnected',account_email:window.connected?'organizer@example.com':null,calendar_id:window.selected,version:window.version,configured:true,owner_active:true,can_manage:true,account_connected:window.accountConnected,available_account_email:window.accountConnected?'organizer@example.com':null,connection_valid:window.connected};
 else if(path==='/google/start')result={authorization_url:'https://accounts.google.com/o/oauth2/v2/auth?state=synthetic'};
 else if(path.startsWith('/google/calendars'))result={calendars:[{id:'recruiting',name:'Recruiting',primary:false}]};
-else if(path==='/google/select'){window.selected=body.calendar_id;window.version++;result={ok:true}};
+else if(path==='/google/select'){window.connected=true;window.selected=body.calendar_id;window.version++;result={ok:true}};
 if(path==='/google/disconnect'){window.connected=false;window.selected='';window.version++;result={ok:true}};
 if(path.startsWith('/google/events'))result={events:[{id:'event-1',title:'Working interview',starts_at:1793750400000,ends_at:1793752200000,meeting_code:'abc-defg-hij'}]};
 if(path==='/google/track'){window.records=[{id:'target',version:1,kind:'working_interview',interview_id:null,meeting_code:'abc-defg-hij',starts_at:1793750400000,ends_at:1793752200000,configured_starts_at:1793750400000,configured_ends_at:1793752200000,source_ready:1,google_user_id:body.google_user_id,calendar_id:'recruiting',calendar_event_id:'event-1',enabled:1,latest_check:null}];result={ok:true}};
@@ -41,9 +41,10 @@ test('Google Calendar controls connect, select, track, pause and disconnect with
     await page.getByRole('button',{name:'Connect Google Calendar',exact:true}).click()
     await expect(page).toHaveURL(/https:\/\/accounts.google.com\/o\/oauth2\/v2\/auth/)
     await page.goto(base)
-    await page.evaluate(()=>{window.connected=true;window.version=1})
+    await page.evaluate(()=>{window.accountConnected=true})
     await page.getByText('Google Calendar',{exact:true}).click()
-    await expect(page.getByText('Connected as organizer@example.com')).toBeVisible()
+    await expect(page.getByText('Available Google account: organizer@example.com.',{exact:false})).toBeVisible()
+    await expect(page.getByText('No Google Calendar connected.')).toBeVisible()
     await page.getByLabel('Calendar',{exact:true}).selectOption('recruiting')
     await page.getByRole('button',{name:'Save calendar',exact:true}).click()
     await expect(page.getByRole('button',{name:'Save calendar',exact:true})).toBeDisabled()
@@ -69,6 +70,8 @@ test('Google Calendar controls connect, select, track, pause and disconnect with
     await page.getByRole('button',{name:'Disconnect Google Calendar',exact:true}).click()
     await page.getByRole('button',{name:'Disconnect',exact:true}).click()
     await expect(page.getByRole('button',{name:'Connect Google Calendar',exact:true})).toBeVisible()
+    await expect(page.getByLabel('Calendar',{exact:true})).toBeVisible()
+    assert.equal(await page.evaluate(()=>window.accountConnected),true)
     await page.goto(base+'callback?code=one-use&state=synthetic-state')
     await expect(page).toHaveURL(/\/recruiter\/organizations\/org\/brands\/brand\/settings$/)
     assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.path==='/google/complete').length),1)

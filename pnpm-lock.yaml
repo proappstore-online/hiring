@@ -67,8 +67,8 @@ importers:
   worker:
     dependencies:
       '@proappstore/sdk':
-        specifier: 1.16.78
-        version: 1.16.78(react@19.2.7)
+        specifier: 1.16.98
+        version: 1.16.98(react@19.2.7)
     devDependencies:
       esbuild:
         specifier: 0.27.4
@@ -1134,6 +1134,14 @@ packages:
 
   '@proappstore/sdk@1.16.78':
     resolution: {integrity: sha512-KWUQTjIpRxADXFGifg5TFzVMJw9PfLCzC58AmKwZSs5eR+tiJQXbLXQI5/pbGn3h15fzPNlLpPGvHgTRVDAa2w==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+
+  '@proappstore/sdk@1.16.98':
+    resolution: {integrity: sha512-tH9lhj07ojXrl2Mw8D4080RVGqP5x59lZZeuSDvd/2CMl08ONcegi4wPm+0gw9DeOGlEc3yjRs9f9p3TPR+lww==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
     peerDependenciesMeta:
@@ -4515,6 +4523,10 @@ snapshots:
       playwright: 1.56.1
 
   '@proappstore/sdk@1.16.78(react@19.2.7)':
+    optionalDependencies:
+      react: 19.2.7
+
+  '@proappstore/sdk@1.16.98(react@19.2.7)':
     optionalDependencies:
       react: 19.2.7
 

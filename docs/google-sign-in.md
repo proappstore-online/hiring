@@ -23,4 +23,4 @@ After a credential change, check that `/.pas/auth/start?provider=google&return_t
 
 Candidate intake remains closed. Staff sign-in does not grant access to another organization or brand by itself. The internal workspace grants the creator owner access and lets that owner add recruiters by exact PAS user ID; see [internal workspace](internal-workspace.md).
 
-Calendar/Meet linking is a separate, owner-authorized OAuth flow with its own server-side client and encrypted refresh tokens. See [meeting attendance](meeting-attendance.md); the sign-in configuration above is unchanged.
+Calendar/Meet linking is a separate, owner-authorized OAuth flow through the shared PAS connector, reusing the platform client with additional scopes and encrypted refresh tokens. See [meeting attendance](meeting-attendance.md); the sign-in configuration above is unchanged.

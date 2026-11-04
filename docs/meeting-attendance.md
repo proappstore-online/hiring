@@ -1,15 +1,16 @@
 # Google Calendar and meeting attendance
 
-Hiring owns the Google connection and an hourly PAS app worker, `meeting_attendance`
-(`0 * * * *`, UTC). A PAGS agent can configure/read scoped attendance through Hiring's
-registered actions; credentials and unattended execution belong to the app.
+PAS owns the reusable Google Calendar/Meet connector and encrypted credentials.
+Hiring owns the brand grants, candidate mapping and hourly app-worker job,
+`meeting_attendance` (`0 * * * *`, UTC). A PAGS agent can configure/read scoped
+attendance through Hiring's registered actions; no agent is needed to run the job.
 
-This implements Serge's 2026-11-04 request, using Seedstart's Google OAuth and
-hourly Meet-session sync as the reference. It uses PAS workers, encrypted private
-worker storage and D1 instead of Firebase/Firestore. The connection is read-only:
-no invitations, calendar edits, candidate exports or automatic hiring decisions.
-It is separate from the invitation/scheduling work in
-[integration-assessment.md](integration-assessment.md).
+This implements Serge's 2026-11-04 request using Seedstart's hourly Meet-session
+sync and PAGS's platform-held connection / explicit grant pattern as references.
+It uses PAS workers and D1 instead of Firebase. PAGS's existing Calendar connector
+reads events/RSVPs; actual attendance additionally requires Meet conference and
+participant-session access. PAS is independent of PAGS and holds its own tokens.
+The connection is read-only: no invitations, calendar edits or hiring decisions.
 
 ## User flow
 
@@ -22,7 +23,7 @@ It is separate from the invitation/scheduling work in
    from Google Calendar**, select an occurrence, and choose **Track meeting attendance**.
 5. Review attendance in the same section. **Pause tracking** stops that target.
    **Disconnect Google Calendar** in settings stops the brand's checks and removes
-   its saved credential. Existing attendance evidence is retained.
+   its calendar grant. The shared Google account remains connected. Existing attendance evidence is retained.
 
 The meeting picker expands recurring events into individual occurrences for the
 past seven days and next thirty days. It does not enroll an entire calendar or
@@ -40,76 +41,77 @@ attendance. No contacts/directory permission is requested.
 
 ## One-time operator setup
 
-Production preflight on 2026-11-04 found the Hiring worker disabled and no app
-secrets configured. `pas worker enable hiring` was refused with HTTP 403:
-`app workers are limited to first-party apps during the prototype`. A platform
-operator must resolve Hiring's eligibility through the supported control plane
-before deployment. Do not push this worker while that gate remains closed: the
-deployment applies migrations first, then fails at worker upload.
+On 2026-11-04, deployment of Hiring `0bf3cb1` built successfully and applied
+migrations `0071`/`0072`, then stopped before worker/frontend upload because the
+worker was disabled. Enabling it returned HTTP 403: `app workers are limited to
+first-party apps during the prototype`. The platform checks the registered app
+owner against its administrator list. An authorized platform operator must
+resolve eligibility through the supported control plane; this implementation
+does not change that policy or transfer ownership.
 
-The PAS main branch checked on that date (`e8ed2a0`) supplies app workers,
-schedules and app secrets, but its connector manifest accepts only `kind: github`.
-Its Google sign-in requests `openid email profile`, and its proxy OAuth support
-uses client credentials, not a Calendar user's authorization-code/refresh-token
-grant. There is no existing platform Calendar connector to select for this flow.
+Browser setup on 2026-11-04 confirmed **Enabled** for Calendar API and Google Meet
+REST API in the `proappstore-online` Google Cloud project. The existing
+`proappstore-api` OAuth client has the sign-in callback. The new connector callback
+has been prepared in the browser but remains unsaved pending action-time approval.
+No client secret was created, copied or changed; no organizer consent was accepted.
 
-Local builds do not configure a production Google client, deploy the worker, or
-complete the organizer's consent. Before first deployment:
+The Hiring refactor is saved to main with `[skip ci]` while worker upload remains
+explicitly denied. Local build, worker build, SQL/attendance tests and browser
+checks passed; the three navigation timeouts in the concurrent full suite passed
+when rerun sequentially. After eligibility is resolved, a normal main push runs
+the deployment workflow. Do not re-run the older app-owned-OAuth deployment.
 
-1. A platform administrator enables the app worker: `pas worker enable hiring`.
-   Check `pas worker status --app hiring`. The existing deploy workflow refuses
-   a worker that is not enabled.
-2. Enable the **Google Calendar API** and **Google Meet REST API** in the Google
-   Cloud project. Register an OAuth **Web application** client with this exact
-   authorized redirect URI:
+Deploy in this order:
 
-   `https://hiring.proappstore.online/recruiter/google-calendar/callback`
+1. PAS connector source is committed as `81186ef`; SDK `1.16.98` is published
+   and pinned in Hiring. Deploy the backend migration through platform main.
+   Existing PAS secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+   `APP_SECRET_KEK` and `SESSION_SIGNING_KEY` are reused. No Hiring secrets are needed.
+2. Enable Google Calendar API and Google Meet REST API in the PAS Google Cloud
+   project. Add this exact redirect to the existing OAuth Web application client:
+   `https://api.proappstore.online/v1/connectors/google-calendar/callback`.
+   Keep the existing sign-in callback. Configure consent/test users as required.
+3. Resolve Hiring worker eligibility, then check `pas worker status --app hiring`.
+   Deploy Hiring main with the SDK version that includes `connectors.googleCalendar`.
+   The workflow uploads the worker and registers the hourly schedule and actions.
+4. The organizer personally completes Google consent, then saves a calendar for
+   the brand. To smoke-test, track a known attended occurrence, run
+   `pas schedule run meeting_attendance --app hiring`, inspect
+   `pas schedule runs --app hiring`, and review the candidate's attendance result.
 
-3. Set three PAS app secrets through the hidden `pas secret set NAME --app hiring`
-   prompt, or `--stdin` from the approved secret store:
+Ordinary PAS Google sign-in does not authorize Calendar/Meet. Requested scopes:
+`openid`, `email`, and `calendar.events.readonly`, `calendar.calendarlist.readonly`,
+`meetings.space.readonly` under `https://www.googleapis.com/auth/`.
+Local tests use synthetic Google responses; they do not prove production consent
+or live Google Meet access.
 
-   - `HIRING_GOOGLE_CLIENT_ID`
-   - `HIRING_GOOGLE_CLIENT_SECRET`
-   - `HIRING_GOOGLE_TOKEN_KEY`: a cryptographically random 32-byte encryption key,
-     encoded as 64 hexadecimal characters. Preserve it; changing it requires
-     reconnecting stored accounts.
+## Connection security and lifecycle
 
-4. Deploy through main. The workflow applies migrations `0071`/`0072`, builds
-   `worker/dist/app.js`, deploys it and registers the schedule/tools. CI also builds
-   the worker. No Firebase function or GitHub Actions cron is required.
-5. The owner completes the user flow above. For a live smoke check, track a known
-   attended meeting, run `pas schedule run meeting_attendance --app hiring`, then
-   inspect `pas schedule runs --app hiring` and the candidate's attendance.
+PAS uses PKCE S256 and a random, hashed, ten-minute, one-use state bound to the
+initiating PAS user and app. The public PAS callback forwards the code to the
+pinned app origin. Its authenticated worker completes the exchange for the same
+user. The SPA removes the code from browser history. Credentials use PAS envelope
+encryption and remain on the platform; neither tokens nor client secrets reach
+Hiring, its database, the browser, action parameters or logs.
 
-No per-organizer refresh tokens need to be manually copied into secrets. Ordinary
-PAS Google sign-in is separate and does not itself authorize Calendar/Meet.
-Requested scopes are `calendar.readonly`, `meetings.space.readonly` and
-`userinfo.email` under `https://www.googleapis.com/auth/`.
+Connecting in one app does not authorize another app. Each app must complete its
+own OAuth flow before listing the user's calendars or creating exact-calendar
+grants. The worker manifest must declare the connector. Grant reads recheck the
+app, account version and revocation. Publisher transfer removes app authorization,
+pending callbacks and grants. Reconnecting Google increments the account version:
+existing grants stop and each affected brand must save its calendar again.
 
-## Connection security
+Hiring checks live brand permissions on connection operations. Only brand-wide
+owners can connect/select/disconnect; authorized recruiters can browse meetings.
+The saved grant must belong to the recorded connecting owner and exact calendar,
+so submitting another owner's grant ID through a metadata action grants no access.
+Revoking the owner's Hiring permissions stops the job. Disconnect disables the
+brand before revoking its grant; other brands and the shared account are unaffected.
 
-OAuth uses PKCE S256 and random state, bound to the initiating PAS user, exact
-organization/brand, live owner grant, ten-minute expiry and connection version.
-Callback claims are one-use. A stale callback cannot overwrite a reconnect or
-undo a disconnect. The SPA callback removes the authorization code from browser
-history and posts it to the authenticated app-worker route; refresh/access tokens
-never reach the browser or registered-action parameters.
-
-The server exchanges the code, checks granted scopes and the verified account
-email, and encrypts the refresh token with AES-256-GCM. The encryption's associated
-context includes the exact organization, brand and connection ID, preventing
-credential substitution across scopes. Only non-secret connection metadata is in
-D1. Private worker storage holds the encrypted credential; app secrets hold the
-client secret and encryption key.
-
-All connection operations recheck database permissions. Only brand-wide owners
-can connect/select/disconnect; brand-wide owners/recruiters can browse meetings.
-Application-scoped attendance actions also enforce requisition grants and erasure.
-Revoking the connecting owner's grant stops credential use. Disconnect changes
-D1 state before removing the encrypted credential, so a storage cleanup failure
-cannot leave the connection active. It unlinks this brand; users can separately
-remove Hiring's Google grant in their Google Account connections. Revoking the
-Google grant automatically could also invalidate another brand using that account.
+Meet reads require an actual occurrence in the granted calendar with the exact
+code and current timing. Short-lived signed resource receipts restrict participant
+and session queries to records returned by that scoped lookup. Names, emails,
+calendar descriptions and raw provider responses are not retained as evidence.
 
 ## Job behavior
 
@@ -118,7 +120,7 @@ linked upcoming occurrences within thirty days and reconciles completed meetings
 for seven days. Meet checks begin fifteen minutes after the meeting ends. Larger
 backlogs take multiple runs; review throughput before larger cohorts.
 
-All Meet lists are paginated with a shared 180-request invocation budget and a
+All Meet lists are paginated with a shared 120-call connector budget per invocation and a
 10-second request timeout. Calendar listing is capped at five pages of 100 events;
 exceeding it reports an error instead of silently truncating. Provider failures,
 incomplete sessions and request limits never become absence.
@@ -163,16 +165,18 @@ schedule is authoritative and location must contain the exact Google Meet URL.
 Rescheduling invalidates old results. Cancellation, missing time/duration or a
 changed Meet link stops checks (`source_ready: 0`). For standalone occurrences,
 use `working_interview` or `standup`, null interview ID, exact start/end epoch
-milliseconds and the Meet code. Calendar-linked targets additionally have
-`calendar_id` and `calendar_event_id`, set through the meeting picker. API callers
+milliseconds and the Meet code. Every target must link a Calendar occurrence using
+`calendar_id` and `calendar_event_id`, set through the meeting picker. Legacy
+manual targets without an event report `calendar_event_required`; they cannot read
+unscoped Meet records. API callers
 must not fabricate an identity from a participant display name.
 
 ## Validation and references
 
 Tests cover real migration/action SQL, grants, cross-brand isolation, erasure,
-stale writes, OAuth expiry/replay/PKCE, scope denial, reconnect/disconnect races,
-credential encryption, calendar timing/cancellations, pagination and session
-aggregation. Browser checks cover connection controls and responsive layout.
+stale writes, calendar timing/cancellations, pagination and session
+aggregation. Platform tests cover OAuth expiry/replay/PKCE, scope denial, encrypted
+credentials, app isolation, resource receipts and reconnect/disconnect races. Browser checks cover connection controls and responsive layout.
 Live organizer consent and scheduler delivery still require the smoke check above.
 
 - [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server)

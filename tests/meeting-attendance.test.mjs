@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fixture } from './playbook-fixture.mjs'
-import { checkMeetingAttendance, googleClient, observeAttendance, summarizeSessions } from '../worker/meeting-attendance.mjs'
+import { checkMeetingAttendance, platformMeetClient, observeAttendance, summarizeSessions } from '../worker/meeting-attendance.mjs'
 
 const manifest = JSON.parse(readFileSync(new URL('../mcp.json', import.meta.url)))
 const start = Date.parse('2026-11-04T00:00:00Z'), end = start + 1_800_000
@@ -13,7 +13,7 @@ const observation = { connection_id: 'connection-a', target_id: 'target-a', orga
 function setup() {
   const f = fixture()
   f.call('create_application', 'owner-a', { ...scope, requisition_id: 'req-a', candidate_id: 'candidate-a', operation_id: 'candidate-create', candidate_name: 'Candidate', email: 'candidate@example.com', phone: '', source: 'manual', source_detail: 'Direct', basis_reference: 'recruitment', contact_context: 'Direct', assignee_user_id: 'owner-a' })
-  f.db.exec("INSERT INTO hiring_google_calendar_connections(organization_id,brand_id,connection_id,account_email,calendar_id,status,version,connected_by,connected_at,updated_at) VALUES ('a','brand-a','connection-a','organizer@example.com','primary','connected',1,'owner-a',1,1)")
+  f.db.exec("INSERT INTO hiring_google_calendar_connections(organization_id,brand_id,connection_id,account_email,calendar_id,status,version,connected_by,connected_at,updated_at) VALUES ('a','brand-a','connection-a','organizer@example.com','team@example.test','connected',1,'owner-a',1,1)")
   let now = end + 900_000
   const call = (name, user, values = {}) => {
     const t = manifest.tools.find(t => t.name === name)
@@ -123,58 +123,65 @@ test('session durations merge reconnects and simultaneous devices and clip the e
 
 function provider({ anonymous=false, match=true, secondPage=true, failure=null }={}) {
   const requests=[]
-  const fetchImpl=async (input,init)=>{
-    const url=new URL(input);requests.push({url,init})
-    if(url.hostname==='oauth2.googleapis.com') return Response.json({access_token:'access'})
-    if(failure) return Response.json({error:'sensitive provider details'},{status:failure})
-    if(url.pathname==='/v2/conferenceRecords') return Response.json({conferenceRecords:[{name:'conferenceRecords/c1',startTime:iso(start),endTime:iso(end)}]})
-    if(url.pathname.endsWith('/participants')) {
-      if(secondPage&&!url.searchParams.has('pageToken'))return Response.json({participants:[],nextPageToken:'page2'})
-      return Response.json({participants:[{name:'conferenceRecords/c1/participants/p1',...(anonymous?{anonymousUser:{displayName:'Candidate'}}:{signedinUser:{user:match?'users/123456':'users/999999',displayName:'Candidate'}})}]})
+  const connector=async(_name,input)=>{
+    requests.push(input)
+    if(failure)return {error:failure,status:502}
+    if(input.operation==='grant_status')return {user_id:'owner-a',calendar_id:'team@example.test'}
+    if(input.operation==='event')return {id:'event1',status:'confirmed',start:{dateTime:iso(start)},end:{dateTime:iso(end)},hangoutLink:'https://meet.google.com/abc-defg-hij'}
+    if(input.operation==='conferences')return {conferenceRecords:[{name:'conferenceRecords/c1',startTime:iso(start),endTime:iso(end),receipt:'conference-receipt'}]}
+    if(input.operation==='participants'){
+      assert.equal(input.receipt,'conference-receipt')
+      if(secondPage&&!input.page_token)return {participants:[],nextPageToken:'page2'}
+      return {participants:[{name:'conferenceRecords/c1/participants/p1',receipt:'participant-receipt',...(anonymous?{anonymousUser:{}}:{signedinUser:{user:match?'users/123456':'users/999999'}})}]}
     }
-    if(url.pathname.endsWith('/participantSessions'))return Response.json({participantSessions:[{startTime:iso(start+60_000),endTime:iso(end)}]})
-    throw Error('Unexpected provider path')
+    if(input.operation==='sessions'){
+      assert.equal(input.receipt,'participant-receipt')
+      return {participantSessions:[{startTime:iso(start+60_000),endTime:iso(end)}]}
+    }
+    throw Error('Unexpected connector operation')
   }
-  return {fetchImpl,requests}
+  return {pas:{connectors:{googleCalendar:connector}},requests}
 }
-const target={...config,id:config.target_id,version:1,source_version:0}
+const target={...config,id:config.target_id,version:1,source_version:0,calendar_event_id:'event1'}
+const connection={connection_id:'connection-a',calendar_id:'team@example.test',connected_by:'owner-a'}
+const client=(p,budget)=>platformMeetClient(p.pas,target,connection,budget)
 
-test('Google pagination, exact meeting filter and stable identity; same names never match', async () => {
+test('connector pagination and stable identity preserve receipts; matching names never become evidence',async()=>{
   const p=provider()
-  const result=await observeAttendance(target,googleClient(p.fetchImpl),'access')
+  const result=await observeAttendance(target,client(p))
   assert.equal(result.status,'attended');assert.equal(result.duration_seconds,1740)
-  assert.match(p.requests[0].url.searchParams.get('filter'),/^space.meeting_code = "abc-defg-hij" AND/)
-  assert.equal(p.requests.filter(r=>r.url.pathname.endsWith('/participants')).length,2)
-  assert.equal((await observeAttendance(target,googleClient(provider({match:false}).fetchImpl),'access')).status,'not_observed')
-  assert.equal((await observeAttendance(target,googleClient(provider({anonymous:true}).fetchImpl),'access')).status,'identity_unresolved')
-  assert.equal((await observeAttendance({...target,google_user_id:null},googleClient(()=>{throw Error('No API call expected')}),'access')).status,'identity_unresolved')
+  assert.equal(p.requests[0].event_id,'event1');assert.equal(p.requests[0].meeting_code,'abc-defg-hij')
+  assert.equal(p.requests.filter(r=>r.operation==='participants').length,2)
+  assert.equal((await observeAttendance(target,client(provider({match:false})))).status,'not_observed')
+  assert.equal((await observeAttendance(target,client(provider({anonymous:true})))).status,'identity_unresolved')
+  assert.equal((await observeAttendance({...target,google_user_id:null},{list:()=>{throw Error('No API call expected')}})).status,'identity_unresolved')
 })
 
-test('missing records, incomplete pages, permission errors and rate limits cannot become absences', async () => {
-  assert.equal((await observeAttendance(target,googleClient(async()=>Response.json({})),'access')).status,'no_record')
-  for(const [status,code] of [[401,'google_auth'],[403,'google_forbidden'],[404,'google_not_found'],[429,'google_rate_limited'],[500,'google_unavailable']]) {
-    await assert.rejects(observeAttendance(target,googleClient(provider({failure:status}).fetchImpl),'access'),new RegExp(code))
-  }
-  await assert.rejects(googleClient(async()=>Response.json({nextPageToken:'same'})).list('conferenceRecords','conferenceRecords','access'),/google_invalid_response/)
-  await assert.rejects(observeAttendance(target,googleClient(provider().fetchImpl,1),'access'),/request_budget/)
-  const incomplete = googleClient(async input => Response.json(new URL(input).pathname.endsWith('/participants') ? {} : {conferenceRecords:[{name:'conferenceRecords/c1',startTime:iso(start),endTime:iso(end)}]}))
-  await assert.rejects(observeAttendance(target,incomplete,'access'),/incomplete_sessions/)
+test('missing records, incomplete pages, revoked grants and request budgets cannot become absences',async()=>{
+  const mock=reply=>({pas:{connectors:{googleCalendar:async()=>reply}}})
+  assert.equal((await observeAttendance(target,client(mock({})))).status,'no_record')
+  for(const code of ['google_auth','google_forbidden','google_not_found','google_rate_limited','google_unavailable','reconnect_required'])await assert.rejects(observeAttendance(target,client(provider({failure:code}))),new RegExp(code))
+  await assert.rejects(client(mock({nextPageToken:'same'})).list('conferenceRecords','conferenceRecords'),/google_invalid_response/)
+  await assert.rejects(observeAttendance(target,client(provider(),{remaining:1})),/request_budget/)
+  const incomplete={pas:{connectors:{googleCalendar:async(_n,p)=>p.operation==='participants'?{}:{conferenceRecords:[{name:'conferenceRecords/c1',startTime:iso(start),endTime:iso(end),receipt:'r'}]}}}}
+  await assert.rejects(observeAttendance(target,client(incomplete)),/incomplete_sessions/)
+  await assert.rejects(platformMeetClient(provider().pas,{...target,calendar_event_id:null},connection).list('conferenceRecords','conferenceRecords'),/calendar_event_required/)
 })
 
 test('scheduled handler persists observations, retries idempotently, stops on disconnect and redacts logs', async () => {
   const f=setup(), logs=[]
   try {
-    f.call('configure_meeting_attendance','owner-a',config)
+    f.call('configure_meeting_attendance','owner-a',{...config,calendar_id:'team@example.test',calendar_event_id:'event1'})
     const pas={actions:{call:async(name,params)=>{const result=f.call(name,'system:worker',params);return name.startsWith('worker_list')||name==='worker_get_google_calendar_connection'?{rows:result}:{meta:{changes:result[0]}}}},log:async(...args)=>logs.push(args)}
-    const p=provider(),options={fetchImpl:p.fetchImpl,tokenForConnection:async()=> 'access'}
-    await checkMeetingAttendance({id:'scheduled-1'},pas,options)
+    const p=provider();pas.connectors=p.pas.connectors
+    await checkMeetingAttendance({id:'scheduled-1'},pas)
     const calls=p.requests.length
-    await checkMeetingAttendance({id:'scheduled-1'},pas,options)
+    await checkMeetingAttendance({id:'scheduled-1'},pas)
     assert.equal(p.requests.length,calls)
     assert.equal(f.db.prepare('SELECT COUNT(*) n FROM hiring_attendance_checks').get().n,1)
     f.at(end+900_000+3_600_000)
     f.db.exec("UPDATE hiring_google_calendar_connections SET status='disconnected'")
-    await checkMeetingAttendance({id:'scheduled-2'},pas,options)
+    await checkMeetingAttendance({id:'scheduled-2'},pas)
     assert.equal(p.requests.length,calls)
     assert.deepEqual(f.call('worker_record_attendance','system:worker',{...observation,event_id:'after-disconnect'}),[0])
     assert.doesNotMatch(JSON.stringify(logs),/123456|Candidate|secret|refresh|abc-defg/)
