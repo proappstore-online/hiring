@@ -12,6 +12,27 @@ reads events/RSVPs; actual attendance additionally requires Meet conference and
 participant-session access. PAS is independent of PAGS and holds its own tokens.
 The connection is read-only: no invitations, calendar edits or hiring decisions.
 
+## Production release verified — 2026-11-05 Australia/Melbourne
+
+PAS owner-worker support is deployed at `d9925f6`: migration, backend health smoke,
+CI, related worker deployments and published documentation all succeeded in
+[platform run 41885998435](https://github.com/proappstore-online/platform/actions/runs/41885998435).
+Hiring `bea7bd2` deployed successfully in
+[run 41886840017](https://github.com/proappstore-online/hiring/actions/runs/41886840017),
+including its worker, action registration and frontend. Hiring CI and compliance
+also passed. The production bundle contains the attendance route and Calendar UI.
+
+The worker is enabled on `loader` and `meeting_attendance` is active hourly.
+Manual smoke run `8e60574b-554e-4092-9f47-238e55b3a5e7` succeeded with HTTP 200 at
+2026-11-04 18:27:49 UTC. This verifies execution, not Google attendance ingestion.
+The FreeAppStore brand currently reports `disconnected`, with no saved Calendar
+grant. Scoped reports for this week and last week returned no participant records.
+The organizer must personally complete Calendar/Meet consent, select the
+FreeAppStore calendar, and then link the intended meeting occurrences to candidates.
+The date-based release hold is removed; Google consent and attendance enrollment
+remain application setup. Chrome automation became unavailable during the final
+check, so a live visual smoke check remains unverified.
+
 ## User flow
 
 The recruiter navigation's **More → Attendance** opens `/recruiter/attendance`
@@ -112,11 +133,11 @@ PAS connection for `serge.the.dev@gmail.com` already reports `you: owner` for
 Hiring. Recovery is therefore not a prerequisite for this release. Worker
 eligibility must be resolved by the supported platform release above.
 
-The Hiring refactor is saved to main with `[skip ci]` while worker upload remains
-explicitly denied. Local build, worker build, SQL/attendance tests and browser
+Before this release, the Hiring refactor was saved to main with `[skip ci]` while
+worker upload was explicitly denied. Local build, worker build, SQL/attendance tests and browser
 checks passed; the three navigation timeouts in the concurrent full suite passed
-when rerun sequentially. After eligibility is resolved, a normal main push runs
-the deployment workflow. Do not re-run the older app-owned-OAuth deployment.
+when rerun sequentially. The normal main push above has now completed deployment.
+Do not re-run the older app-owned-OAuth deployment.
 
 Deploy in this order:
 
