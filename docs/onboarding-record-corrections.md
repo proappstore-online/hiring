@@ -11,8 +11,13 @@ not update databases that had already applied its paid-only guard.
 version, offered stage, approved scoped offer, real candidate acceptance evidence,
 human identity and recruiter grant are required for paid and unpaid roles.
 Historical acceptances remain readable through the stable reconciliation tools.
-Lifecycle transitions use the successor ledger and require registration,
-requirements acknowledgement and team handoff evidence before `onboarded`.
+Lifecycle transitions use the successor ledger. Migration
+`0073_organization_onboarding` adds a separate organisation-configurable
+checklist and requires verified completion of its required steps before
+`onboarded`. Earlier lifecycle evidence stays readable. New lifecycle entries
+store a checklist-version reference in the three legacy evidence columns to
+satisfy the already-applied trigger without treating those columns as new
+requirements.
 
 An owner can use `correct_accepted_offer` when an already accepted or onboarding
 candidate's approved offer was recorded incorrectly. Supply the exact application

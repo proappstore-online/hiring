@@ -47,6 +47,14 @@ After acceptance, use `record_lifecycle_transition` for `accepted` →
 `onboarding` → `onboarded` → `active`. Staff withdrawal uses that lifecycle tool
 only from `accepted`, `onboarding`, or `onboarded`; the same three stages also
 allow rejection. `hired`, `rejected`, `withdrawn`, and `active` are terminal.
+For onboarding completion, read the organisation's current policy, assign its
+version to the onboarding application, and record each required candidate step
+with its real field value, evidence and verifier. The server refuses `onboarded`
+while any required latest step is incomplete. Do not use the hiring-team task
+tools for candidate checklist data. The organisation owner controls criteria
+and may explicitly opt into the FreeAppStore Interns reminder behaviour; the
+default is no Interns invitation note. A recorded checklist does not create an
+actual agreement, signature, Discord or Slack membership.
 The agent mutation `hiring_v1_advance_application` further reserves final
 dispositions for the dedicated decision action.
 

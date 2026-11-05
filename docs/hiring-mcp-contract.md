@@ -429,11 +429,31 @@ is retained independently; it does not imply canonical onboarding completion.
 
 Every lifecycle operation requires organization, brand, requisition, application,
 expected application version, prior/next stage, operation ID and transition evidence.
-Supply empty strings for registration_evidence, requirements_evidence and
-handoff_evidence except when completing onboarding: all three must then contain
-references proving registration, requirements acknowledgement and team/Discord
-handoff completion. Actor and time are recorded by the server. Only scoped owners
-and recruiters may write/read detailed lifecycle evidence.
+For new operations, `onboarded` requires an assigned organisation checklist with
+every required step's latest status completed and verified. Call
+`get_onboarding_policy` to read the current criteria, then
+`assign_onboarding_policy` once the candidate is onboarding. The assignment
+freezes the policy version for that candidate. `list_onboarding_checklist`
+returns each configured step or custom field, status, value, comment, evidence,
+verifier and timestamp. `record_onboarding_step` appends a new version for one
+step; `get_onboarding_step_result` confirms an exact retry. Only scoped owners
+and recruiters may record or read the candidate checklist. These records are
+separate from internal hiring-team reminder tasks.
+
+An organisation owner publishes criteria through `publish_onboarding_policy`
+with `expected_version`, a JSON array of unique `{key,label,kind,required}`
+steps, and `invitation_mode`. Kinds are `text`, `url`, `identity`, `membership`,
+`document`, and `confirmation`. Completed values require evidence and the acting
+recruiter is recorded as verifier. `get_onboarding_policy_result` confirms an
+exact policy write. `invitation_mode=freeappstore_interns` explicitly enables
+the existing Interns invitation reminder; `none` is the default. Neither mode
+sends mail or changes membership.
+
+The old lifecycle columns `registration_evidence`, `requirements_evidence`, and
+`handoff_evidence` remain for historical reads and immutable applied triggers.
+New completion writes put the same `checklist:<version>` reference in all three
+columns. They are compatibility pointers, not claims that those three specific
+activities occurred. Actor and time are recorded by the server.
 
 Writes are atomic with immutable stage and audit events. Retry with the same
 operation ID and identical payload, then confirm with `get_lifecycle_result`.

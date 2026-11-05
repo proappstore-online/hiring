@@ -7,10 +7,11 @@ import { onboardingMigration, correctionTools } from '../scripts/onboarding-cont
 const read = path => JSON.parse(readFileSync(new URL('../'+path,import.meta.url)))
 const migrations=read('migrations.json').migrations, tools=read('mcp.json').tools
 const internsMigration=migrations.find(m=>m.name==='0055_discord_interns_fields')
+const orgMigration=migrations.find(m=>m.name==='0073_organization_onboarding')
 const scope={organization_id:'org',brand_id:'brand',application_id:'app',requisition_id:'req'}
 function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={}) {
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON')
- for(const m of migrations.filter(m=>m.name!==onboardingMigration.name && m.name!==internsMigration.name))db.exec(m.sql)
+ for(const m of migrations.filter(m=>m.name!==onboardingMigration.name && m.name!==internsMigration.name && m.name!==orgMigration.name))db.exec(m.sql)
  const call=(name,user='owner',values={})=>{
   const t=tools.find(t=>t.name===name),p={...Object.fromEntries(Object.entries(t.params??{}).filter(([,s])=>s.optional).map(([k])=>[k,null])),...values,__user_id:user,__now:Date.now(),__uuid:crypto.randomUUID()}
   db.exec('BEGIN');try{
@@ -25,7 +26,7 @@ function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={
  for(const [name,version] of [['submit_offer_for_approval',1],['approve_offer',2]])call(name,'owner',{tenant_id:'org',brand_id:'brand',offer_id:offer.id,expected_version:version,operation_id:name})
  db.exec("UPDATE hiring_applications SET stage='offered'")
  if(legacyAcceptance)db.prepare("INSERT INTO hiring_acceptances VALUES('legacy-accept','org','brand','app',?,1,'owner',1,'Original paid test acceptance',1)").run(offer.id)
- if(!legacy){db.exec(onboardingMigration.sql);db.exec(internsMigration.sql)}
+ if(!legacy){db.exec(onboardingMigration.sql);db.exec(internsMigration.sql);db.exec(orgMigration.sql)}
  return {db,call,offer:db.prepare('SELECT * FROM hiring_offers').get()}
 }
 const accept={tenant_id:'org',brand_id:'brand',application_id:'app',expected_version:1,operation_id:'accept',acceptance_evidence:'Candidate explicitly accepted the unpaid volunteer role by email'}
@@ -43,6 +44,7 @@ test('upgrade retains the original paid-only migration and commits unpaid accept
    if(compensation!=='paid')assert.throws(()=>f.db.prepare("INSERT INTO hiring_acceptances VALUES('old-attempt','org','brand','app',?,1,'owner',1,'accepted',1)").run(f.offer.id),/invalid acceptance/)
    f.db.exec(onboardingMigration.sql)
    f.db.exec(internsMigration.sql)
+   f.db.exec(orgMigration.sql)
    assert.deepEqual(f.db.prepare('SELECT id,stage,version,accepted_stage FROM hiring_applications').all(),before.map(({id,stage,version,accepted_stage})=>Object.assign(Object.create(null),{id,stage,version,accepted_stage})))
    assert.equal(f.call('record_acceptance','owner',accept)[0],1)
    assert.equal(f.db.prepare("SELECT sql FROM sqlite_schema WHERE name='hiring_acceptances_validate'").get().sql,original)
@@ -109,7 +111,7 @@ test('correction and acceptance fail atomically on audit failure, erasure or for
  }finally{f.db.close()}
 })
 
-test('successor acceptance can be corrected and completion still requires every handoff evidence',()=>{
+test('successor acceptance can be corrected and completion requires the organisation checklist',()=>{
  const f=fixture();try{
   f.call('record_acceptance','owner',accept)
   const args=correction(f)
@@ -117,8 +119,11 @@ test('successor acceptance can be corrected and completion still requires every 
   assert.equal(f.call('get_application','owner',scope)[0].acceptance_evidence,args.acceptance_evidence)
   f.call('record_lifecycle_transition','owner',{...lifecycle,expected_version:3})
   const done={...lifecycle,expected_version:4,from_stage:'onboarding',to_stage:'onboarded',operation_id:'complete'}
-  assert.throws(()=>f.call('record_lifecycle_transition','owner',done),/evidence are required/)
-  f.call('record_lifecycle_transition','owner',{...done,registration_evidence:'Verified Interns membership',requirements_evidence:'Profile, agreement and checklist complete',handoff_evidence:'Team introduction verified'})
+  assert.throws(()=>f.call('record_lifecycle_transition','owner',done),/checklist incomplete/)
+  f.call('publish_onboarding_policy','owner',{organization_id:'org',brand_id:'brand',expected_version:0,steps_json:JSON.stringify([{key:'setup',label:'Setup',kind:'confirmation',required:true}]),invitation_mode:'none',operation_id:'policy'})
+  f.call('assign_onboarding_policy','owner',scope)
+  f.call('record_onboarding_step','owner',{...scope,policy_version:1,step_key:'setup',expected_version:0,status:'completed',value_json:'true',comment:'Reviewed',evidence:'Verified setup',operation_id:'step'})
+  f.call('record_lifecycle_transition','owner',done)
   assert.equal(f.call('get_application','owner',scope)[0].stage,'onboarded')
   assert.equal(f.call('get_offer','owner',{tenant_id:'org',brand_id:'brand',application_id:'app'})[0].terms_json,args.terms_json)
  }finally{f.db.close()}

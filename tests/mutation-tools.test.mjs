@@ -148,7 +148,12 @@ test('v1 withdraws an accepted, onboarding or onboarded application; decision an
     try {
       const application=()=>f.call('get_application','owner',{organization_id:'org',brand_id:'brand',application_id:'app'})[0]
       if(fromStage!=='accepted') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarding-'+fromStage,expected_version:application().version,to_stage:'onboarding'})
-      if(fromStage==='onboarded') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarded-'+fromStage,expected_version:application().version,from_stage:'onboarding',to_stage:'onboarded',evidence:'Onboarding complete',registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined'})
+      if(fromStage==='onboarded') {
+        f.call('publish_onboarding_policy',f.user,{organization_id:'org',brand_id:'brand',expected_version:0,steps_json:JSON.stringify([{key:'setup',label:'Setup verified',kind:'confirmation',required:true}]),invitation_mode:'none',operation_id:'life-policy'})
+        f.call('assign_onboarding_policy',f.user,{...scope})
+        f.call('record_onboarding_step',f.user,{...scope,policy_version:1,step_key:'setup',expected_version:0,status:'completed',value_json:'true',comment:'Reviewed',evidence:'Recruiter verified setup',operation_id:'life-step'})
+        f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarded-'+fromStage,expected_version:application().version,from_stage:'onboarding',to_stage:'onboarded',evidence:'Onboarding complete'})
+      }
       assert.equal(application().stage,fromStage)
       // The two tools Thanh Van's withdrawal was tried through (#1400) are correctly refused once the
       // application has entered the lifecycle workflow (hiring_workflow_decision_guard, migration 0051).

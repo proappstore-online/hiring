@@ -4413,7 +4413,7 @@
         }
       },
       "operation": "query",
-      "sql": "SELECT (SELECT COUNT(*) FROM hiring_acceptances_v2 WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_lifecycle_events_v2 WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_corrections WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_lifecycle_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM working_interview_records WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_internship_progress WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_stage_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_assignment_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_consent_records WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_rights_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interviews WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignment_history WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offers WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_approval_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox_authorizations WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_mail_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_intake_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_application_sources WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_worker_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_scorecard_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_decisions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_acceptances WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_attachments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_notes WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_agent_activity WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker'))) + (SELECT COUNT(*) FROM hiring_candidates c WHERE c.id=r.candidate_id AND c.organization_id=r.organization_id AND c.brand_id=r.brand_id AND (c.name IS NOT '[redacted]' OR c.email IS NOT '[redacted]' OR c.phone IS NOT '[redacted]' OR c.linkedin_url IS NOT '[redacted]' OR c.linkedin_profile_url IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_applications a WHERE a.id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND (a.source_detail IS NOT '[redacted]' OR a.basis_reference IS NOT '[redacted]' OR a.contact_context IS NOT '[redacted]' OR a.submitted_snapshot_json IS NOT NULL OR a.acceptance_evidence IS NOT NULL OR a.workflow_acceptance_evidence IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_rights_requests q WHERE q.candidate_id=r.candidate_id AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) + (SELECT COUNT(*) FROM hiring_candidate_merges q WHERE (q.source_id=r.candidate_id OR q.target_id=r.candidate_id) AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) AS remaining_records FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
+      "sql": "SELECT (SELECT COUNT(*) FROM hiring_onboarding_assignments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_onboarding_step_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_acceptances_v2 WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_lifecycle_events_v2 WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_corrections WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_lifecycle_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM working_interview_records WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_internship_progress WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_stage_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_assignment_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_consent_records WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_rights_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interviews WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM interview_assignment_history WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offers WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_approval_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox_authorizations WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_mail_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_intake_receipts WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_application_sources WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_worker_communication_events WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_outbox WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_scorecard_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_decisions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_offer_versions WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_acceptances WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_attachments WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_notes WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')))+(SELECT COUNT(*) FROM hiring_agent_activity WHERE application_id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker'))) + (SELECT COUNT(*) FROM hiring_candidates c WHERE c.id=r.candidate_id AND c.organization_id=r.organization_id AND c.brand_id=r.brand_id AND (c.name IS NOT '[redacted]' OR c.email IS NOT '[redacted]' OR c.phone IS NOT '[redacted]' OR c.linkedin_url IS NOT '[redacted]' OR c.linkedin_profile_url IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_applications a WHERE a.id IN (SELECT a.id FROM hiring_applications a JOIN hiring_deletion_requests r ON r.candidate_id=a.candidate_id AND r.organization_id=a.organization_id AND r.brand_id=a.brand_id WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker')) AND (a.source_detail IS NOT '[redacted]' OR a.basis_reference IS NOT '[redacted]' OR a.contact_context IS NOT '[redacted]' OR a.submitted_snapshot_json IS NOT NULL OR a.acceptance_evidence IS NOT NULL OR a.workflow_acceptance_evidence IS NOT NULL)) + (SELECT COUNT(*) FROM hiring_rights_requests q WHERE q.candidate_id=r.candidate_id AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) + (SELECT COUNT(*) FROM hiring_candidate_merges q WHERE (q.source_id=r.candidate_id OR q.target_id=r.candidate_id) AND q.organization_id=r.organization_id AND q.brand_id=r.brand_id) AS remaining_records FROM hiring_deletion_requests r WHERE r.id=:request_id AND r.organization_id=:organization_id AND r.brand_id=:brand_id AND :__user_id=('system'||char(58)||'worker') LIMIT 1"
     },
     {
       "name": "export_retention_objects",
@@ -5871,7 +5871,7 @@
     },
     {
       "name": "record_lifecycle_transition",
-      "description": "Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result.",
+      "description": "Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Onboarded requires every required step in the assigned organisation checklist to be verified; legacy evidence columns hold a checklist reference. Exact retry uses get_lifecycle_result.",
       "requires_auth": true,
       "operation": "execute",
       "params": {
@@ -5901,22 +5901,13 @@
         },
         "evidence": {
           "type": "string"
-        },
-        "registration_evidence": {
-          "type": "string"
-        },
-        "requirements_evidence": {
-          "type": "string"
-        },
-        "handoff_evidence": {
-          "type": "string"
         }
       },
-      "sql": "INSERT INTO hiring_lifecycle_events_v2 (organization_id,brand_id,requisition_id,application_id,operation_id,expected_version,from_stage,to_stage,evidence,registration_evidence,requirements_evidence,handoff_evidence,actor_user_id,created_at) SELECT :organization_id,:brand_id,:requisition_id,:application_id,:operation_id,:expected_version,:from_stage,:to_stage,:evidence,:registration_evidence,:requirements_evidence,:handoff_evidence,:__user_id,:__now WHERE NOT EXISTS(SELECT 1 FROM hiring_lifecycle_events_v2 WHERE operation_id=:operation_id)"
+      "sql": "INSERT INTO hiring_lifecycle_events_v2 (organization_id,brand_id,requisition_id,application_id,operation_id,expected_version,from_stage,to_stage,evidence,registration_evidence,requirements_evidence,handoff_evidence,actor_user_id,created_at) SELECT :organization_id,:brand_id,:requisition_id,:application_id,:operation_id,:expected_version,:from_stage,:to_stage,:evidence,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,:__user_id,:__now WHERE NOT EXISTS(SELECT 1 FROM hiring_lifecycle_events_v2 WHERE operation_id=:operation_id)"
     },
     {
       "name": "get_lifecycle_result",
-      "description": "Confirm an exact scoped lifecycle operation, including actor, evidence and original version, even after later transitions.",
+      "description": "Confirm an exact scoped lifecycle operation, actor, original version and transition reason; onboarding completion references the frozen checklist.",
       "requires_auth": true,
       "operation": "query",
       "params": {
@@ -5946,18 +5937,9 @@
         },
         "evidence": {
           "type": "string"
-        },
-        "registration_evidence": {
-          "type": "string"
-        },
-        "requirements_evidence": {
-          "type": "string"
-        },
-        "handoff_evidence": {
-          "type": "string"
         }
       },
-      "sql": "SELECT e.* FROM hiring_lifecycle_history e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.requisition_id=:requisition_id AND e.application_id=:application_id AND e.operation_id=:operation_id AND e.expected_version=:expected_version AND e.from_stage=:from_stage AND e.to_stage=:to_stage AND e.evidence=:evidence AND e.registration_evidence=:registration_evidence AND e.requirements_evidence=:requirements_evidence AND e.handoff_evidence=:handoff_evidence AND e.actor_user_id=:__user_id AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=e.organization_id AND g.brand_id=e.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=e.requisition_id))"
+      "sql": "SELECT e.* FROM hiring_lifecycle_history e WHERE e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.requisition_id=:requisition_id AND e.application_id=:application_id AND e.operation_id=:operation_id AND e.expected_version=:expected_version AND e.from_stage=:from_stage AND e.to_stage=:to_stage AND e.evidence=:evidence AND e.actor_user_id=:__user_id AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.user_id=:__user_id AND g.organization_id=e.organization_id AND g.brand_id=e.brand_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=e.requisition_id))"
     },
     {
       "name": "list_lifecycle_events",
@@ -6329,7 +6311,7 @@
     },
     {
       "name": "hiring_v1_record_lifecycle_transition",
-      "description": "Hiring mutation contract v1. Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Completion requires registration, requirements and handoff evidence. Exact retry uses get_lifecycle_result. Refused stage and decision writes return an error; zero changes may indicate a retry.",
+      "description": "Hiring mutation contract v1. Record accepted → onboarding → onboarded → active, or rejected/withdrawn before activation. Onboarded requires every required step in the assigned organisation checklist to be verified; legacy evidence columns hold a checklist reference. Exact retry uses get_lifecycle_result. Refused stage and decision writes return an error; zero changes may indicate a retry.",
       "requires_auth": true,
       "operation": "batch",
       "params": {
@@ -6359,19 +6341,10 @@
         },
         "evidence": {
           "type": "string"
-        },
-        "registration_evidence": {
-          "type": "string"
-        },
-        "requirements_evidence": {
-          "type": "string"
-        },
-        "handoff_evidence": {
-          "type": "string"
         }
       },
       "statements": [
-        "INSERT INTO hiring_lifecycle_events_v2 (organization_id,brand_id,requisition_id,application_id,operation_id,expected_version,from_stage,to_stage,evidence,registration_evidence,requirements_evidence,handoff_evidence,actor_user_id,created_at) SELECT :organization_id,:brand_id,:requisition_id,:application_id,:operation_id,:expected_version,:from_stage,:to_stage,:evidence,:registration_evidence,:requirements_evidence,:handoff_evidence,:__user_id,:__now WHERE NOT EXISTS(SELECT 1 FROM hiring_lifecycle_events_v2 WHERE operation_id=:operation_id) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0"
+        "INSERT INTO hiring_lifecycle_events_v2 (organization_id,brand_id,requisition_id,application_id,operation_id,expected_version,from_stage,to_stage,evidence,registration_evidence,requirements_evidence,handoff_evidence,actor_user_id,created_at) SELECT :organization_id,:brand_id,:requisition_id,:application_id,:operation_id,:expected_version,:from_stage,:to_stage,:evidence,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,CASE WHEN :to_stage='onboarded' THEN 'checklist:'||(SELECT policy_version FROM hiring_onboarding_assignments WHERE application_id=:application_id AND organization_id=:organization_id AND brand_id=:brand_id) ELSE '' END,:__user_id,:__now WHERE NOT EXISTS(SELECT 1 FROM hiring_lifecycle_events_v2 WHERE operation_id=:operation_id) AND :__user_id NOT IN ('system','automation','api_key','system'||char(58)||'worker') AND length(trim(:operation_id)) BETWEEN 1 AND 128 AND typeof(:expected_version) IN ('integer','real') AND :expected_version=CAST(:expected_version AS INTEGER) AND :expected_version>=0"
       ]
     },
     {
@@ -7221,6 +7194,195 @@
         }
       },
       "sql": "SELECT j.requisition_id,j.linkedin_job_id,(CASE WHEN abs(j.expiry_date)<10000000000 THEN j.expiry_date*1000 ELSE j.expiry_date END) AS expiry_date,j.version AS expected_version,CASE WHEN j.lifecycle_status='expired' THEN 'expired' WHEN j.lifecycle_status='closed' OR j.status='closed' THEN 'closed' WHEN pc.paused=1 THEN 'paused' WHEN j.status='published' THEN 'published' ELSE 'draft' END AS status FROM hiring_job_publications j LEFT JOIN hiring_publication_controls pc ON pc.requisition_id=j.requisition_id WHERE j.organization_id=:organization_id AND j.brand_id=:brand_id AND (j.linkedin_job_id=:linkedin_job_id OR EXISTS (SELECT 1 FROM hiring_linkedin_repost_history h WHERE h.requisition_id=j.requisition_id AND h.previous_linkedin_job_id=:linkedin_job_id)) AND EXISTS (SELECT 1 FROM hiring_effective_access p WHERE p.organization_id=j.organization_id AND p.brand_id=j.brand_id AND p.user_id=:__user_id AND p.role IN ('owner','recruiter') AND (p.requisition_id IS NULL OR p.requisition_id=j.requisition_id)) ORDER BY j.created_at DESC LIMIT 100"
+    },
+    {
+      "name": "publish_onboarding_policy",
+      "description": "Organisation owner publishes an immutable version of onboarding checklist steps and custom fields. Each step has key, label, kind (text, url, identity, membership, document, confirmation) and required boolean. Invitation mode is none or an explicit FreeAppStore Interns opt-in. This never sends invitations or changes memberships.",
+      "requires_auth": true,
+      "operation": "execute",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "steps_json": {
+          "type": "string"
+        },
+        "invitation_mode": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_onboarding_policies(organization_id,audit_brand_id,version,steps_json,invitation_mode,operation_id,actor_user_id,created_at)\nSELECT :organization_id,:brand_id,:expected_version+1,:steps_json,:invitation_mode,:operation_id,:__user_id,:__now\nWHERE NOT EXISTS(SELECT 1 FROM hiring_onboarding_policies WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_organizations o WHERE o.id=:organization_id AND o.status='active' AND\n (o.created_by=:__user_id OR EXISTS(SELECT 1 FROM hiring_grants g WHERE g.organization_id=o.id AND g.brand_id IS NULL AND g.requisition_id IS NULL AND g.user_id=:__user_id AND g.role='owner' AND g.status='active')))"
+    },
+    {
+      "name": "get_onboarding_policy_result",
+      "description": "Organisation owner confirms an exact published policy operation and payload after a lost response.",
+      "requires_auth": true,
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "steps_json": {
+          "type": "string"
+        },
+        "invitation_mode": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT p.* FROM hiring_onboarding_policies p WHERE p.organization_id=:organization_id AND p.audit_brand_id=:brand_id AND p.version=:expected_version+1 AND p.steps_json=:steps_json AND p.invitation_mode=:invitation_mode AND p.operation_id=:operation_id AND p.actor_user_id=:__user_id AND EXISTS(SELECT 1 FROM hiring_organizations o WHERE o.id=:organization_id AND o.status='active' AND\n (o.created_by=:__user_id OR EXISTS(SELECT 1 FROM hiring_grants g WHERE g.organization_id=o.id AND g.brand_id IS NULL AND g.requisition_id IS NULL AND g.user_id=:__user_id AND g.role='owner' AND g.status='active')))"
+    },
+    {
+      "name": "get_onboarding_policy",
+      "description": "Scoped current organisation onboarding criteria, custom fields and optional invitation mode. Hiring-team reminders are separate.",
+      "requires_auth": true,
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT p.* FROM hiring_onboarding_policies p WHERE p.organization_id=:organization_id AND p.version=(SELECT MAX(version) FROM hiring_onboarding_policies WHERE organization_id=:organization_id) AND EXISTS(SELECT 1 FROM hiring_effective_access g WHERE g.organization_id=:organization_id AND g.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter'))"
+    },
+    {
+      "name": "assign_onboarding_policy",
+      "description": "Scoped recruiter freezes the current organisation checklist version for one onboarding application. Repeated assignment retains the original version; it never changes a candidate decision.",
+      "requires_auth": true,
+      "operation": "execute",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_onboarding_assignments(organization_id,brand_id,application_id,policy_version,actor_user_id,created_at)\nSELECT :organization_id,:brand_id,:application_id,MAX(p.version),:__user_id,:__now FROM hiring_onboarding_policies p\nWHERE p.organization_id=:organization_id AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) AND NOT EXISTS(SELECT 1 FROM hiring_onboarding_assignments WHERE application_id=:application_id)\nHAVING MAX(p.version) IS NOT NULL"
+    },
+    {
+      "name": "list_onboarding_checklist",
+      "description": "Scoped recruiter reads the frozen checklist, latest per-step status, custom field value, comments, evidence, verifier and timestamps for one candidate. These are candidate onboarding records, not hiring-team tasks.",
+      "requires_auth": true,
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT x.policy_version,s.key AS step_index,json_extract(s.value,'$.key') AS step_key,json_extract(s.value,'$.label') AS label,json_extract(s.value,'$.kind') AS kind,json_type(s.value,'$.required')='true' AS required,e.version AS step_version,COALESCE(e.status,'pending') AS status,e.value_json,e.comment,e.evidence,e.verifier_user_id,e.actor_user_id,e.created_at FROM hiring_onboarding_assignments x JOIN hiring_onboarding_policies p ON p.organization_id=x.organization_id AND p.version=x.policy_version,json_each(p.steps_json) s LEFT JOIN hiring_onboarding_step_events e ON e.application_id=x.application_id AND e.step_key=json_extract(s.value,'$.key') AND e.version=(SELECT MAX(z.version) FROM hiring_onboarding_step_events z WHERE z.application_id=x.application_id AND z.step_key=e.step_key) WHERE x.application_id=:application_id AND x.organization_id=:organization_id AND x.brand_id=:brand_id AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id)) ORDER BY CAST(s.key AS INTEGER)"
+    },
+    {
+      "name": "record_onboarding_step",
+      "description": "Scoped recruiter records one candidate checklist step status, typed field value, comment and evidence. Completed requires a real value and evidence and records the acting recruiter as verifier. Exact retry uses get_onboarding_step_result. No actual membership, agreement or signature is changed.",
+      "requires_auth": true,
+      "operation": "execute",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "integer"
+        },
+        "step_key": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "value_json": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "INSERT INTO hiring_onboarding_step_events(operation_id,organization_id,brand_id,application_id,policy_version,step_key,version,status,value_json,comment,evidence,verifier_user_id,actor_user_id,created_at)\nSELECT :operation_id,:organization_id,:brand_id,:application_id,:policy_version,:step_key,:expected_version+1,:status,:value_json,:comment,:evidence,CASE WHEN :status='completed' THEN :__user_id ELSE NULL END,:__user_id,:__now\nWHERE NOT EXISTS(SELECT 1 FROM hiring_onboarding_step_events WHERE operation_id=:operation_id) AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id))"
+    },
+    {
+      "name": "get_onboarding_step_result",
+      "description": "Scoped exact readback for one candidate step operation, including actor, status, field value, comment, evidence and version.",
+      "requires_auth": true,
+      "operation": "query",
+      "params": {
+        "organization_id": {
+          "type": "string"
+        },
+        "brand_id": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "integer"
+        },
+        "step_key": {
+          "type": "string"
+        },
+        "expected_version": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "value_json": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "sql": "SELECT e.* FROM hiring_onboarding_step_events e WHERE e.operation_id=:operation_id AND e.organization_id=:organization_id AND e.brand_id=:brand_id AND e.application_id=:application_id AND e.policy_version=:policy_version AND e.step_key=:step_key AND e.version=:expected_version+1 AND e.status=:status AND e.value_json=:value_json AND e.comment=:comment AND e.evidence=:evidence AND e.actor_user_id=:__user_id AND EXISTS(SELECT 1 FROM hiring_applications a JOIN hiring_effective_access g ON g.organization_id=a.organization_id AND g.brand_id=a.brand_id WHERE a.id=:application_id AND a.organization_id=:organization_id AND a.brand_id=:brand_id AND g.user_id=:__user_id AND g.role IN ('owner','recruiter') AND (g.requisition_id IS NULL OR g.requisition_id=a.requisition_id))"
     }
   ],
   "worker": {

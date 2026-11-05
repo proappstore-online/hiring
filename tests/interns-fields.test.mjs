@@ -101,6 +101,7 @@ test('cross reference returns only authorized onboarding applications', () => {
     f.call('approve_offer', 'owner', { tenant_id: 'org', brand_id: 'brand', offer_id: offerId, expected_version: 2, operation_id: 'offer-approve' })
     f.db.exec("UPDATE hiring_applications SET stage='offered'")
     f.call('record_acceptance', 'owner', { tenant_id: 'org', brand_id: 'brand', application_id: 'app', expected_version: 1, operation_id: 'accept', acceptance_evidence: 'Candidate accepted' })
+    f.call('publish_onboarding_policy', 'owner', { organization_id: 'org', brand_id: 'brand', expected_version: 0, steps_json: JSON.stringify([{ key: 'interns', label: 'Interns setup', kind: 'identity', required: true }]), invitation_mode: 'freeappstore_interns', operation_id: 'interns-policy' })
     f.call('record_lifecycle_transition', 'owner', { ...scope, expected_version: 2, from_stage: 'accepted', to_stage: 'onboarding', operation_id: 'start', evidence: 'Start setup', registration_evidence: '', requirements_evidence: '', handoff_evidence: '' })
     const rows = f.call('list_onboarding_crossref', 'owner', { organization_id: 'org', brand_id: 'brand' })
     assert.equal(rows.length, 1)

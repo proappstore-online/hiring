@@ -284,11 +284,18 @@ test('unapproved offers fail with an explicit approval error and preserve applic
 
 const lifecycleArgs={...scope,requisition_id:'req-a',application_id:'app-a',operation_id:'lifecycle-1',expected_version:2,from_stage:'accepted',to_stage:'onboarding',evidence:'Setup handoff started',registration_evidence:'',requirements_evidence:'',handoff_evidence:''}
 function lifecycleReady(){const f=acceptanceReady();f.call('record_acceptance','staff-a',acceptanceArgs);return f}
+function verifiedChecklist(f) {
+ const definition=JSON.stringify([{key:'setup',label:'Setup confirmed',kind:'confirmation',required:true}])
+ f.call('publish_onboarding_policy','staff-a',{...scope,expected_version:0,steps_json:definition,invitation_mode:'none',operation_id:'policy-life'})
+ f.call('assign_onboarding_policy','staff-a',{...scope,application_id:'app-a'})
+ f.call('record_onboarding_step','staff-a',{...scope,application_id:'app-a',policy_version:1,step_key:'setup',expected_version:0,status:'completed',value_json:'true',comment:'Reviewed',evidence:'Setup confirmed by recruiter',operation_id:'step-life'})
+}
 test('lifecycle progresses with completion evidence, scoped reads and exact immutable retries',()=>{
  const f=lifecycleReady();try{
  let args={...lifecycleArgs}
  for(const stage of ['onboarding','onboarded','active']){
- args={...args,to_stage:stage,operation_id:'lifecycle-'+stage,...(stage==='onboarded'?{registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined; team introduction #3'}:{})}
+ args={...args,to_stage:stage,operation_id:'lifecycle-'+stage}
+ if(stage==='onboarded')verifiedChecklist(f)
  assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],1)
  assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],0)
  assert.equal(f.call('get_lifecycle_result','staff-a',args)[0].actor_user_id,'staff-a')
@@ -306,7 +313,7 @@ test('lifecycle progresses with completion evidence, scoped reads and exact immu
  assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'onboarding',operation_id:'back'}),/Invalid/)
  }finally{f.db.close()}
 })
-test('lifecycle rejects skips, stale versions, missing completion evidence and unauthorized scope',()=>{
+test('lifecycle rejects skips, stale versions, missing checklist and unauthorized scope',()=>{
  const f=lifecycleReady();try{
  for(const patch of [{to_stage:'active'},{expected_version:1},{application_id:'other'},{brand_id:'other'},{organization_id:'other'},{requisition_id:'other'},{evidence:' '}])assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,...patch}))
  f.call('grant_workspace_access','staff-a',{...scope,member_user_id:'reviewer',role:'reviewer',requisition_id:'req-a',grant_id:'life-reviewer',operation_id:'life-review-grant'})
@@ -317,7 +324,7 @@ test('lifecycle rejects skips, stale versions, missing completion evidence and u
  assert.deepEqual(f.call('list_lifecycle_events',user,lifecycleArgs),[])
  }
  f.call('record_lifecycle_transition','staff-a',lifecycleArgs)
- assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,expected_version:3,from_stage:'onboarding',to_stage:'onboarded',operation_id:'incomplete'}),/evidence are required/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,expected_version:3,from_stage:'onboarding',to_stage:'onboarded',operation_id:'incomplete'}),/checklist incomplete/)
  assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].version,3)
  }finally{f.db.close()}
 })
