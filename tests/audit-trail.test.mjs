@@ -202,3 +202,14 @@ test('next actions cannot be assigned to candidates or interns', () => {
     }
   } finally { f.db.close() }
 })
+
+test('log_external_action documents the journal input format', async () => {
+  const { buildAuditTools } = await import('../scripts/audit-tools.mjs')
+  const tool = buildAuditTools().find(t => t.name === 'log_external_action')
+  for (const key of ['entry_type', 'outcome', 'uncertainty', 'next_step', 'receipt_ref', 'approval_ref', 'correction_of']) {
+    assert.match(tool.description, new RegExp(key))
+    assert.match(tool.params.params_json.description, new RegExp(key))
+  }
+  assert.match(tool.description, /summary goes in the top-level notes/)
+  assert.match(tool.params.notes.description, /Required for kind=journal/)
+})
