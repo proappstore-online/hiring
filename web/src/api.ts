@@ -6,7 +6,7 @@ import stageTransitions from './application-stages.json'
 export const STAGES = Object.keys(stageTransitions) as Stage[]
 export type Stage = keyof typeof stageTransitions
 export const allowedNextStages = (stage: Stage): readonly Stage[] => stageTransitions[stage] as Stage[]
-export const TERMINAL_STAGES: readonly Stage[] = STAGES.filter(stage => !allowedNextStages(stage).length)
+export const TERMINAL_STAGES: readonly Stage[] = ['onboarded', 'rejected', 'withdrawn']
 export const stageLabel = (stage: string) => stage.replaceAll('_', ' ')
 export type Role = 'owner' | 'recruiter' | 'reviewer' | 'auditor'
 
@@ -40,6 +40,7 @@ const readAction = async <T,>(name: string, params: Params) => {
 }
 export const read = async <T,>(name: string, params: Params = {}) => (await readAction<T>(name, params)).rows
 const mutationReadbacks: Record<string, string> = {"correct_accepted_offer": "get_offer_correction_result","record_lifecycle_transition": "get_lifecycle_result","reconcile_communication": "get_communication_reconciliation","record_acceptance": "get_acceptance_result","record_decision": "get_decision_result", "save_offer_draft": "get_offer_draft_result", "submit_offer_for_approval": "get_offer_submission_result", "approve_offer": "get_offer_approval_result", "revoke_offer": "get_offer_revocation_result", "authorize_offer_dispatch": "get_offer_dispatch_result"}
+mutationReadbacks.record_application_next_action = 'get_application_next_action_result'
 export const write = async (name: string, params: Params) => {
   const result = await app.actions.call<Write>(name, params)
   const changes = result.results?.at(-1)?.meta?.changes ?? result.meta?.changes ?? 0

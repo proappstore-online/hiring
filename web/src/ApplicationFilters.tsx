@@ -9,6 +9,7 @@ import { button, field } from './ui'
 import { recruiterApplicationUrl, staffBack, withBack } from './routes'
 
 type Row = Pick<Application, 'id' | 'candidate_name' | 'stage' | 'requisition_title' | 'assignee_user_id' | 'source' | 'requisition_id'> & { source_detail?: string; created_at?: number | string }
+type Gap = { application_id: string; candidate_id: string; stage: string; gap_reason: string }
 export function ApplicationFilters({ space, requisitions, members }: { space: Workspace; requisitions: Requisition[]; members: Member[] }) {
   const location = useLocation()
   const createdApplicationId = location.state?.createdApplicationId as string | undefined
@@ -19,6 +20,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [retry, setRetry] = useState(0)
+  const [gaps, setGaps] = useState<Gap[]>([])
   const sequence = useRef(0)
   const staff = space.role === 'owner' || space.role === 'recruiter'
   const key = JSON.stringify([space.organization_id, space.brand_id, space.role, filters, createdApplicationId])
@@ -34,6 +36,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
       .finally(() => { if (sequence.current === current) setLoading(false) })
     return () => { sequence.current++ }
   }, [key, retry])
+  useEffect(() => { if (!staff) return; let live = true; read<Gap>('get_next_action_gaps', { organization_id: space.organization_id, brand_id: space.brand_id }).then(rows => { if (live) setGaps(rows) }).catch(() => { if (live) setGaps([]) }); return () => { live = false } }, [staff, space.organization_id, space.brand_id, retry])
   if (space.role === 'auditor') return <AccessDenied />
   const rows = result?.key === key ? result.rows : []
   const visible = rows.filter(row => matchesSearch(row, search))
@@ -43,6 +46,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
   const scopeQuery = new URLSearchParams({ organization_id: space.organization_id, brand_id: space.brand_id })
   return <Page title="Applications" titleId="applications-title" action={<Link className={button} to={(staff ? '/recruiter/applications/new?' : '/recruiter/search?') + scopeQuery}>{staff ? 'Add candidate' : 'Search records'}</Link>}>
     {createdApplicationId && staff && <p role="status">Candidate saved successfully. No outreach was sent.</p>}
+    {staff && gaps.length > 0 && <details className="mb-3 text-sm"><summary className="min-h-[44px] cursor-pointer">{gaps.length} applications need a hiring-team next action</summary><ul>{gaps.map(gap => <li key={gap.application_id}><Link className="underline" to={recruiterApplicationUrl(gap.application_id, space)}>{gap.application_id}</Link> · {stageLabel(gap.stage)} · {gap.gap_reason}</li>)}</ul></details>}
     <p role="status" aria-live="polite" className="text-sm">{pending ? 'Loading count…' : error ? 'Count unavailable' : `${visible.length} visible / ${rows.length} loaded${rows.length === (staff ? 100 : 25) ? ' · limit reached; narrow filters' : ''}`}</p>
     <button type="button" className={secondaryButton + ' md:hidden'} aria-expanded={expanded} aria-controls="application-filter-panel" onClick={() => setExpanded(value => !value)}>Filters</button>
     <FilterPanel id="application-filter-panel" expanded={expanded}>

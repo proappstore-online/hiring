@@ -49,6 +49,7 @@ function seeded(compensation_type = 'paid') {
   return f
 }
 function setStage(db, stage) {
+  db.prepare("UPDATE hiring_application_next_action_current SET closed_at=NULL WHERE application_id='app-a'").run()
   db.prepare('UPDATE hiring_applications SET stage=?,stage_extension=?,version=1 WHERE id=?').run(stage === 'shortlisted' ? 'in_review' : stage, stage === 'shortlisted' ? stage : null, 'app-a')
 }
 const change = (from_stage, to_stage, extra = {}) => ({...scope, application_id:'app-a', expected_version:1, from_stage, to_stage, reason:'Human decision', operation_id:'transition', ...extra})

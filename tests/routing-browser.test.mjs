@@ -33,13 +33,13 @@ test('routing renders real public/protected pages and preserves URL scope', asyn
   browser=await chromium.launch();const page=await browser.newPage({viewport:{width:375,height:812},locale:'en-US',timezoneId:'UTC'});page.setDefaultTimeout(10000);const base=server.resolvedUrls.local[0].replace(/\/$/,'')
   const go=path=>page.goto(base+path)
   await t.test('direct lifecycle routes expose valid controls, completion evidence and persistent stage filters',async()=>{
-   for(const stage of ['accepted','onboarding','onboarded','active']){
+   for(const stage of ['accepted','onboarding','onboarded']){
     await go('/recruiter/applications/full?organization_id=org&brand_id=brand&view=lifecycle')
     await page.evaluate(stage=>{window.candidateStage=stage;window.auth={user:{id:'staff'},loading:false};window.render()},stage)
     await expect(page.getByRole('heading',{name:'Candidate lifecycle',exact:true})).toBeVisible()
-    if(stage==='active')await expect(page.getByLabel('Next lifecycle stage')).toHaveCount(0)
+    if(stage==='onboarded')await expect(page.getByLabel('Next lifecycle stage')).toHaveCount(0)
     else {
-     await expect(page.getByLabel('Next lifecycle stage')).toHaveValue({accepted:'onboarding',onboarding:'onboarded',onboarded:'active'}[stage])
+     await expect(page.getByLabel('Next lifecycle stage')).toHaveValue({accepted:'onboarding',onboarding:'onboarded'}[stage])
      if(stage==='onboarding')for(const label of ['Completed registration evidence','Requirements acknowledgement evidence','Completed team / Discord handoff evidence'])await expect(page.getByLabel(label,{exact:true})).toBeVisible()
     }
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)

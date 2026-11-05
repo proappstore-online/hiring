@@ -10,7 +10,7 @@ const internsMigration=migrations.find(m=>m.name==='0055_discord_interns_fields'
 const scope={organization_id:'org',brand_id:'brand',application_id:'app',requisition_id:'req'}
 function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={}) {
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON')
- for(const m of migrations.filter(m=>m.name!==onboardingMigration.name && m.name!==internsMigration.name))db.exec(m.sql)
+ for(const m of migrations.filter(m=>m.name!==onboardingMigration.name && m.name!==internsMigration.name && m.name!=='0074_terminal_next_actions'))db.exec(m.sql)
  const call=(name,user='owner',values={})=>{
   const t=tools.find(t=>t.name===name),p={...Object.fromEntries(Object.entries(t.params??{}).filter(([,s])=>s.optional).map(([k])=>[k,null])),...values,__user_id:user,__now:Date.now(),__uuid:crypto.randomUUID()}
   db.exec('BEGIN');try{
