@@ -212,4 +212,6 @@ test('log_external_action documents the journal input format', async () => {
   }
   assert.match(tool.description, /summary goes in the top-level notes/)
   assert.match(tool.params.notes.description, /Required for kind=journal/)
+  assert.doesNotMatch(tool.description, /journal-run-2026/)
+  assert.match(tool.description, /journal-run-EXAMPLE/)
 })
