@@ -148,7 +148,12 @@ test('v1 withdraws an accepted, onboarding or onboarded application; decision an
     try {
       const application=()=>f.call('get_application','owner',{organization_id:'org',brand_id:'brand',application_id:'app'})[0]
       if(fromStage!=='accepted') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarding-'+fromStage,expected_version:application().version,to_stage:'onboarding'})
-      if(fromStage==='onboarded') f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarded-'+fromStage,expected_version:application().version,from_stage:'onboarding',to_stage:'onboarded',evidence:'Onboarding complete',registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined'})
+      if(fromStage==='onboarded') {
+        f.call('publish_onboarding_policy',f.user,{organization_id:'org',brand_id:'brand',operation_id:'policy-onboarded',expected_version:0,steps_json:JSON.stringify([{key:'handoff',label:'Team handoff',type:'text',required:true,instructions:'Verify team introduction'}]),invitation_mode:'off',candidate_note_mode:'off'})
+        f.call('create_onboarding_snapshot',f.user,{organization_id:'org',brand_id:'brand',requisition_id:'req',application_id:'app',operation_id:'snapshot-onboarded',policy_version:1,expected_application_version:application().version})
+        f.call('record_onboarding_step',f.user,{organization_id:'org',brand_id:'brand',requisition_id:'req',application_id:'app',operation_id:'handoff-onboarded',policy_version:1,step_key:'handoff',revision:1,expected_application_version:application().version,status:'verified',value_text:'Team introduction complete',comment:'',evidence:'Team acknowledgement #3'})
+        f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'to-onboarded-'+fromStage,expected_version:application().version,from_stage:'onboarding',to_stage:'onboarded',evidence:'Onboarding complete',registration_evidence:'',requirements_evidence:'',handoff_evidence:''})
+      }
       assert.equal(application().stage,fromStage)
       // The two tools Thanh Van's withdrawal was tried through (#1400) are correctly refused once the
       // application has entered the lifecycle workflow (hiring_workflow_decision_guard, migration 0051).

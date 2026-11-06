@@ -284,10 +284,17 @@ test('unapproved offers fail with an explicit approval error and preserve applic
 
 const lifecycleArgs={...scope,requisition_id:'req-a',application_id:'app-a',operation_id:'lifecycle-1',expected_version:2,from_stage:'accepted',to_stage:'onboarding',evidence:'Setup handoff started',registration_evidence:'',requirements_evidence:'',handoff_evidence:''}
 function lifecycleReady(){const f=acceptanceReady();f.call('record_acceptance','staff-a',acceptanceArgs);return f}
+function verifiedChecklist(f, applicationVersion){
+ const p={...scope,requisition_id:'req-a',application_id:'app-a'}
+ f.call('publish_onboarding_policy','staff-a',{...scope,operation_id:'checklist-policy',expected_version:0,steps_json:JSON.stringify([{key:'handoff',label:'Team handoff',type:'text',required:true,instructions:'Confirm handoff'}]),invitation_mode:'off',candidate_note_mode:'off'})
+ f.call('create_onboarding_snapshot','staff-a',{...p,operation_id:'checklist-snapshot',policy_version:1,expected_application_version:applicationVersion})
+ f.call('record_onboarding_step','staff-a',{...p,operation_id:'checklist-verified',policy_version:1,step_key:'handoff',revision:1,expected_application_version:applicationVersion,status:'verified',value_text:'Handoff completed',comment:'',evidence:'Team acknowledgement #3'})
+}
 test('lifecycle progresses with completion evidence, scoped reads and exact immutable retries',()=>{
  const f=lifecycleReady();try{
  let args={...lifecycleArgs}
  for(const stage of ['onboarding','onboarded','active']){
+ if(stage==='onboarded')verifiedChecklist(f,args.expected_version)
  args={...args,to_stage:stage,operation_id:'lifecycle-'+stage,...(stage==='onboarded'?{registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined; team introduction #3'}:{})}
  assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],1)
  assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],0)
@@ -317,7 +324,7 @@ test('lifecycle rejects skips, stale versions, missing completion evidence and u
  assert.deepEqual(f.call('list_lifecycle_events',user,lifecycleArgs),[])
  }
  f.call('record_lifecycle_transition','staff-a',lifecycleArgs)
- assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,expected_version:3,from_stage:'onboarding',to_stage:'onboarded',operation_id:'incomplete'}),/evidence are required/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,expected_version:3,from_stage:'onboarding',to_stage:'onboarded',operation_id:'incomplete'}),/snapshot required/)
  assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].version,3)
  }finally{f.db.close()}
 })
