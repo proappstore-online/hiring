@@ -1,14 +1,14 @@
 import { Page, FilterPanel, Help, Toolbar, recordRow, secondaryButton } from './design-system'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { read, stageLabel, type Application, type Member, type Requisition, type Workspace } from './api'
+import { read, stageLabel, terminalStatusLabel, TERMINAL_STAGES, type Application, type Member, type Requisition, type Workspace } from './api'
 import { FILTER_STAGES, ONBOARDING_STATUSES, filterQuery, matchesSearch, type FilterKey } from './filter-params'
 import { useFilterParams } from './useFilterParams'
 import { ErrorState, AccessDenied } from './route-ui'
 import { button, field } from './ui'
 import { recruiterApplicationUrl, staffBack, withBack } from './routes'
 
-type Row = Pick<Application, 'id' | 'candidate_name' | 'stage' | 'requisition_title' | 'assignee_user_id' | 'source' | 'requisition_id'> & { source_detail?: string; created_at?: number | string }
+type Row = Pick<Application, 'id' | 'candidate_name' | 'stage' | 'requisition_title' | 'assignee_user_id' | 'source' | 'requisition_id' | 'archive_status' | 'next_action_state'> & { source_detail?: string; created_at?: number | string }
 export function ApplicationFilters({ space, requisitions, members }: { space: Workspace; requisitions: Requisition[]; members: Member[] }) {
   const location = useLocation()
   const createdApplicationId = location.state?.createdApplicationId as string | undefined
@@ -65,7 +65,7 @@ export function ApplicationFilters({ space, requisitions, members }: { space: Wo
         return <li key={row.id}><Link className={recordRow + ' grid-cols-2 md:grid-cols-6'} to={profileUrl} aria-label={`Open ${row.candidate_name}'s profile`}>
           <span className="min-w-0 break-words font-semibold underline">{row.candidate_name}</span>
           <span className="min-w-0 break-words"><span className="sr-only">Role: </span>{row.requisition_title}</span>
-          <span><span className="sr-only">Stage: </span>{stageLabel(row.stage)}</span>
+          <span><span className="sr-only">Stage: </span>{TERMINAL_STAGES.includes(row.stage) || row.archive_status ? <span className="inline-block rounded-full border border-[var(--line)] px-2 py-1 text-xs font-semibold">{terminalStatusLabel(row.stage, row.archive_status)}</span> : stageLabel(row.stage)}{!TERMINAL_STAGES.includes(row.stage) && row.next_action_state === 'missing' && <span className="mt-1 block text-xs font-semibold" role="status">Next action missing</span>}{!TERMINAL_STAGES.includes(row.stage) && row.next_action_state && row.next_action_state !== 'missing' && <span className="mt-1 block text-xs">Next action: {row.next_action_state}</span>}</span>
           <span className="min-w-0 break-words"><span className="sr-only">Source: </span>{row.source || 'Unknown source'}</span>
           <span className="min-w-0 break-words"><span className="md:sr-only">Assignee: </span>{row.assignee_user_id || 'Unassigned'}</span>
           <span><span className="md:sr-only">Submitted: </span>{row.created_at ? <time dateTime={row.created_at}>{row.created_at.slice(0, 10)}</time> : 'Date unavailable'}</span>

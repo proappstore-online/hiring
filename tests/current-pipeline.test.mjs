@@ -20,7 +20,7 @@ test('current pipeline counts exceed list limits, use effective current stages a
     for (const user of ['worker', 'outsider', 'staff-b']) assert.deepEqual(f.call('get_current_pipeline', user, A), [])
     for (const row of f.call('get_current_pipeline', 'owner', A)) assert.deepEqual(Object.keys(row).sort(), ['count', 'stage'])
     f.db.exec("UPDATE hiring_applications SET stage='rejected',stage_extension=NULL,accepted_stage=NULL WHERE brand_id='a'")
-    assert.deepEqual(counts(f.call('get_current_pipeline', 'owner', A)), { rejected: 101 })
+    assert.deepEqual(counts(f.call('get_current_pipeline', 'owner', A)), {})
   } finally { f.db.close() }
 })
 test('current pipeline respects requisition grants, reviewer assignments, revoked access and suspended tenants', () => {

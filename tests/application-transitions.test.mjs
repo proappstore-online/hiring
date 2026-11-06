@@ -83,7 +83,7 @@ test('approved unpaid offers allow the transition into offered', () => {
 test('every invalid edge including terminal, backwards, skipped and unknown stages reports an error', () => {
   const {db,call}=seeded()
   try {
-    for(const from of Object.keys(transitions).filter(s=>!['accepted','onboarding','onboarded','active'].includes(s))) for(const to of [...Object.keys(transitions),'forged']) {
+    for(const from of Object.keys(transitions).filter(s=>!['accepted','onboarding','onboarded','active','rejected'].includes(s))) for(const to of [...Object.keys(transitions),'forged']) {
       if(transitions[from].includes(to))continue
       setStage(db,from)
       const before=db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n
@@ -92,6 +92,13 @@ test('every invalid edge including terminal, backwards, skipped and unknown stag
       assert.equal(db.prepare('SELECT count(*) n FROM hiring_audit_events').get().n,before)
     }
   } finally {db.close()}
+})
+test('rejected remains terminal and cannot be reset by a stage write',()=>{
+ const {db,call}=seeded();try{
+  setStage(db,'rejected')
+  assert.throws(()=>db.exec("UPDATE hiring_applications SET stage='in_review' WHERE id='app-a'"),/Terminal application cannot change stage/)
+  assert.throws(()=>call('change_application_stage','staff-a',change('rejected','in_review')),/APP:invalid_transition/)
+ }finally{db.close()}
 })
 test('stale version, forged prior state, blank reason/operation and unauthorized actor are denied', () => {
  const {db,call}=seeded()

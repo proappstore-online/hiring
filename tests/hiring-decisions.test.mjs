@@ -293,7 +293,7 @@ function verifiedChecklist(f, applicationVersion){
 test('lifecycle progresses with completion evidence, scoped reads and exact immutable retries',()=>{
  const f=lifecycleReady();try{
  let args={...lifecycleArgs}
- for(const stage of ['onboarding','onboarded','active']){
+ for(const stage of ['onboarding','onboarded']){
  if(stage==='onboarded')verifiedChecklist(f,args.expected_version)
  args={...args,to_stage:stage,operation_id:'lifecycle-'+stage,...(stage==='onboarded'?{registration_evidence:'Registration #1',requirements_evidence:'Acknowledged v2',handoff_evidence:'Discord joined; team introduction #3'}:{})}
  assert.equal(f.call('record_lifecycle_transition','staff-a',args)[0],1)
@@ -304,13 +304,14 @@ test('lifecycle progresses with completion evidence, scoped reads and exact immu
  for(const name of ['list_applications','gateway_list_applications'])assert.equal(f.call(name,'staff-a',{...args,stage})[0].stage,stage)
  args={...args,from_stage:stage,expected_version:args.expected_version+1}
  }
- assert.equal(f.call('list_lifecycle_events','staff-a',args).length,3)
+ assert.equal(f.call('list_lifecycle_events','staff-a',args).length,2)
  assert.equal(f.call('get_application','staff-a',args)[0].acceptance_evidence,acceptanceArgs.acceptance_evidence)
- assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_stage_events WHERE application_id='app-a'").get().n,5)
+ assert.equal(f.db.prepare("SELECT count(*) n FROM hiring_stage_events WHERE application_id='app-a'").get().n,4)
  assert.throws(()=>f.db.exec("UPDATE hiring_lifecycle_events_v2 SET evidence='forged'"),/immutable/)
  assert.throws(()=>f.db.exec('DELETE FROM hiring_lifecycle_events_v2'),/immutable/)
  assert.throws(()=>f.db.exec("UPDATE hiring_applications SET lifecycle_stage='onboarding'"),/Controlled/)
- assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'onboarding',operation_id:'back'}),/Invalid/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'onboarding',operation_id:'back'}),/Terminal/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...args,to_stage:'active',operation_id:'old-active'}),/Terminal/)
  }finally{f.db.close()}
 })
 test('lifecycle rejects skips, stale versions, missing completion evidence and unauthorized scope',()=>{
@@ -332,7 +333,7 @@ test('lifecycle terminal boundaries and audit rollback preserve prior records',(
  for(const terminal of ['rejected','withdrawn']){
  const f=lifecycleReady();try{
  f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,to_stage:terminal})
- assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,operation_id:'reopen',expected_version:3,from_stage:terminal}),/Invalid/)
+ assert.throws(()=>f.call('record_lifecycle_transition','staff-a',{...lifecycleArgs,operation_id:'reopen',expected_version:3,from_stage:terminal}),/Terminal/)
  assert.equal(f.call('get_application','staff-a',lifecycleArgs)[0].stage,terminal)
  assert.equal(f.db.prepare('SELECT count(*) n FROM hiring_acceptance_history').get().n,1)
  }finally{f.db.close()}

@@ -20,7 +20,7 @@ test('pipeline filters restore URLs, keep search local, expose unavailable state
  const cacheDir=mkdtempSync(join(tmpdir(),'hiring-filters-'))
  const server=await createServer({root:web,cacheDir,configFile:false,plugins:[react(),tailwind(),{
  name:'filter-fixture',enforce:'pre',resolveId(id){if(id==='/fixture.jsx')return'\0filter-fixture.jsx'},
- load(id){if(id==='\0filter-fixture.jsx')return ts.transpile(fixture,{jsx:ts.JsxEmit.React,module:ts.ModuleKind.ESNext});if(id===web+'src/api.ts')return 'export const read=(...args)=>window.read(...args);export const stageLabel=s=>s.replaceAll("_"," ");'},
+ load(id){if(id==='\0filter-fixture.jsx')return ts.transpile(fixture,{jsx:ts.JsxEmit.React,module:ts.ModuleKind.ESNext});if(id===web+'src/api.ts')return 'export const read=(...args)=>window.read(...args);export const stageLabel=s=>s.replaceAll("_"," ");export const TERMINAL_STAGES=["onboarded","rejected","withdrawn","active","hired"];export const terminalStatusLabel=(s,a)=>s==="onboarded"?"Onboarded ✓":stageLabel(a||s);'},
  configureServer(s){s.middlewares.use(async(req,res,next)=>{if(req.headers.accept?.includes('text/html')){res.setHeader('Content-Type','text/html');res.end(await s.transformIndexHtml(req.url,'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/fixture.jsx"></script></body></html>'))}else next()})}
  }],server:{host:'127.0.0.1',port:0}})
  let browser

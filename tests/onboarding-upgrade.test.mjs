@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { onboardingMigration, correctionTools } from '../scripts/onboarding-contract.mjs'
 import { checklistMigration } from '../scripts/onboarding-checklist.mjs'
+import { terminalMigration } from '../scripts/terminal-next-actions.mjs'
 
 const read = path => JSON.parse(readFileSync(new URL('../'+path,import.meta.url)))
 const migrations=read('migrations.json').migrations, tools=read('mcp.json').tools
@@ -11,7 +12,7 @@ const internsMigration=migrations.find(m=>m.name==='0055_discord_interns_fields'
 const scope={organization_id:'org',brand_id:'brand',application_id:'app',requisition_id:'req'}
 function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={}) {
  const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON')
- for(const m of migrations.filter(m=>m.name!==onboardingMigration.name && m.name!==internsMigration.name && m.name!==checklistMigration.name))db.exec(m.sql)
+ for(const m of migrations.filter(m=>![onboardingMigration.name,internsMigration.name,checklistMigration.name,terminalMigration.name].includes(m.name)))db.exec(m.sql)
  const call=(name,user='owner',values={})=>{
   const t=tools.find(t=>t.name===name),p={...Object.fromEntries(Object.entries(t.params??{}).filter(([,s])=>s.optional).map(([k])=>[k,null])),...values,__user_id:user,__now:Date.now(),__uuid:crypto.randomUUID()}
   db.exec('BEGIN');try{
@@ -26,7 +27,7 @@ function fixture({legacy=false, compensation='unpaid', legacyAcceptance=false}={
  for(const [name,version] of [['submit_offer_for_approval',1],['approve_offer',2]])call(name,'owner',{tenant_id:'org',brand_id:'brand',offer_id:offer.id,expected_version:version,operation_id:name})
  db.exec("UPDATE hiring_applications SET stage='offered'")
  if(legacyAcceptance)db.prepare("INSERT INTO hiring_acceptances VALUES('legacy-accept','org','brand','app',?,1,'owner',1,'Original paid test acceptance',1)").run(offer.id)
- if(!legacy){db.exec(onboardingMigration.sql);db.exec(internsMigration.sql);db.exec(checklistMigration.sql)}
+ if(!legacy){db.exec(onboardingMigration.sql);db.exec(internsMigration.sql);db.exec(checklistMigration.sql);db.exec(terminalMigration.sql)}
  return {db,call,offer:db.prepare('SELECT * FROM hiring_offers').get()}
 }
 const accept={tenant_id:'org',brand_id:'brand',application_id:'app',expected_version:1,operation_id:'accept',acceptance_evidence:'Candidate explicitly accepted the unpaid volunteer role by email'}
@@ -45,6 +46,7 @@ test('upgrade retains the original paid-only migration and commits unpaid accept
    f.db.exec(onboardingMigration.sql)
    f.db.exec(internsMigration.sql)
    f.db.exec(checklistMigration.sql)
+   f.db.exec(terminalMigration.sql)
    assert.deepEqual(f.db.prepare('SELECT id,stage,version,accepted_stage FROM hiring_applications').all(),before.map(({id,stage,version,accepted_stage})=>Object.assign(Object.create(null),{id,stage,version,accepted_stage})))
    assert.equal(f.call('record_acceptance','owner',accept)[0],1)
    assert.equal(f.db.prepare("SELECT sql FROM sqlite_schema WHERE name='hiring_acceptances_validate'").get().sql,original)

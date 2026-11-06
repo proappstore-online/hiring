@@ -8,13 +8,14 @@ export type Stage = keyof typeof stageTransitions
 export const allowedNextStages = (stage: Stage): readonly Stage[] => stageTransitions[stage] as Stage[]
 export const TERMINAL_STAGES: readonly Stage[] = STAGES.filter(stage => !allowedNextStages(stage).length)
 export const stageLabel = (stage: string) => stage.replaceAll('_', ' ')
+export const terminalStatusLabel = (stage: string, archiveStatus?: string | null) => stage === 'onboarded' || archiveStatus === 'onboarded_inactive' ? 'Onboarded ✓' : stageLabel(archiveStatus || stage)
 export type Role = 'owner' | 'recruiter' | 'reviewer' | 'auditor'
 
 export type Scope = { organization_id: string; brand_id: string }
 export type Workspace = Scope & { organization_name: string; brand_name: string; role: Role; can_create_brand: number; can_manage_templates?: number; can_create_requisition?: number }
 export type Requisition = { id: string; title: string; status: string }
 export type Member = { user_id: string; role: Role }
-export type Application = { is_internship?: number; candidate_id?: string; acceptance_evidence?: string | null; requisition_id?: string; created_at?: string; id: string; stage: Stage; version: number; candidate_name: string; email: string | null; phone: string | null; linkedin_url: string | null; profile_url: string | null; links_json?: string; source: string; requisition_title: string; source_detail: string; basis_reference: string; contact_context: string; assignee_user_id: string; updated_at: number }
+export type Application = { is_internship?: number; candidate_id?: string; acceptance_evidence?: string | null; requisition_id?: string; created_at?: string; archive_status?: string | null; next_action_state?: 'actionable' | 'blocked' | 'deferred' | 'closed' | 'missing'; id: string; stage: Stage; version: number; candidate_name: string; email: string | null; phone: string | null; linkedin_url: string | null; profile_url: string | null; links_json?: string; source: string; requisition_title: string; source_detail: string; basis_reference: string; contact_context: string; assignee_user_id: string; updated_at: number }
 export type Note = { id: string; body: string; actor_user_id: string; created_at: number }
 export type EmailStatusEvent = { id: string; logical_email_id: string; status: string; timestamp: number; actor: string; attempt_number: number | null; provider_reference: string | null }
 export type Draft = { delivery_reason?: string | null; logical_email_id?: string | null; current_status?: string | null; latest_activity_at?: number | null; linked_archive_id?: string | null; id: string; recipient_email: string; subject: string; body: string; status: 'draft'; delivery_state: 'draft' | 'pending' | 'sending' | 'sent' | 'failed' | 'unknown' | 'cancelled'; attempt_count: number; actor_user_id: string; created_at: number }

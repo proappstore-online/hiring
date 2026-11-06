@@ -142,7 +142,7 @@ test('v1 stage cannot bypass final decision workflow; scorecard is submit-only',
   try {denied(s.call('hiring_v1_submit_scorecard',s.user,{...s.args,status:'draft'}))} finally {s.db.close()}
 })
 
-test('v1 withdraws an accepted, onboarding or onboarded application; decision and stage-change tools stay refused (#1400)',()=>{
+test('v1 withdraws accepted or onboarding applications, while onboarded is terminal',()=>{
   for(const fromStage of ['accepted','onboarding','onboarded']){
     const f=ready('hiring_v1_record_lifecycle_transition')
     try {
@@ -159,9 +159,15 @@ test('v1 withdraws an accepted, onboarding or onboarded application; decision an
       // application has entered the lifecycle workflow (hiring_workflow_decision_guard, migration 0051).
       deniedWrite(f.call,'hiring_v1_record_decision',f.user,{organization_id:'org',brand_id:'brand',requisition_id:'req',application_id:'app',expected_version:application().version,operation_id:'bad-decision-'+fromStage,disposition:'withdrawn',rationale:'Candidate withdrew'})
       deniedWrite(f.call,'hiring_v1_advance_application',f.user,{organization_id:'org',brand_id:'brand',application_id:'app',expected_version:application().version,from_stage:fromStage,to_stage:'withdrawn',reason:'Candidate withdrew',operation_id:'bad-advance-'+fromStage})
-      const result=f.call('hiring_v1_record_lifecycle_transition',f.user,{...f.args,operation_id:'withdraw-'+fromStage,expected_version:application().version,from_stage:fromStage,to_stage:'withdrawn',evidence:'Candidate withdrew'})
-      assert.equal(mutationResult(result).ok,true)
-      assert.equal(application().stage,'withdrawn')
+      const withdrawal={...f.args,operation_id:'withdraw-'+fromStage,expected_version:application().version,from_stage:fromStage,to_stage:'withdrawn',evidence:'Candidate withdrew'}
+      if(fromStage==='onboarded'){
+        assert.throws(()=>f.call('hiring_v1_record_lifecycle_transition',f.user,withdrawal),/Terminal/)
+        assert.equal(application().stage,'onboarded')
+      }else{
+        const result=f.call('hiring_v1_record_lifecycle_transition',f.user,withdrawal)
+        assert.equal(mutationResult(result).ok,true)
+        assert.equal(application().stage,'withdrawn')
+      }
     } finally {f.db.close()}
   }
 })

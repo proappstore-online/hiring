@@ -36,10 +36,6 @@
     "rejected",
     "withdrawn"
   ],
-  "onboarded": [
-    "active",
-    "rejected",
-    "withdrawn"
-  ],
+  "onboarded": [],
   "active": []
 }
