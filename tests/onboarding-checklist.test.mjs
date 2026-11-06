@@ -98,3 +98,23 @@ test('verification rejects stale revisions, invalid typed values, cross-scope wr
   assert.deepEqual(f.call('get_current_onboarding_policy','outsider',scope),[])
  }finally{f.close()}
 })
+
+test('a stale policy cannot be pinned and a later needs-work revision blocks completion without a lifecycle event',()=>{
+ const f=fixture();try{
+  f.call('publish_onboarding_policy','owner',publish())
+  begin(f)
+  f.call('publish_onboarding_policy','owner',publish({operation_id:'policy-2',expected_version:1}))
+  assert.throws(()=>f.call('create_onboarding_snapshot','owner',snapshot()),/Stale onboarding policy/)
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM hiring_onboarding_snapshots').get().n,0)
+  f.call('create_onboarding_snapshot','owner',snapshot({policy_version:2}))
+  assert.throws(()=>f.call('record_onboarding_step','owner',record()),/snapshot/)
+  f.call('record_onboarding_step','owner',record({policy_version:2}))
+  f.call('record_onboarding_step','owner',record({operation_id:'identity-recheck',policy_version:2,revision:2,status:'needs_work',value_text:'',evidence:'',comment:'Identity needs another check'}))
+  f.call('record_onboarding_step','owner',record({operation_id:'document-1',policy_version:2,step_key:'document',value_text:'document #5',evidence:'Reviewed document #5'}))
+  assert.throws(()=>f.call('record_lifecycle_transition','owner',transition()),/not verified/)
+  assert.equal(f.call('get_application','owner',scope)[0].stage,'onboarding')
+  assert.equal(f.db.prepare("SELECT COUNT(*) n FROM hiring_lifecycle_events_v2 WHERE to_stage='onboarded'").get().n,0)
+  f.call('record_onboarding_step','owner',record({operation_id:'identity-reverified',policy_version:2,revision:3}))
+  assert.equal(f.call('record_lifecycle_transition','owner',transition()),1)
+ }finally{f.close()}
+})

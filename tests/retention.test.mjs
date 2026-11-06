@@ -55,6 +55,8 @@ const gate=()=>({closed:false,async close(){this.closed=true},async isClosed(){r
 
 test('registered retention contract matches deployed SQL and worker mutations are inaccessible to users',()=>{
  for(const t of retentionTools)assert.deepEqual(tools.find(x=>x.name===t.name),t)
+ const verify=tools.find(t=>t.name==='verify_store_d1')
+ for(const table of ['hiring_onboarding_snapshots','hiring_onboarding_step_records'])assert.match(verify.sql,new RegExp(`COUNT\\(\\*\\) FROM ${table} WHERE application_id IN`))
  const f=fixture()
  for(const t of retentionTools.filter(t=>t.callers))assert.throws(()=>f.call(t.name,'owner-a',A),/worker-only/)
  assert.equal(f.db.prepare('SELECT retention_policy FROM hiring_organizations LIMIT 1').get().retention_policy,'indefinite')
