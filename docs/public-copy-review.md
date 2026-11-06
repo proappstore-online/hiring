@@ -36,3 +36,17 @@ platform as controller. Keep `identity-policies` blocked in `launch-evidence.jso
 until those details are verified, draft presentation is removed, the marketing
 site is published and public page URLs are recorded. Keep candidate intake closed
 under its separate release gate.
+
+## Owner-requested icon correction — 2026-11-06
+
+The owner requested: “check what icons are used in PAS apps? Why i keep seeing
+"F" icon - have to change”. Branding revision `2026-11-06-icon-repair-1` replaces
+the inherited F PNGs with the app’s H lettermark and fresh icon URLs. The asset
+commit is `88b0f438522e88f466c0598278d36045810a82de`.
+
+The JSON retains the original approved digests in `original_approved_files` and
+records the requested correction separately in `branding_amendments`; `files`
+binds the current source and assets. This records authorization to make the icon
+correction, not a separate visual review. Marketing prose, legal terms, the
+original copy approval, missing identity details and all publication/intake gates
+remain unchanged.

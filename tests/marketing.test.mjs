@@ -64,7 +64,7 @@ test('copy review binds the exact marketing source and existing brand assets', a
   assert.match(read('marketing/src/site.ts'), new RegExp(review.copy_version))
   const walk = dir => readdirSync(resolve(root, dir), { withFileTypes: true }).flatMap(entry =>
     entry.isDirectory() ? walk(`${dir}/${entry.name}`) : [`${dir}/${entry.name}`])
-  const expected = [...walk('marketing/src'), ...walk('marketing/public'), 'web/public/icon-192.png', 'web/public/icon-512.png', 'web/public/og-image.png'].sort()
+  const expected = [...walk('marketing/src'), ...walk('marketing/public'), 'web/public/icon-192.png', 'web/public/icon-512.png', 'web/public/app-icon-192.png', 'web/public/app-icon-512.png', 'web/public/og-image.png'].sort()
   assert.deepEqual(Object.keys(review.files).sort(), expected)
   for (const [file, digest] of Object.entries(review.files)) {
     assert.equal(createHash('sha256').update(readFileSync(resolve(root, file))).digest('hex'), digest, file)
